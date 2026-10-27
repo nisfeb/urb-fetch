@@ -12,7 +12,7 @@ index e5fcff64..da2a3cc0 100644
  ladybird_lib(LibURL url)
 diff --git a/Libraries/LibURL/Urb.cpp b/Libraries/LibURL/Urb.cpp
 new file mode 100644
-index 00000000..f4155be2
+index 00000000..3e1439f0
 --- /dev/null
 +++ b/Libraries/LibURL/Urb.cpp
 @@ -0,0 +1,80 @@
@@ -34,7 +34,7 @@ index 00000000..f4155be2
 +
 +static u16 gateway_port()
 +{
-+    if (auto const* port = getenv("URB_FETCH_PORT")) {
++    if (auto const* port = getenv("LADYBIRD_URB_FETCH_PORT")) {
 +        if (auto value = StringView { port, strlen(port) }.to_number<u16>(); value.has_value())
 +            return *value;
 +    }
@@ -98,7 +98,7 @@ index 00000000..f4155be2
 +}
 diff --git a/Libraries/LibURL/Urb.h b/Libraries/LibURL/Urb.h
 new file mode 100644
-index 00000000..00efa467
+index 00000000..3459c27c
 --- /dev/null
 +++ b/Libraries/LibURL/Urb.h
 @@ -0,0 +1,24 @@
@@ -116,7 +116,7 @@ index 00000000..00efa467
 +
 +// urb:// addresses name pages published on the Urbit network. They are read through the urb-fetch gateway on this
 +// computer (https://github.com/nisfeb/urb-fetch), which serves urb://~ship/path at http://ship.urb.localhost:8475/path.
-+// The port is 8475 unless URB_FETCH_PORT says otherwise.
++// The port is 8475 unless LADYBIRD_URB_FETCH_PORT says otherwise; helper processes only see LADYBIRD_ variables.
 +namespace URL {
 +
 +// The gateway URL for an urb:// URL; empty for anything else.
