@@ -28,15 +28,32 @@ import (
 func logf(format string, args ...any) { log.Printf(format, args...) }
 
 func main() {
-	listen := flag.String("listen", "127.0.0.1:8475", "address to serve on (keep it on loopback)")
+	listen := flag.String("listen", "localhost:8475", "address to serve on (keep it on loopback); localhost means both 127.0.0.1 and ::1")
 	state := flag.String("state", defaultState(), "where the identity and its network state live")
 	moon := flag.String("moon", "", "run as this moon: the keyfile its parent's |moon printed")
 	newMoon := flag.Bool("new-moon", false, "the moon has never run anywhere: start its state empty")
 	flag.Parse()
 
-	_, port, err := net.SplitHostPort(*listen)
+	host, port, err := net.SplitHostPort(*listen)
 	if err != nil {
 		log.Fatalf("-listen: %v", err)
+	}
+	//  browsers resolve *.localhost to both loopbacks, ::1 often first
+	addrs := []string{*listen}
+	if host == "localhost" {
+		addrs = []string{net.JoinHostPort("127.0.0.1", port), net.JoinHostPort("::1", port)}
+	}
+	var lns []net.Listener
+	for _, a := range addrs {
+		ln, err := net.Listen("tcp", a)
+		if err != nil && len(lns) > 0 {
+			logf("not serving on %s: %v", a, err) // e.g. IPv6 is off
+			continue
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+		lns = append(lns, ln)
 	}
 	if err := os.MkdirAll(*state, 0o700); err != nil {
 		log.Fatal(err)
@@ -57,13 +74,16 @@ func main() {
 		}
 		stop()
 	}()
-	srv := &http.Server{Addr: *listen, Handler: &gateway{r, port}, ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Handler: &gateway{r, port}, ReadHeaderTimeout: 10 * time.Second}
+	for _, ln := range lns[1:] {
+		go srv.Serve(ln)
+	}
 	go func() {
 		<-ctx.Done()
 		srv.Close()
 	}()
 	logf("serving http://urb.localhost:%s/", port)
-	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+	if err := srv.Serve(lns[0]); !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
 	node.Close()

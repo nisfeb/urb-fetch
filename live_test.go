@@ -49,7 +49,8 @@ func TestLive(t *testing.T) {
 	big := 0
 	for key, id := range revs {
 		k := r.keen(her, "/g/x/1/grubbery//1/pub/page"+key+"/"+id)
-		v, _ := r.peek(her, b+"/pub/vault"+key, "gmi", textOf).(string)
+		got, _ := r.peek(her, b+"/pub/vault"+key, "gmi", textOf, nil)
+		v, _ := got.(string)
 		if !k.ok || v != k.body {
 			t.Errorf("%s: keen ok=%v (%d bytes), peek %d bytes", key, k.ok, len(k.body), len(v))
 		}

@@ -22,11 +22,11 @@ make ZIG=/path/to/zig-x86_64-linux-0.15.2/zig
 
 The first start mines a comet, which takes a few seconds, and keeps it in `~/.local/state/urb-fetch`. Then open `http://urb.localhost:8475/` and enter an `urb://` address, or go straight to `http://<ship>.urb.localhost:8475/<path>`. Add `?raw` to a page's address to see its source.
 
-The first page from a ship takes a few seconds while the two ships meet. After that a page takes well under a second.
+The first page from a ship takes a few seconds while the two ships meet. After that a page takes well under a second. Right after a restart, a ship can take a minute or two to answer, because it is still resending answers meant for the gateway's previous run. The gateway then says so (a 504), keeps the answer when it comes, and the next try is fast.
 
 | Flag | Default | |
 | --- | --- | --- |
-| `-listen` | `127.0.0.1:8475` | Where to serve. Keep it on loopback. |
+| `-listen` | `localhost:8475` | Where to serve. `localhost` means both `127.0.0.1` and `::1`, since browsers try either for `*.localhost`. Keep it on loopback. |
 | `-state` | `~/.local/state/urb-fetch` | The identity and its network state. |
 | `-moon` | | Run as this moon instead of a comet. |
 | `-new-moon` | | The moon has never run anywhere. Start its state empty. |

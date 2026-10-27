@@ -30,6 +30,12 @@ const (
 	revsTTL     = 60 * time.Second // +revs-ttl
 	keenTimeout = 10 * time.Second // +mesa-timeout
 	peekTimeout = 30 * time.Second // +remote-timeout
+
+	//  how long a peek its caller gave up on still waits for a late answer.
+	//  A publisher holds its answers in order behind one it couldn't
+	//  deliver (to an earlier run of this gateway), so after a restart the
+	//  first answers can come a minute or two late.
+	lateWait = 5 * time.Minute
 )
 
 // revList is a publisher's /pub/revs, page -> id, and when it was read.
@@ -45,6 +51,8 @@ type peek struct {
 	conv func(mesa.Noun) any // runs in the hook: nouns are borrowed
 	jobe string              // the snap's content hash, while a %want is out
 	done chan any            // the converted file, or nil
+	late func(any)           // takes an answer that came after its caller gave up
+	gone time.Time           // when its caller gave up (zero: still waiting)
 }
 
 type keenResult struct {
@@ -175,9 +183,16 @@ func (r *Reader) Scry(n *mesa.Node, her mesa.Ship, path, mark string, noun mesa.
 }
 
 func (r *Reader) finish(wire string, v any) {
-	if p := r.peeks[wire]; p != nil {
-		delete(r.peeks, wire)
+	p := r.peeks[wire]
+	if p == nil {
+		return
+	}
+	delete(r.peeks, wire)
+	if p.gone.IsZero() {
 		p.done <- v
+	} else if p.late != nil && v != nil {
+		logf("a late answer came in on %s", wire)
+		p.late(v)
 	}
 }
 
@@ -279,11 +294,18 @@ func textOf(n mesa.Noun) any {
 
 // ------------------------------------------------------------ requests
 
-// peek reads one grubbery file, [folder]/[name], from her.
-func (r *Reader) peek(her mesa.Ship, folder, name string, conv func(mesa.Noun) any) any {
+// peek reads one grubbery file, [folder]/[name], from her: the file, or
+// nil, and whether she answered at all. An answer that comes after the
+// timeout goes to late, if there is one.
+func (r *Reader) peek(her mesa.Ship, folder, name string, conv func(mesa.Noun) any, late func(any)) (any, bool) {
 	done := make(chan any, 1)
 	var wire string
 	err := r.node.Do(func() error {
+		for w, p := range r.peeks {
+			if !p.gone.IsZero() && time.Since(p.gone) > lateWait {
+				delete(r.peeks, w)
+			}
+		}
 		r.seq++
 		wire = fmt.Sprintf("/urb-fetch/%s/%d", r.nonce, r.seq)
 		bone, ok := r.flows[her]
@@ -301,19 +323,29 @@ func (r *Reader) peek(her mesa.Ship, folder, name string, conv func(mesa.Noun) a
 			return err // the transaction undoes a flow it opened
 		}
 		r.flows[her] = bone
-		r.peeks[wire] = &peek{seq: r.seq, bone: bone, conv: conv, done: done}
+		r.peeks[wire] = &peek{seq: r.seq, bone: bone, conv: conv, done: done, late: late}
 		return nil
 	})
 	if err != nil {
 		logf("peek %s %s/%s: %v", her, folder, name, err)
-		return nil
+		return nil, false
 	}
 	select {
 	case v := <-done:
-		return v
+		return v, true
 	case <-time.After(peekTimeout):
-		r.node.Do(func() error { delete(r.peeks, wire); return nil })
-		return nil
+		r.node.Do(func() error {
+			if p := r.peeks[wire]; p != nil {
+				p.gone = time.Now()
+			}
+			return nil
+		})
+		select {
+		case v := <-done: // it came while we were giving up
+			return v, true
+		default:
+			return nil, false
+		}
 	}
 }
 
@@ -363,14 +395,30 @@ func (r *Reader) base(her mesa.Ship) (string, error) {
 		return b, nil
 	}
 	for _, b := range []string{deskBase, appBase} {
-		if v, ok := r.peek(her, b+"/pub", "revs", revsOf).(map[string]string); ok {
-			r.mu.Lock()
-			r.bases[her], r.revs[her] = b, revList{time.Now(), v}
-			r.mu.Unlock()
+		v, answered := r.peek(her, b+"/pub", "revs", revsOf, r.keepRevs(her, b))
+		if m, ok := v.(map[string]string); ok {
+			r.keepRevs(her, b)(m)
 			return b, nil
 		}
+		if !answered {
+			//  the other place would only wait behind the same stall
+			return "", fail(504, "%s did not answer within %s. It may be offline, or still catching up "+
+				"after this gateway restarted, which can take a minute or two: try again shortly", her, peekTimeout)
+		}
 	}
-	return "", fail(502, "%s did not answer a lattice read: offline, not running lattice release 35 or later, or not sharing anything", her)
+	return "", fail(502, "%s shares no lattice pages here: it runs no lattice, one older than release 35, or shares nothing", her)
+}
+
+// keepRevs stores a revision list read from her lattice at b, however
+// late it came.
+func (r *Reader) keepRevs(her mesa.Ship, b string) func(any) {
+	return func(v any) {
+		if m, ok := v.(map[string]string); ok {
+			r.mu.Lock()
+			r.bases[her], r.revs[her] = b, revList{time.Now(), m}
+			r.mu.Unlock()
+		}
+	}
 }
 
 // revList is her revision list, cached for revsTTL (+peer-revs-cached).
@@ -385,14 +433,17 @@ func (r *Reader) revList(her mesa.Ship) (map[string]string, error) {
 	if ok && time.Since(l.at) < revsTTL {
 		return l.revs, nil
 	}
-	v, _ := r.peek(her, b+"/pub", "revs", revsOf).(map[string]string)
-	if v == nil {
-		v = map[string]string{}
+	v, answered := r.peek(her, b+"/pub", "revs", revsOf, r.keepRevs(her, b))
+	m, _ := v.(map[string]string)
+	switch {
+	case m != nil:
+	case !answered && ok:
+		return l.revs, nil // no answer yet: the stale list beats none
+	default:
+		m = map[string]string{} // a list that isn't there is kept as an empty one
 	}
-	r.mu.Lock()
-	r.revs[her] = revList{time.Now(), v}
-	r.mu.Unlock()
-	return v, nil
+	r.keepRevs(her, b)(m)
+	return m, nil
 }
 
 // page is one published page (+read-page-body-rev): a keen at the id the
@@ -411,7 +462,8 @@ func (r *Reader) page(her mesa.Ship, key string, revs map[string]string) (body, 
 	if err != nil {
 		return "", ""
 	}
-	if s, ok := r.peek(her, b+"/pub/vault"+key, "gmi", textOf).(string); ok {
+	if v, _ := r.peek(her, b+"/pub/vault"+key, "gmi", textOf, nil); v != nil {
+		s, _ := v.(string)
 		return s, "peek"
 	}
 	return "", ""
