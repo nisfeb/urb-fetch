@@ -99,6 +99,10 @@ Don't point `URB_FETCH_STATE` at a folder a running gateway is using.
 
 `prototype/urb_fetch.py` is the first version, in Python on libmesa's ctypes binding. It reads pages from the command line, one process per run. It needs `LIBMESA=third_party/libmesa/zig-out/lib/libmesa.so` and `LIBMESA_PY=third_party/libmesa/bindings/python`.
 
+## Ladybird
+
+`contrib/ladybird/` has a patch that teaches the Ladybird browser to open `urb://` addresses through this gateway, from links, scripts and its address bar. See its README for what it changes and how it was tested.
+
 ## License
 
 MIT. libmesa, a submodule, is MIT too.
