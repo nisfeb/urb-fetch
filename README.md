@@ -101,7 +101,20 @@ Don't point `URB_FETCH_STATE` at a folder a running gateway is using.
 
 ## Ladybird
 
-`contrib/ladybird/` has a patch that teaches the Ladybird browser to open `urb://` addresses through this gateway, from links, scripts and its address bar. See its README for what it changes and how it was tested.
+The `urb` branch of [nisfeb/ladybird](https://github.com/nisfeb/ladybird/tree/urb) is the Ladybird browser with `urb://` support. It opens `urb://` addresses through this gateway, from links, scripts, forms and its address bar, and its address bar shows a gateway page by its `urb://` address. Set `LADYBIRD_URB_FETCH_PORT` if the gateway runs on another port.
+
+```
+git clone -b urb https://github.com/nisfeb/ladybird
+cd ladybird
+./Meta/ladybird.py build
+```
+
+Tested on Linux against live ships on 2026-10-27, with Ladybird's sandbox on:
+
+- `TestURL`, with a new case for both directions of the mapping.
+- An `urb://` address given on the command line rendered through the gateway.
+- A page whose script navigates to an `urb://` address reached the gateway, both on the default port and with `LADYBIRD_URB_FETCH_PORT`.
+- Not yet tried in the windowed browser, so the address bar's display of `urb://` addresses is covered by the unit test only.
 
 ## License
 
