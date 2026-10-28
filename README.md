@@ -107,7 +107,8 @@ Don't point `URB_FETCH_STATE` at a folder a running gateway is using.
 
 - `build.sh` applies `libmesa-wasm32.diff` to a copy of libmesa and links it with `glue.c` into `build/mesa.wasm`.
 - `mesa.mjs` runs the engine as a comet and reads pages the way the gateway does. It works in Node and in a browser. Its host supplies a transport for datagrams and a store for the comet and the engine's state. Each commit's changes are saved before the datagrams it released go out.
-- `host.mjs` reads one page from Node.
+- `host.mjs` reads one page from Node, and `node.mjs` has what Node's command lines share: the state folder, UDP, and the options that pick who runs.
+- `furum.mjs` talks to [furum](https://github.com/nisfeb/furum) boards on another ship: it reads a board's posts, comments and votes, and posts, comments and votes through the host's public `inbox.sig`. `furum-cli.mjs` drives it from Node.
 
 ```
 ZIG=/path/to/zig-x86_64-linux-0.15.2/zig wasm/build.sh
@@ -117,6 +118,14 @@ node wasm/host.mjs urb://~sampel-palnet/page
 The comet is mined on the first run and kept in `~/.local/state/urb-fetch-wasm`, with its state and its UDP port. `--tries 4` keeps the engine running across several tries, for a ship that is still catching up. `--trace` logs every datagram and the engine's view of it.
 
 `--moon moon.key` reads as a moon instead, from the key `|moon` printed, with its state in a folder of its own. Pass `--new-moon` on its first run only, and only for a moon that never ran anywhere, as with the gateway's `-new-moon`. A moon, or a comet, can also read what a publisher shares with it privately: `urb://~ship/k/<key>` reads a know entry, and `urb://~ship/t/<path>` a text file anywhere in the publisher's tree. The publisher decides who may read each, so anything not shared looks the same as nothing there. `urb://~ship/p/...` names a live Lattice page, which only Lattice shows.
+
+Apps on other ships: `urb.grub.peek` reads a file in a ship's grubbery, `urb.grub.poke` pokes one of its grubs, and `urb.grub.onInbox` hears grubs that poke ours. A poke resolves once the grub took it in, or with the refusal. `furum.mjs` is built on these.
+
+`--fake ~ship` runs on a fake network on this machine (`urbit -F`), with keys made from the ship's name, for testing against fake ships. On furum's fleet set (`~rup` hosting board `urbtest`):
+
+```
+node wasm/furum-cli.mjs --fake ~dozbud-dozzod-dozhus ~rup urbtest --post 'Hello' --body 'From a moon in wasm'
+```
 
 ### The relay
 

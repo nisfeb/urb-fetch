@@ -168,7 +168,7 @@ export function relayTransport(url, log = console.error) {
 
 // ------------------------------------------------------------- the engine
 
-export async function open({ wasm, transport, store, log = console.error, env = {} }) {
+export async function open({ wasm, transport, store, log = console.error, env = {}, fake = false }) {
   let X;
   const mem = () => new Uint8Array(X.memory.buffer);   // replaced when memory grows
   const imports = {
@@ -323,6 +323,23 @@ export async function open({ wasm, transport, store, log = console.error, env = 
 
   const cord = n => (n.isCell ? null : n.text());
 
+  // the lines of a tang
+  function tangText(t) {
+    return [...list(t)].map(k => tankText(k)).join('\n  ');
+  }
+  function tankText(t, depth = 0) {
+    const tape = t => dec.decode(Uint8Array.from([...list(t)].map(c => (c.isCell ? 63 : Number(c.int() & 0xffn)))));
+    if (depth > 32 || !t.isCell || t.head.isCell) return '';
+    const tag = t.head.text();
+    if (tag === 'leaf') return tape(t.tail);
+    if (tag !== 'rose' && tag !== 'palm') return '';
+    const pre = t.tail.head;
+    const [sep, opn, cls] = tag === 'rose'
+      ? [tape(pre.head), tape(pre.tail.head), tape(pre.tail.tail)]
+      : [tape(pre.head), tape(pre.tail.head) + tape(pre.tail.tail.head), tape(pre.tail.tail.tail)];
+    return opn + [...list(t.tail.tail)].map(k => tankText(k, depth + 1)).join(sep) + cls;
+  }
+
   // the lines of an error noun [tag tang] (a nack's naxplanation)
   function tang(err) {
     const tape = t => dec.decode(Uint8Array.from([...list(t)].map(c => (c.isCell ? 63 : Number(c.int() & 0xffn)))));
@@ -421,6 +438,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
 
   function need_point(lo, hi) {
     [lo, hi] = [u64(lo), u64(hi)];
+    //  a fake network's keys come from names: answer once the engine call
+    //  that asked has returned
+    if (fake) return void setTimeout(() => call(() => X.point_fake(lo, hi)));
     const k = `${lo}:${hi}`;
     if (asking.has(k)) return;
     asking.add(k);
@@ -443,6 +463,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   // ----------------------------------------------------------- the reader
 
   const peeks = new Map();   // wire -> state of one peek
+  const pokes = new Map();   // wire -> state of one grubbery poke
+  const poking = new Map();  // bone -> that poke's state: each has a flow of its own
+  let inbox = null;          // who hears grubbery pokes to us, see grub.onInbox
   const keens = new Map();   // scry path -> {done, promise}
   const flows = new Map();   // ship -> bone of our flow to its %grubbery
   const bases = new Map();   // ship -> where it runs lattice
@@ -486,13 +509,66 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     });
   }
 
-  // hook: a poke to us; only %grubbery-transfer answers matter
+  // grubbery's cross-ship poke: [mark noun] to the grub [folder name] on
+  // [her], where mark is [path name] (a blot, e.g. ['/furum', 'msg']).
+  // Resolves {ok} once the grub took it in, or {ok: false, error}: refused
+  // (a nack), or no answer in time (with later). Its own flow, so a nack or
+  // an ack on that flow is this poke's, and the flow is corked after.
+  function grubPoke(her, folder, name, mark, value) {
+    const wire = `/grub-poke/${nonce}/${++wires}`;
+    return new Promise(resolve => {
+      const st = { done: false, her };
+      st.finish = r => {
+        if (st.done) return;
+        st.done = true;
+        clearTimeout(st.timer);
+        pokes.delete(wire);
+        resolve(r);
+      };
+      st.timer = setTimeout(() => st.finish({ ok: false, error: `${shipText(...her)} did not answer`, later: true }), PEEK_TIMEOUT);
+      pokes.set(wire, st);
+      txn(() => {
+        const bone = u64(X.flow_open(her[0], her[1]));
+        if (bone === NONE) throw new Error('flow_open failed');
+        st.bone = bone;
+        poking.set(bone, st);
+        poke(her, bone, 'grubbery', 'grubbery-load',
+             [[path(wire), [true, path(folder), name]], ['poke', [path(mark[0]), mark[1]], value]]);
+      });
+    });
+  }
+
+  // hook: a poke to us: %grubbery-transfer answers our peeks and pokes, and
+  // a %grubbery-load %poke is a grub on another ship writing to ours
   function on_poke(lo, hi, bone, agentPtr, markN, nounN) {
     [lo, hi, bone] = [u64(lo), u64(hi), u64(bone)];
-    if (cstr(agentPtr) !== 'grubbery' || new Noun(markN).text() !== 'grubbery-transfer') return ACK;
+    if (cstr(agentPtr) !== 'grubbery') return ACK;
+    const mark = new Noun(markN).text();
     const n = new Noun(nounN);
+    if (mark === 'grubbery-load') {
+      //  [[wire dest] %poke [blot noun]], dest a rail [%& [path name]]
+      const dest = n.head.tail, act = n.tail;
+      if (inbox && act.head.text() === 'poke' && !dest.head.int()) {
+        const pathOf = p => '/' + [...list(p)].map(s => s.text()).join('/');
+        const blot = act.tail.head;
+        inbox({
+          from: shipText(lo, hi),
+          to: [pathOf(dest.tail.head), dest.tail.tail.text()],
+          mark: [pathOf(blot.head), blot.tail.text()],
+          noun: act.tail.tail,
+        });
+      }
+      return ACK;
+    }
+    if (mark !== 'grubbery-transfer') return ACK;
     const wire = '/' + [...list(n.head)].map(s => s.text()).join('/');
     const tag = n.tail.head.text(), r = n.tail.tail;
+    if (pokes.has(wire)) {
+      //  [%pack err=(unit tang)]: the grub took the poke in, or refused it
+      const err = tag === 'pack' ? unit(r) : null;
+      pokes.get(wire).finish(err ? { ok: false, error: tangText(err) } : { ok: tag === 'pack' });
+      return ACK;
+    }
     if (wire === '/want') {
       //  +process-want answers on the fixed wire /want, not ours, so match
       //  the content to the snap that asked for it
@@ -524,6 +600,14 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   // hook: our poke was acked, or nacked
   function on_done(lo, hi, bone, error) {
     [lo, hi, bone, error] = [u64(lo), u64(hi), u64(bone), u64(error)];
+    const st = poking.get(bone);
+    if (st) {
+      //  a grubbery poke's own flow: closed once answered
+      poking.delete(bone);
+      X.flow_cork(lo, hi, bone);
+      if (error !== NONE) st.finish({ ok: false, error: tang(new Noun(error)) });
+      return;
+    }
     if (error === NONE) return;
     log(`nack from ${shipText(lo, hi)}: ${tang(new Noun(error))}`);
     for (const st of [...peeks.values()]) if (st.bone === bone) st.finish(null);
@@ -655,22 +739,45 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   //  the transport is up before the engine opens: opening can send
   await transport.start(our, onPacket);
   if (rows?.length) check(withBytes(rows, (p, n) => X.store_load(p, n)), 'store_load');
-  const err = call(() => withStr(keyfile, p => X.open(p, BigInt(Date.now()), fresh && !rows?.length ? 1 : 0)));
+  //  a fake ship is rebooted fresh, so it may always start from empty state
+  const breached = fake || (fresh && !rows?.length);
+  const err = call(() => withStr(keyfile, p => X.open(p, BigInt(Date.now()), breached ? 1 : 0, fake ? 1 : 0)));
   if (err === -2) {
     transport.close();
     throw new Error(`${our} has run before, and its state here is empty. Starting it from nothing would replay old messages, so breach it on its parent (|moon-breach) and add its new key.`);
   }
   check(err, 'open');
 
+  // the noun readers an app's own reading needs, valid during the call
+  // that hands a noun out
+  const nouns = {
+    entries, list, unit, cord, json,
+    ship: n => {
+      const b = n.bytes(), at = i => b.slice(i, i + 8).reduceRight((v, x) => (v << 8n) | BigInt(x), 0n);
+      return shipText(at(0), at(8));
+    },
+  };
+
   return {
     our,
     read,
-    // resolves once everything committed is saved
-    close() {
+    nouns,
+    // grubbery on other ships: read a file, poke a grub, and hear grubs
+    // that poke ours (f({from, to, mark, noun}), during the hook)
+    grub: {
+      peek: (ship, folder, name, conv) => peek(shipOf(ship), folder, name, conv),
+      poke: (ship, folder, name, mark, value) => grubPoke(shipOf(ship), folder, name, mark, value),
+      onInbox: f => { inbox = f; },
+    },
+    // resolves once everything committed is saved and sent. The last acks
+    // go out after a commit: a host that never gets them resends to us
+    // later, and our next run waits behind those
+    async close() {
       clearTimeout(timer);
+      await saved;
+      await new Promise(r => setTimeout(r, 500));
       transport.close();
       X.close();
-      return saved;
     },
   };
 }
@@ -705,6 +812,13 @@ export async function fakeKeyfile(wasm, ship) {
     X.free(p);
     X.free(out);
   }
+}
+
+// The @p of a ship number, as [lo, hi] BigInt halves: a moon of parent p
+// is (k << 32) | p.
+export async function shipName(wasm, lo, hi = 0n) {
+  const X = await bare(wasm);
+  return takeIn(X, X.ship_render(lo, hi));
 }
 
 // The module with no engine and hooks that do nothing, for the helpers above.

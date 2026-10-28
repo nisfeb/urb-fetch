@@ -402,7 +402,7 @@ u_fake_keyfile(uint64_t lo, uint64_t hi)
 //  moon only when [breached] says it never ran (or was breached since).
 //  Both have fixed sponsors.
 EXPORT("open") int
-u_open(const char* keyfile, uint64_t now, int breached)
+u_open(const char* keyfile, uint64_t now, int breached, int fake)
 {
   mesa_config cfg = { 0 };
 
@@ -427,6 +427,7 @@ u_open(const char* keyfile, uint64_t now, int breached)
   };
   cfg.now = now;
   cfg.breached = breached;
+  cfg.fake = fake;
   return mesa_engine_open(&cfg, &eng);
 }
 
@@ -473,6 +474,19 @@ u_point(uint64_t lo, uint64_t hi, const char* json, size_t len)
   return 0;
 }
 
+//  answer hooks.need_point on a fake network (urbit -F), where every
+//  ship's keys come from its name
+EXPORT("point_fake") void
+u_point_fake(uint64_t lo, uint64_t hi)
+{
+  mesa_ident ide;
+  mesa_point pot = { .who = ship(lo, hi), .rift = 0, .life = 1, .has_sponsor = false };
+
+  mesa_ident_fake(ship(lo, hi), &ide);
+  mesa_ident_pass(&ide, pot.pass);
+  mesa_engine_point(eng, &pot);
+}
+
 EXPORT("txn_begin") int u_txn_begin(void) { return mesa_txn_begin(eng); }
 EXPORT("txn_commit") int u_txn_commit(void) { return mesa_txn_commit(eng); }
 EXPORT("txn_abort") void u_txn_abort(void) { mesa_txn_abort(eng); }
@@ -483,6 +497,13 @@ u_flow_open(uint64_t lo, uint64_t hi)
 {
   uint64_t bone;
   return MESA_OK == mesa_flow_open(eng, ship(lo, hi), &bone) ? bone : UINT64_MAX;
+}
+
+//  close our forward flow [bone] once its pleas are done
+EXPORT("flow_cork") int
+u_flow_cork(uint64_t lo, uint64_t hi, uint64_t bone)
+{
+  return mesa_flow_cork(eng, ship(lo, hi), bone);
 }
 
 EXPORT("poke") int
