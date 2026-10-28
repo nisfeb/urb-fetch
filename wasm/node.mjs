@@ -1,5 +1,6 @@
 // Node's side of mesa.mjs, shared by the command-line hosts (host.mjs,
-// furum.mjs): a state folder, UDP, and the options that pick who runs.
+// furum-cli.mjs, pub-cli.mjs): a state folder, UDP, and the options that
+// pick who runs.
 //
 //   --state DIR        where the identity and its state live (default
 //                      ~/.local/state/urb-fetch-wasm)
@@ -157,5 +158,5 @@ export async function connect(opt) {
     fake: Boolean(opt.fake),
   });
   log(`as ${urb.our}, ready in ${((Date.now() - t) / 1000).toFixed(1)}s${opt.relay ? ` through ${opt.relay}` : opt.fake ? ' on the fake network' : ''}`);
-  return urb;
+  return Object.assign(urb, { dir });
 }

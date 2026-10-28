@@ -27,8 +27,11 @@
 //
 //   const urb = await open({ wasm, transport, store })
 //   const { key, body, how } = await urb.read('urb://~sampel-palnet/page')
+//
+// It also serves, for pub.mjs: our files to other ships' grubbery (their
+// peeks and keeps, see grub.serve) and our scry namespace (scry.serve).
 
-const DESK_BASE = '/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app';
+export const DESK_BASE = '/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app';
 const APP_BASE = '/apps/lattice.lattice_app';
 const REVS_TTL = 60_000;     // +revs-ttl
 const KEEN_TIMEOUT = 10_000; // +mesa-timeout
@@ -40,12 +43,27 @@ const NONE = 2n ** 64n - 1n;
 const ACK = 0;
 const LANE_GALAXY = 1, LANE_IP = 2;
 const GONE = 0xffffffff;     // a deleted row's vlen
+// ponytail: a cap on the keeps we answer, so a ship can't grow our state
+// without bound; past it a keep gets its first wave and no news
+const MAX_KEEPERS = 256;
 
 // wasm hands 64-bit integers to JS as signed BigInts: read them unsigned
 const u64 = x => BigInt.asUintN(64, x);
 const enc = new TextEncoder(), dec = new TextDecoder();
+const bigOf = bytes => bytes.reduceRight((v, b) => (v << 8n) | BigInt(b), 0n);   // little-endian
 
 export class UrbError extends Error {}
+
+// a BigInt as @uv text, as (scot %uv n) writes it: 0v, then base-32 digits
+// in dotted groups of five from the right
+export function uv(n) {
+  const d = n.toString(32), head = d.length % 5 || 5;
+  return '0v' + [d.slice(0, head), ...(d.slice(head).match(/.{5}/g) || [])].join('.');
+}
+
+// milliseconds since the epoch as a @da
+export const da = ms => ((BigInt(Math.floor(ms / 1000)) + 0x8000000cce9e0d80n) << 64n)
+  | ((BigInt(ms % 1000) << 64n) / 1000n);
 
 // ------------------------------------------------------------- addresses
 
@@ -173,7 +191,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   const mem = () => new Uint8Array(X.memory.buffer);   // replaced when memory grows
   const imports = {
     wasi_snapshot_preview1: wasi(() => X.memory.buffer, log, env),
-    host: guarded({ send, need_point, on_poke, on_done, on_sage, store_commit }, log),
+    host: guarded({ send, need_point, on_poke, on_done, on_sage, on_peek, store_commit }, log),
   };
   const inst = wasm instanceof WebAssembly.Module
     ? await WebAssembly.instantiate(wasm, imports)
@@ -263,8 +281,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   }
 
   // a new noun (an owned reference) from a JS value: null (~), a boolean
-  // (a loobean), a number or BigInt, a string (a cord), a Noun, or an
-  // array of two or more, right-associated into cells
+  // (a loobean), a number or BigInt, a string (a cord), a Noun, an array
+  // of two or more, right-associated into cells, or a Map or Set, a hoon
+  // map or set of those
   function noun(x) {
     if (x === null) return atom(new Uint8Array());
     if (typeof x === 'boolean') return atom(new Uint8Array(x ? [] : [1]));
@@ -280,10 +299,59 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       for (let i = x.length - 2; i >= 0; i--) n = X.cell(noun(x[i]), n);
       return n;
     }
+    if (x instanceof Map || x instanceof Set) return treap(x);
     throw new TypeError(`can't make a noun of ${x}`);
   }
 
   const atom = bytes => withBytes(bytes, (p, n) => X.atom(p, n));
+  const mug = n => X.mug(n) >>> 0;
+
+  // +dor, depth-first order: the tiebreak when two mugs are equal
+  function dor(a, b) {
+    if (X.eq(a, b)) return true;
+    if (X.is_cell(a)) {
+      if (!X.is_cell(b)) return false;
+      return X.eq(X.head(a), X.head(b)) ? dor(X.tail(a), X.tail(b)) : dor(X.head(a), X.head(b));
+    }
+    return X.is_cell(b) || new Noun(a).int() < new Noun(b).int();
+  }
+
+  // A hoon map (of a Map) or set (of a Set) as +put:by and +put:in build
+  // it: a treap, keys in +gor order (by mug) and the +mor-first key (by
+  // the mug of the mug) on top. A map is validated against exactly this
+  // shape when it is clammed, and its keys fix it, so it is built at once.
+  // ponytail: O(n^2) in the keys, fine for a few hundred.
+  function treap(x) {
+    const isMap = x instanceof Map;
+    const items = [...x].map(e => {
+      const key = noun(isMap ? e[0] : e), m = mug(key), mm = noun(m);
+      const it = { key, val: isMap ? e[1] : undefined, m, mm: mug(mm) };
+      X.unref(mm);
+      return it;
+    });
+    const before = (a, b, k) => (a[k] !== b[k] ? a[k] < b[k] : dor(a.key, b.key));
+    const build = list => {
+      if (!list.length) return noun(null);
+      const top = list.reduce((a, b) => (before(b, a, 'mm') ? b : a));
+      const rest = list.filter(e => e !== top);
+      const left = rest.filter(e => before(e, top, 'm')), right = rest.filter(e => !left.includes(e));
+      const [l, r] = [build(left), build(right)];
+      return X.cell(isMap ? X.cell(top.key, noun(top.val)) : top.key, X.cell(l, r));
+    };
+    return build(items);
+  }
+
+  // +sham of a value (as noun takes it): the hash grubbery names content by
+  function sham(x) {
+    const n = noun(x), out = X.alloc(16);
+    try {
+      X.sham(n, out);
+      return bigOf(mem().slice(out, out + 16));
+    } finally {
+      X.free(out);
+      X.unref(n);
+    }
+  }
 
   // a path noun from "/a/b/c", keeping empty segments as stab does
   function path(text) {
@@ -543,8 +611,11 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     });
   }
 
+  const pathOf = p => '/' + [...list(p)].map(s => s.text()).join('/');
+
   // hook: a poke to us: %grubbery-transfer answers our peeks and pokes, and
-  // a %grubbery-load %poke is a grub on another ship writing to ours
+  // a %grubbery-load is another ship's grubbery reading our files (%peek,
+  // %keep, %drop) or a grub there writing to ours (%poke)
   function on_poke(lo, hi, bone, agentPtr, markN, nounN) {
     [lo, hi, bone] = [u64(lo), u64(hi), u64(bone)];
     if (cstr(agentPtr) !== 'grubbery') return ACK;
@@ -552,10 +623,13 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     const n = new Noun(nounN);
     if (mark === 'grubbery-load') {
       //  [[wire dest] %poke [blot noun]], dest a rail [%& [path name]]
-      const dest = n.head.tail, act = n.tail;
-      if (act.head.text() !== 'poke') return ACK;
+      const dest = n.head.tail, act = n.tail, tag = act.head.text();
+      if (['peek', 'keep', 'drop'].includes(tag)) {
+        serveLoad([lo, hi], n.head.head, dest, tag);
+        return ACK;
+      }
+      if (tag !== 'poke') return ACK;
       if (inbox && !dest.head.int()) {
-        const pathOf = p => '/' + [...list(p)].map(s => s.text()).join('/');
         const blot = act.tail.head;
         inbox({
           from: shipText(lo, hi),
@@ -649,6 +723,70 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     if (!k) return;
     const g = u64(gage) === NONE ? null : new Noun(gage);
     k.done(g && { mark: g.head.text(), body: cord(g.tail) });
+  }
+
+  // ----------------------------------------------------------- serving
+
+  // What we publish, as grub.serve and scry.serve set it: file(folder,
+  // name) and scries(path), both null for anything we don't serve.
+  let files = () => null;
+  let scries = () => null;
+  let keepers = new Map();   // `${ship} ${folder} ${name}` -> {ship, wire, folder, name}
+  let keepersChanged = () => {};
+
+  const cass = f => [BigInt(f.rev), da(f.at)];
+
+  // A file's wave, the version news grubbery sends whoever keeps it: here
+  // its folder's [fold-cass {name: cass}] with the one file in it, which is
+  // all lattice's page subscription reads (+sub-apply-wave). Empty for a
+  // file that never was.
+  const waveOf = (f, name) => (f?.rev ? [[null, cass(f), new Map([[name, cass(f)]])], null] : [null, null]);
+
+  // A file as grubbery's %snap: its version, and the content-addressed
+  // silo that holds it, sent inline. The reader checks that each noun and
+  // ject hashes (+sham) to its name, then reads the noun and its mark.
+  // ponytail: always inline, never the %want leg grubbery uses past 8 KB,
+  // so a file rides whole in one message.
+  function snapOf(f) {
+    const nobe = sham(f.value);
+    const ject = ['leaf', nobe, [[path(f.mark[0]), f.mark[1]], 0, null], true, null];
+    const jobe = sham(ject);
+    return [
+      [cass(f), ['firm', null, jobe], [new Set([jobe]), new Set([nobe])]],
+      [new Map([[nobe, [0, f.value]]]), new Map([[jobe, [0, ject]]])],
+    ];
+  }
+
+  // A %peek, %keep or %drop of one of our files, in a hook: answer it on
+  // our flow to the asker's %grubbery, as grubbery's +process-peek and
+  // +keep do. Only files the host serves are ever answered with content.
+  function serveLoad(her, wire, dest, tag) {
+    const at = dest.head.int() ? null : [pathOf(dest.tail.head), dest.tail.tail.text()];
+    const f = at && files(...at);
+    const ship = shipText(...her), k = at && `${ship} ${at[0]} ${at[1]}`;
+    if (tag === 'drop') {
+      if (k && keepers.delete(k)) keepersChanged([...keepers.values()]);
+      return;
+    }
+    if (tag === 'peek') {
+      const [snap, data] = f && f.value !== undefined ? snapOf(f) : [null, null];
+      const id = bigOf(crypto.getRandomValues(new Uint8Array(16)));
+      poke(her, flowTo(her), 'grubbery', 'grubbery-transfer',
+           [wire, 'snap', dest, id, snap && [null, snap], data && [null, data]]);
+      return;
+    }
+    if (f && (keepers.has(k) || keepers.size < MAX_KEEPERS)) {
+      keepers.set(k, { ship, wire: [...list(wire)].map(s => s.text()), folder: at[0], name: at[1] });
+      keepersChanged([...keepers.values()]);
+    }
+    //  the first wave answers the keep, even for nothing
+    poke(her, flowTo(her), 'grubbery', 'grubbery-intake', [wire, dest, waveOf(f, at?.[1])]);
+  }
+
+  // hook: a read of our namespace, a %keen from another ship
+  function on_peek(pathPtr) {
+    const got = scries(cstr(pathPtr));
+    return got ? noun(got) : NONE;
   }
 
   // +peer-base: where the peer runs lattice, asked, not guessed
@@ -759,7 +897,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   // the noun readers an app's own reading needs, valid during the call
   // that hands a noun out
   const nouns = {
-    entries, list, unit, cord, json,
+    entries, list, unit, cord, json, sham,
     ship: n => {
       const b = n.bytes(), at = i => b.slice(i, i + 8).reduceRight((v, x) => (v << 8n) | BigInt(x), 0n);
       return shipText(at(0), at(8));
@@ -776,7 +914,33 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       peek: (ship, folder, name, conv) => peek(shipOf(ship), folder, name, conv),
       poke: (ship, folder, name, mark, value) => grubPoke(shipOf(ship), folder, name, mark, value),
       onInbox: f => { inbox = f; },
+      // Serve our files to other ships' grubbery: file(folder, name) gives
+      // {mark: [path, name], value, rev, at} (at in ms; no value while there
+      // is nothing there, not yet or no longer), or null for a file we don't
+      // serve. Each keep is kept until its ship drops it: saved, the keeps
+      // the last run handed onKeepers, which hears every change.
+      serve(file, saved = [], onKeepers = () => {}) {
+        files = file;
+        keepers = new Map(saved.map(k => [`${k.ship} ${k.folder} ${k.name}`, k]));
+        keepersChanged = onKeepers;
+      },
+      // tell whoever keeps [folder name] its new version
+      changed(folder, name) {
+        const f = files(folder, name);
+        txn(() => {
+          for (const k of keepers.values()) {
+            if (k.folder !== folder || k.name !== name) continue;
+            const her = shipOf(k.ship);
+            poke(her, flowTo(her), 'grubbery', 'grubbery-intake',
+                 [k.wire.length ? [...k.wire, null] : null, [0, path(folder), name], waveOf(f, name)]);
+          }
+        });
+      },
     },
+    // serve our scry namespace: f(path) gives [mark, value] or null, for
+    // paths such as /g/x/1/grubbery//1/pub/page/<name>/<id>. A path must
+    // never be bound to two different values.
+    scry: { serve: f => { scries = f; } },
     // resolves once everything committed is saved and sent. The last acks
     // go out after a commit: a host that never gets them resends to us
     // later, and our next run waits behind those
@@ -834,7 +998,7 @@ async function bare(wasm) {
   const none = () => 0;
   const imports = {
     wasi_snapshot_preview1: wasi(() => X.memory.buffer, () => {}, {}),
-    host: { send: none, need_point: none, on_poke: none, on_done: none, on_sage: none, store_commit: none },
+    host: { send: none, need_point: none, on_poke: none, on_done: none, on_sage: none, on_peek: () => NONE, store_commit: none },
   };
   const inst = wasm instanceof WebAssembly.Module
     ? await WebAssembly.instantiate(wasm, imports)
@@ -861,7 +1025,8 @@ function takeIn(X, p) {
 }
 
 // An error thrown in a hook would trap the module and leave the engine
-// unusable: log it instead, and answer as the hook's default would.
+// unusable: log it instead, and answer as the hook's default would (no
+// noun, for on_peek, whose answer is a 64-bit handle).
 function guarded(hooks, log) {
   const out = {};
   for (const [name, f] of Object.entries(hooks)) {
@@ -870,7 +1035,7 @@ function guarded(hooks, log) {
         return f(...a);
       } catch (e) {
         log(e);
-        return 0;
+        return name === 'on_peek' ? NONE : 0;
       }
     };
   }

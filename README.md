@@ -110,6 +110,8 @@ Don't point `URB_FETCH_STATE` at a folder a running gateway is using.
 - `mesa.mjs` runs the engine as a comet and reads pages the way the gateway does. It works in Node and in a browser. Its host supplies a transport for datagrams and a store for the comet and the engine's state. Each commit's changes are saved before the datagrams it released go out.
 - `host.mjs` reads one page from Node, and `node.mjs` has what Node's command lines share: the state folder, UDP, and the options that pick who runs.
 - `furum.mjs` talks to [furum](https://github.com/nisfeb/furum) boards on another ship: it reads a board's posts, comments and votes, and posts, comments and votes through the host's public `inbox.sig`. `furum-cli.mjs` drives it from Node.
+- `pub.mjs` publishes pages from the engine, so lattice readers on other ships open them at `urb://~our-ship/<name>`. It lays them out as lattice does: `/pub/index` and `/pub/revs` and each page's vault file answer grubbery peeks, a keep on a page's vault file hears its edits, and each revision's body answers remote scry at an unguessable id. `pub-cli.mjs` publishes and serves from Node.
+- `check.mjs` checks serving with no ship. vere's `urbit eval` computes the hashes, maps, ids and dates that other ships check, and the engine must agree. Then two engines in one process publish and read pages, edits and removals.
 
 ```
 ZIG=/path/to/zig-x86_64-linux-0.15.2/zig wasm/build.sh
@@ -121,6 +123,15 @@ The comet is mined on the first run and kept in `~/.local/state/urb-fetch-wasm`,
 `--moon moon.key` reads as a moon instead, from the key `|moon` printed, with its state in a folder of its own. Pass `--new-moon` on its first run only, and only for a moon that never ran anywhere, as with the gateway's `-new-moon`. A moon, or a comet, can also read what a publisher shares with it privately: `urb://~ship/k/<key>` reads a know entry, and `urb://~ship/t/<path>` a text file anywhere in the publisher's tree. The publisher decides who may read each, so anything not shared looks the same as nothing there. `urb://~ship/p/...` names a live Lattice page, which only Lattice shows.
 
 Apps on other ships: `urb.grub.peek` reads a file in a ship's grubbery, `urb.grub.poke` pokes one of its grubs, and `urb.grub.onInbox` hears grubs that poke ours. A poke resolves once the grub took it in, or with the refusal. `furum.mjs` is built on these.
+
+Serving: `urb.grub.serve` answers other ships' grubbery peeks and keeps of the files the host names, and `urb.scry.serve` answers remote scry. A reader's ship checks that every noun in a grubbery answer hashes to its name, and clams every map against its exact treap shape, so the engine builds both as Hoon does. `pub.mjs` is built on these:
+
+```
+node wasm/pub-cli.mjs --put notes/intro=intro.gmi
+URBIT=/path/to/urbit node wasm/check.mjs
+```
+
+The pages, and the keeps of readers following them, are kept in `pages.json` in the identity's state folder. Serving lasts while the engine runs. A reader that read a page in the last minute keeps seeing the revision it read, as with lattice: its list of ids is a minute old. Serving has not yet run against lattice on a ship.
 
 `--fake ~ship` runs on a fake network on this machine (`urbit -F`), with keys made from the ship's name, for testing against fake ships. On furum's fleet set (`~rup` hosting board `urbtest`):
 

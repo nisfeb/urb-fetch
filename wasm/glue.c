@@ -27,7 +27,12 @@ IMPORT("on_done") void host_on_done(uint64_t lo, uint64_t hi, uint64_t bone,
                                     mesa_noun error);
 IMPORT("on_sage") void host_on_sage(uint64_t lo, uint64_t hi,
                                     const char* path, mesa_noun gage);
+IMPORT("on_peek") mesa_noun host_on_peek(const char* path);
 IMPORT("store_commit") int host_store_commit(const uint8_t* buf, size_t len);
+
+//  libmesa's +shaf (src/sha.h, not in its public headers)
+void mesa_shaf(size_t sal_z, const uint8_t* sal_y, size_t len_z,
+               const uint8_t* msg_y, uint8_t out_y[16]);
 
 static mesa_engine* eng;
 
@@ -284,10 +289,11 @@ h_sage(void* ctx, mesa_ship her, const char* path, mesa_noun gage)
   host_on_sage(her.lo, her.hi, path, gage);
 }
 
+//  what we publish is public: the reader doesn't change the answer
 static mesa_noun
 h_peek(void* ctx, const mesa_ship* her, const char* path)
 {
-  return MESA_NONE;
+  return host_on_peek(path);
 }
 
 static void
@@ -535,6 +541,31 @@ u_atom(const uint8_t* buf, size_t len)
 
 EXPORT("cell") mesa_noun u_cell(mesa_noun h, mesa_noun t) { return mesa_cell(h, t); }
 EXPORT("is_cell") int u_is_cell(mesa_noun n) { return mesa_is_cell(n); }
+EXPORT("eq") int u_eq(mesa_noun a, mesa_noun b) { return mesa_eq(a, b); }
+EXPORT("mug") uint32_t u_mug(mesa_noun n) { return mesa_mug(n); }
+
+//  +sham, the 128-bit hash grubbery names content by: (shaf %mash a) of
+//  an atom, (shaf %sham (jam a)) of a cell, into [out_y]. libmesa's +shaf
+//  hashes the salted mix at a full 32 bytes, and agrees with vere
+//  (check.mjs); trimming the mix's trailing zeros, as +shax would, gave
+//  another hash for about one value in 256.
+EXPORT("sham") void
+u_sham(mesa_noun n, uint8_t* out_y)
+{
+  size_t   len_z;
+  uint8_t* buf_y;
+
+  if ( mesa_is_cell(n) ) {
+    buf_y = mesa_jam_bytes(n, &len_z);
+  }
+  else {
+    len_z = mesa_met3(n);
+    buf_y = mesa_malloc(len_z ? len_z : 1);
+    mesa_atom_get_bytes(n, len_z, buf_y);
+  }
+  mesa_shaf(4, (const uint8_t*)(mesa_is_cell(n) ? "sham" : "mash"), len_z, buf_y, out_y);
+  mesa_free(buf_y);
+}
 EXPORT("head") mesa_noun u_head(mesa_noun n) { return mesa_head(n); }
 EXPORT("tail") mesa_noun u_tail(mesa_noun n) { return mesa_tail(n); }
 EXPORT("met3") size_t u_met3(mesa_noun n) { return mesa_met3(n); }
