@@ -4,10 +4,12 @@
 //  ship crosses to JavaScript as two 64-bit halves, a noun as its 64-bit
 //  handle, a string as a pointer to NUL-terminated UTF-8. The hooks call
 //  the host's imports, and the host calls the exports below. One engine
-//  per module, run by a comet on an in-memory store.
+//  per module, run by a comet. Its store is libmesa's in-memory one, and
+//  the host saves what each commit changed.
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "mesa/engine.h"
 #include "mesa/gall.h"
@@ -25,8 +27,200 @@ IMPORT("on_done") void host_on_done(uint64_t lo, uint64_t hi, uint64_t bone,
                                     mesa_noun error);
 IMPORT("on_sage") void host_on_sage(uint64_t lo, uint64_t hi,
                                     const char* path, mesa_noun gage);
+IMPORT("store_commit") int host_store_commit(const uint8_t* buf, size_t len);
 
 static mesa_engine* eng;
+
+//  the store: libmesa's in-memory store, noting the keys each transaction
+//  writes. A commit hands the host every row those keys now hold, as
+//  [klen:4][key][vlen:4][val] (little-endian, vlen UINT32_MAX for a
+//  deleted row), and the host saves them before it sends the datagrams
+//  that commit released. store_load puts saved rows back.
+
+static mesa_store* inn;     //  the memory store, which does the work
+static mesa_store  sto;     //  it, as the engine sees it
+static uint8_t*    dir_y;   //  keys written since begin, each [len:4][key]
+static size_t      dir_z;
+static size_t      dic_z;
+static int         txn_i;
+
+static int
+_flush(void)
+{
+  size_t   cap_z = dir_z * 2 + 64;
+  size_t   len_z = 0;
+  uint8_t* out_y = malloc(cap_z);
+  int      ret_i;
+
+  for ( size_t at_z = 0; at_z < dir_z; ) {
+    uint32_t       key_w;
+    const uint8_t* key_y;
+    uint8_t*       val_y = NULL;
+    size_t         val_z = 0;
+    uint32_t       len_w;
+    int            got_i;
+
+    memcpy(&key_w, dir_y + at_z, 4);
+    key_y = dir_y + at_z + 4;
+    at_z += 4 + key_w;
+
+    got_i = inn->get(inn->ctx, key_y, key_w, &val_y, &val_z);
+    if ( got_i < 0 ) {
+      free(out_y);
+      return -1;
+    }
+    if ( len_z + 8 + key_w + val_z > cap_z ) {
+      cap_z = (len_z + 8 + key_w + val_z) * 2;
+      out_y = realloc(out_y, cap_z);
+    }
+    len_w = got_i ? UINT32_MAX : (uint32_t)val_z;
+    memcpy(out_y + len_z, &key_w, 4);
+    memcpy(out_y + len_z + 4, key_y, key_w);
+    memcpy(out_y + len_z + 4 + key_w, &len_w, 4);
+    len_z += 8 + key_w;
+    if ( !got_i ) {
+      memcpy(out_y + len_z, val_y, val_z);
+      len_z += val_z;
+      mesa_free(val_y);
+    }
+  }
+  dir_z = 0;
+  ret_i = len_z ? host_store_commit(out_y, len_z) : 0;
+  free(out_y);
+  return ret_i;
+}
+
+static void
+_dirty(const uint8_t* key_y, size_t key_z)
+{
+  uint32_t key_w = key_z;
+
+  if ( dir_z + 4 + key_z > dic_z ) {
+    dic_z = (dir_z + 4 + key_z) * 2;
+    dir_y = realloc(dir_y, dic_z);
+  }
+  memcpy(dir_y + dir_z, &key_w, 4);
+  memcpy(dir_y + dir_z + 4, key_y, key_z);
+  dir_z += 4 + key_z;
+}
+
+static int
+s_begin(void* ctx)
+{
+  int ret_i = inn->begin(inn->ctx);
+  if ( !ret_i ) {
+    txn_i = 1;
+    dir_z = 0;
+  }
+  return ret_i;
+}
+
+static int
+s_commit(void* ctx)
+{
+  int ret_i = inn->commit(inn->ctx);
+  txn_i = 0;
+  return ret_i ? ret_i : _flush();
+}
+
+static int
+s_rollback(void* ctx)
+{
+  txn_i = 0;
+  dir_z = 0;
+  return inn->rollback(inn->ctx);
+}
+
+static int s_mark(void* ctx) { return inn->mark(inn->ctx); }
+static int s_rewind(void* ctx) { return inn->rewind(inn->ctx); }
+static int s_release(void* ctx) { return inn->release(inn->ctx); }
+
+static int
+s_get(void* ctx, const uint8_t* key_y, size_t key_z,
+      uint8_t** val_y, size_t* val_z)
+{
+  return inn->get(inn->ctx, key_y, key_z, val_y, val_z);
+}
+
+//  a write outside a transaction is saved at once
+static int
+s_put(void* ctx, const uint8_t* key_y, size_t key_z,
+      const uint8_t* val_y, size_t val_z)
+{
+  int ret_i = inn->put(inn->ctx, key_y, key_z, val_y, val_z);
+  if ( !ret_i ) {
+    _dirty(key_y, key_z);
+    if ( !txn_i ) ret_i = _flush();
+  }
+  return ret_i;
+}
+
+static int
+s_del(void* ctx, const uint8_t* key_y, size_t key_z)
+{
+  int ret_i = inn->del(inn->ctx, key_y, key_z);
+  if ( !ret_i ) {
+    _dirty(key_y, key_z);
+    if ( !txn_i ) ret_i = _flush();
+  }
+  return ret_i;
+}
+
+static int
+s_scan(void* ctx, const uint8_t* pre_y, size_t pre_z,
+       mesa_store_scan_f fun_f, void* arg)
+{
+  return inn->scan(inn->ctx, pre_y, pre_z, fun_f, arg);
+}
+
+static void s_close(void* ctx) { inn->close(inn->ctx); }
+
+static mesa_store*
+_store(void)
+{
+  if ( !inn ) {
+    inn = mesa_store_memory();
+    sto = (mesa_store){
+      .begin    = s_begin,
+      .commit   = s_commit,
+      .rollback = s_rollback,
+      .mark     = s_mark,
+      .rewind   = s_rewind,
+      .release  = s_release,
+      .get      = s_get,
+      .put      = s_put,
+      .del      = s_del,
+      .scan     = s_scan,
+      .close    = s_close,
+    };
+  }
+  return &sto;
+}
+
+//  put back rows a commit handed out (deleted ones are skipped); before
+//  open, and not journaled. -1 if [buf] is malformed.
+EXPORT("store_load") int
+u_store_load(const uint8_t* buf_y, size_t len_z)
+{
+  _store();
+  for ( size_t at_z = 0; at_z < len_z; ) {
+    uint32_t key_w;
+    uint32_t val_w;
+
+    if ( at_z + 4 > len_z ) return -1;
+    memcpy(&key_w, buf_y + at_z, 4);
+    if ( at_z + 8 + (size_t)key_w > len_z ) return -1;
+    memcpy(&val_w, buf_y + at_z + 4 + key_w, 4);
+    if ( UINT32_MAX == val_w ) {
+      at_z += 8 + key_w;
+      continue;
+    }
+    if ( at_z + 8 + (size_t)key_w + val_w > len_z ) return -1;
+    inn->put(inn->ctx, buf_y + at_z + 4, key_w, buf_y + at_z + 8 + key_w, val_w);
+    at_z += 8 + key_w + val_w;
+  }
+  return 0;
+}
 
 static mesa_ship
 ship(uint64_t lo, uint64_t hi)
@@ -166,10 +360,25 @@ u_ship_render(uint64_t lo, uint64_t hi)
   return mesa_ship_render(ship(lo, hi));
 }
 
+//  the ship a keyfile is for, into out[0..1]; 0 if it isn't a keyfile
+EXPORT("keyfile_ship") int
+u_keyfile_ship(const char* keyfile, uint64_t* out)
+{
+  mesa_ident ide;
+
+  if ( mesa_keyfile_parse(keyfile, &ide, 1) < 1 ) {
+    return 0;
+  }
+  out[0] = ide.who.lo;
+  out[1] = ide.who.hi;
+  return 1;
+}
+
 //  the engine
 
-//  open as the comet in [keyfile]; a mesa_err. Comets may always start
-//  from an empty store, and their sponsor is fixed.
+//  open as the comet in [keyfile], on the store after any store_load; a
+//  mesa_err. Comets may always start from an empty store, and their
+//  sponsor is fixed.
 EXPORT("open") int
 u_open(const char* keyfile, uint64_t now)
 {
@@ -181,7 +390,7 @@ u_open(const char* keyfile, uint64_t now)
   if ( MESA_RIFT_UNKNOWN == cfg.ident.rift ) {
     cfg.ident.rift = 0;
   }
-  cfg.store = mesa_store_memory();
+  cfg.store = _store();
   cfg.hooks = (mesa_hooks){
     .send       = h_send,
     .need_point = h_need_point,

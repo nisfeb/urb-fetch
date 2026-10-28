@@ -3,6 +3,7 @@ module github.com/nisfeb/urb-fetch
 go 1.26.0
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/mopfel-winrux/libmesa/bindings/go v0.0.0
 	modernc.org/sqlite v1.61.0
 )

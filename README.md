@@ -30,6 +30,8 @@ The first page from a ship takes a few seconds while the two ships meet. After t
 | `-state` | `~/.local/state/urb-fetch` | The identity and its network state. |
 | `-moon` | | Run as this moon instead of a comet. |
 | `-new-moon` | | The moon has never run anywhere. Start its state empty. |
+| `-relay` | | Run the relay for libmesa in a browser on this address, such as `localhost:8476`, instead of the gateway. See [wasm](#wasm). |
+| `-relay-origins` | `chrome-extension://*` | The `Origin` patterns the relay accepts, comma-separated. Clients that send no `Origin`, such as Node, are always accepted. |
 
 ### As your moon
 
@@ -101,16 +103,33 @@ Don't point `URB_FETCH_STATE` at a folder a running gateway is using.
 
 ## wasm
 
-`wasm/` builds libmesa as WebAssembly, with a Node host that reads pages the way the prototype does. It is a first step toward reading `urb://` pages from a browser or an extension.
+`wasm/` builds libmesa as WebAssembly, so a browser or an extension can read `urb://` pages itself.
+
+- `build.sh` applies `libmesa-wasm32.diff` to a copy of libmesa and links it with `glue.c` into `build/mesa.wasm`.
+- `mesa.mjs` runs the engine as a comet and reads pages the way the gateway does. It works in Node and in a browser. Its host supplies a transport for datagrams and a store for the comet and the engine's state. Each commit's changes are saved before the datagrams it released go out.
+- `host.mjs` reads one page from Node.
 
 ```
 ZIG=/path/to/zig-x86_64-linux-0.15.2/zig wasm/build.sh
 node wasm/host.mjs urb://~sampel-palnet/page
 ```
 
-`build.sh` applies `wasm/libmesa-wasm32.diff` to a copy of libmesa and links it with `wasm/glue.c` into `wasm/build/mesa.wasm`. The host mines a new comet on every run and keeps no state, so each run leaves another comet on the publisher. Use it for tests only.
+The comet is mined on the first run and kept in `~/.local/state/urb-fetch-wasm`, with its state and its UDP port. `--tries 4` keeps the engine running across several tries, for a ship that is still catching up. `--trace` logs every datagram and the engine's view of it.
 
-Tested on 2026-10-27 against a live ship: a page read by remote scry, with the same text the gateway serves. The paths for large files and the fallback to the publisher's vault are ported from the prototype but have not run yet.
+### The relay
+
+A browser can't send UDP. The relay sends and receives a browser's datagrams for it over a WebSocket:
+
+```
+./urb-fetch -relay localhost:8476
+node wasm/host.mjs --relay ws://localhost:8476 urb://~sampel-palnet/page
+```
+
+The relay keeps one UDP port for each ship, open while it runs and the same across runs. It looks up galaxies' addresses for the browser. It sees which ships a browser talks to and the public pages it reads, but never a key. It accepts any ship name and sends datagrams anywhere, so keep it on loopback. Hosting it for others needs proof that a client holds its ship's key, and rate limits.
+
+When a comet moves to a new address, its publishers keep resending earlier answers to the old one for a minute or two before newer answers arrive. Keep a comet on one transport.
+
+Tested on 2026-10-27 against a live ship, over UDP and through the relay: the same comet across runs, pages read by remote scry with the same text the gateway serves. The paths for large files and the fallback to the publisher's vault are ported from the prototype but have not run yet.
 
 ## Ladybird
 

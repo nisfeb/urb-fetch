@@ -32,32 +32,28 @@ func main() {
 	state := flag.String("state", defaultState(), "where the identity and its network state live")
 	moon := flag.String("moon", "", "run as this moon: the keyfile its parent's |moon printed")
 	newMoon := flag.Bool("new-moon", false, "the moon has never run anywhere: start its state empty")
+	relayAt := flag.String("relay", "", "instead of the gateway, run the relay for libmesa in a browser (wasm/mesa.mjs) on this address, e.g. localhost:8476")
+	origins := flag.String("relay-origins", "chrome-extension://*", "comma-separated Origin patterns the relay accepts (clients that send none, such as Node, are always accepted)")
 	flag.Parse()
 
-	host, port, err := net.SplitHostPort(*listen)
-	if err != nil {
-		log.Fatalf("-listen: %v", err)
-	}
-	//  browsers resolve *.localhost to both loopbacks, ::1 often first
-	addrs := []string{*listen}
-	if host == "localhost" {
-		addrs = []string{net.JoinHostPort("127.0.0.1", port), net.JoinHostPort("::1", port)}
-	}
-	var lns []net.Listener
-	for _, a := range addrs {
-		ln, err := net.Listen("tcp", a)
-		if err != nil && len(lns) > 0 {
-			logf("not serving on %s: %v", a, err) // e.g. IPv6 is off
-			continue
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-		lns = append(lns, ln)
-	}
 	if err := os.MkdirAll(*state, 0o700); err != nil {
 		log.Fatal(err)
 	}
+	if *relayAt != "" {
+		lns, _ := listenAll(*relayAt)
+		rl, err := newRelay(*state, strings.Split(*origins, ","))
+		if err != nil {
+			log.Fatal(err)
+		}
+		srv := &http.Server{Handler: rl, ReadHeaderTimeout: 10 * time.Second}
+		for _, ln := range lns[1:] {
+			go srv.Serve(ln)
+		}
+		logf("relaying at ws://%s/", *relayAt)
+		log.Fatal(srv.Serve(lns[0]))
+	}
+
+	lns, port := listenAll(*listen)
 	r := newReader()
 	node, err := open(*state, *moon, *newMoon, r)
 	if err != nil {
@@ -87,6 +83,33 @@ func main() {
 		log.Fatal(err)
 	}
 	node.Close()
+}
+
+// listenAll listens on addr, and on both loopbacks for localhost:
+// browsers resolve localhost and *.localhost to either, ::1 often first.
+// It returns the listeners and the port.
+func listenAll(addr string) ([]net.Listener, string) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		log.Fatalf("%s: %v", addr, err)
+	}
+	addrs := []string{addr}
+	if host == "localhost" {
+		addrs = []string{net.JoinHostPort("127.0.0.1", port), net.JoinHostPort("::1", port)}
+	}
+	var lns []net.Listener
+	for _, a := range addrs {
+		ln, err := net.Listen("tcp", a)
+		if err != nil && len(lns) > 0 {
+			logf("not serving on %s: %v", a, err) // e.g. IPv6 is off
+			continue
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+		lns = append(lns, ln)
+	}
+	return lns, port
 }
 
 func defaultState() string {
