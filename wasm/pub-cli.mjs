@@ -6,11 +6,15 @@
 // A reader opens urb://~our-ship/NAME. The pages, and the keeps of readers
 // following them, are kept in pages.json in the identity's state folder,
 // so a later run serves them again. On a fake network, for a fleet set:
-//   node pub-cli.mjs --fake ~doznec-dozzod-dozhus --put notes=notes.gmi
+//   node pub-cli.mjs --fake ~bidlys-donref-dozzod-dozrup --put notes=notes.gmi
+//
+// It logs what other ships ask for: each file looked up, each keep, each
+// scry.
 
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { DESK_BASE } from './mesa.mjs';
 import { connect, log, options } from './node.mjs';
 import { publish } from './pub.mjs';
 
@@ -23,6 +27,26 @@ const { values: opt } = parseArgs({
 let urb = null;
 try {
   urb = await connect(opt);
+  //  say what other ships ask for: each file looked up (a peek, a keep, or
+  //  news to keepers), each keep made or dropped, each scry
+  const { serve } = urb.grub, scry = urb.scry.serve;
+  urb.grub.serve = (f, saved, onKeepers) => serve(
+    (folder, name) => {
+      const got = f(folder, name);
+      log(`file ${folder.replace(DESK_BASE, '<base>')}/${name}: ${got ? `rev ${got.rev}` : 'not ours'}`);
+      return got;
+    },
+    saved,
+    ks => {
+      log(`keeps: ${ks.map(k => `${k.ship} ${k.folder.replace(DESK_BASE, '<base>')}/${k.name}`).join(', ') || 'none'}`);
+      onKeepers(ks);
+    },
+  );
+  urb.scry.serve = f => scry(p => {
+    const got = f(p);
+    log(`scry ${p}: ${got ? 'answered' : 'nothing'}`);
+    return got;
+  });
   const file = join(urb.dir, 'pages.json');
   let saved = {};
   try { saved = JSON.parse(readFileSync(file, 'utf8')); } catch {}

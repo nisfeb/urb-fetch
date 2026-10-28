@@ -131,7 +131,7 @@ node wasm/pub-cli.mjs --put notes/intro=intro.gmi
 URBIT=/path/to/urbit node wasm/check.mjs
 ```
 
-The pages, and the keeps of readers following them, are kept in `pages.json` in the identity's state folder. Serving lasts while the engine runs. A reader that read a page in the last minute keeps seeing the revision it read, as with lattice: its list of ids is a minute old. Serving has not yet run against lattice on a ship.
+The pages, and the keeps of readers following them, are kept in `pages.json` in the identity's state folder. Serving lasts while the engine runs. A reader that read a page in the last minute keeps seeing the revision it read, as with lattice: its list of ids is a minute old. Tested on 2026-10-28 on fake ships, with lattice main reading a fake moon: pages, the home page and a 15 KB page by remote scry, the 15 KB vault file inline over peek, and a missing page as a 404. A page followed from lattice heard an edit, a removal and a republish, and the reader's drop.
 
 `--fake ~ship` runs on a fake network on this machine (`urbit -F`), with keys made from the ship's name, for testing against fake ships. On furum's fleet set (`~rup` hosting board `urbtest`):
 
