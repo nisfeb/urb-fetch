@@ -34,6 +34,7 @@ func main() {
 	newMoon := flag.Bool("new-moon", false, "the moon has never run anywhere: start its state empty")
 	relayAt := flag.String("relay", "", "instead of the gateway, run the relay for libmesa in a browser (wasm/mesa.mjs) on this address, e.g. localhost:8476")
 	origins := flag.String("relay-origins", "chrome-extension://*", "comma-separated Origin patterns the relay accepts (clients that send none, such as Node, are always accepted)")
+	relayFake := flag.Bool("relay-fake", false, "for tests: relay to a fake network (urbit -F) on this machine, galaxy g at 127.0.0.1:31337+g")
 	flag.Parse()
 
 	if err := os.MkdirAll(*state, 0o700); err != nil {
@@ -41,7 +42,7 @@ func main() {
 	}
 	if *relayAt != "" {
 		lns, _ := listenAll(*relayAt)
-		rl, err := newRelay(*state, strings.Split(*origins, ","))
+		rl, err := newRelay(*state, strings.Split(*origins, ","), *relayFake)
 		if err != nil {
 			log.Fatal(err)
 		}

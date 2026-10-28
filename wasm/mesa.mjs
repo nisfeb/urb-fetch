@@ -480,6 +480,17 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     withStr(agent, a => withStr(mark, m => check(X.poke(her[0], her[1], bone, a, m, n), 'poke')));
   }
 
+  // our one flow to [her]'s %grubbery, for peeks and answers
+  function flowTo(her) {
+    const k = `${her[0]}:${her[1]}`;
+    if (!flows.has(k)) {
+      const bone = u64(X.flow_open(her[0], her[1]));
+      if (bone === NONE) throw new Error('flow_open failed');
+      flows.set(k, bone);
+    }
+    return flows.get(k);
+  }
+
   // grubbery's cross-ship peek of one file: [dest-dir, name]
   function peek(her, folder, name, conv) {
     const wire = `/urb-fetch/${nonce}/${++wires}`;
@@ -496,13 +507,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       st.timer = setTimeout(() => st.finish(null), PEEK_TIMEOUT);
       peeks.set(wire, st);
       txn(() => {
-        const k = `${her[0]}:${her[1]}`;
-        if (!flows.has(k)) {
-          const bone = u64(X.flow_open(her[0], her[1]));
-          if (bone === NONE) throw new Error('flow_open failed');
-          flows.set(k, bone);
-        }
-        st.bone = flows.get(k);
+        st.bone = flowTo(her);
         poke(her, st.bone, 'grubbery', 'grubbery-load',
              [[path(wire), [true, path(folder), name]], ['peek', null, true]]);
       });
@@ -548,7 +553,8 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     if (mark === 'grubbery-load') {
       //  [[wire dest] %poke [blot noun]], dest a rail [%& [path name]]
       const dest = n.head.tail, act = n.tail;
-      if (inbox && act.head.text() === 'poke' && !dest.head.int()) {
+      if (act.head.text() !== 'poke') return ACK;
+      if (inbox && !dest.head.int()) {
         const pathOf = p => '/' + [...list(p)].map(s => s.text()).join('/');
         const blot = act.tail.head;
         inbox({
@@ -558,6 +564,8 @@ export async function open({ wasm, transport, store, log = console.error, env = 
           noun: act.tail.tail,
         });
       }
+      //  say it was taken in: the sender waits for this %pack, on its wire
+      poke([lo, hi], flowTo([lo, hi]), 'grubbery', 'grubbery-transfer', [n.head.head, 'pack', null]);
       return ACK;
     }
     if (mark !== 'grubbery-transfer') return ACK;

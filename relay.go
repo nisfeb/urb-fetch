@@ -42,6 +42,7 @@ const (
 
 type relay struct {
 	origins []string
+	fake    bool   // a fake network on this machine: every ship on loopback
 	file    string // ship -> UDP port, as JSON
 
 	mu       sync.Mutex
@@ -63,9 +64,10 @@ type galaxyAddr struct {
 	at   time.Time
 }
 
-func newRelay(state string, origins []string) (*relay, error) {
+func newRelay(state string, origins []string, fake bool) (*relay, error) {
 	rl := &relay{
 		origins:  origins,
+		fake:     fake,
 		file:     filepath.Join(state, "relay-ports.json"),
 		ports:    map[string]int{},
 		ships:    map[string]*relayShip{},
@@ -124,10 +126,16 @@ func (rl *relay) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (rl *relay) dest(kind, galaxy byte, ip []byte, port uint16) *net.UDPAddr {
 	switch kind {
 	case 1:
+		if rl.fake {
+			return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 31337 + int(galaxy)}
+		}
 		return rl.galaxy(galaxy)
 	case 2:
 		if port == 0 {
 			return nil
+		}
+		if rl.fake {
+			return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: int(port)}
 		}
 		return &net.UDPAddr{IP: net.IP(append([]byte(nil), ip...)), Port: int(port)}
 	}
