@@ -99,6 +99,19 @@ Don't point `URB_FETCH_STATE` at a folder a running gateway is using.
 
 `prototype/urb_fetch.py` is the first version, in Python on libmesa's ctypes binding. It reads pages from the command line, one process per run. It needs `LIBMESA=third_party/libmesa/zig-out/lib/libmesa.so` and `LIBMESA_PY=third_party/libmesa/bindings/python`.
 
+## wasm
+
+`wasm/` builds libmesa as WebAssembly, with a Node host that reads pages the way the prototype does. It is a first step toward reading `urb://` pages from a browser or an extension.
+
+```
+ZIG=/path/to/zig-x86_64-linux-0.15.2/zig wasm/build.sh
+node wasm/host.mjs urb://~sampel-palnet/page
+```
+
+`build.sh` applies `wasm/libmesa-wasm32.diff` to a copy of libmesa and links it with `wasm/glue.c` into `wasm/build/mesa.wasm`. The host mines a new comet on every run and keeps no state, so each run leaves another comet on the publisher. Use it for tests only.
+
+Tested on 2026-10-27 against a live ship: a page read by remote scry, with the same text the gateway serves. The paths for large files and the fallback to the publisher's vault are ported from the prototype but have not run yet.
+
 ## Ladybird
 
 The `urb` branch of [nisfeb/ladybird](https://github.com/nisfeb/ladybird/tree/urb) is the Ladybird browser with `urb://` support. It opens `urb://` addresses through this gateway, from links, scripts, forms and its address bar, and its address bar shows a gateway page by its `urb://` address. Set `LADYBIRD_URB_FETCH_PORT` if the gateway runs on another port.

@@ -1,0 +1,50 @@
+--- a/build.zig
++++ b/build.zig
+@@ -35,6 +35,7 @@
+         .macos => try flags.append("-DU3_OS_osx=1"),
+         .linux => try flags.append("-DU3_OS_linux=1"),
+         .windows => try flags.append("-DU3_OS_windows=1"),
++        .wasi => try flags.append("-DU3_OS_linux=1"),
+         else => return error.UnsupportedOs,
+     }
+ 
+@@ -103,7 +104,7 @@
+         }),
+     });
+     addCore(b, so, crypt, sql, sqlite, urcrypt, flags.items);
+-    b.installArtifact(so);
++    if (t.os.tag != .wasi) b.installArtifact(so); //  no shared libraries on wasm
+ 
+     lib.installHeadersDirectory(b.path("include/mesa"), "mesa", .{});
+ 
+--- a/vendor/c3/portable.h
++++ b/vendor/c3/portable.h
+@@ -29,13 +29,15 @@
+ #     include <stdint.h>
+ #     include <assert.h>
+ #     include <byteswap.h>
+-#     include <setjmp.h>
+ #     include <stdio.h>
+-#     include <signal.h>
+ #     include <sys/time.h>
++#     ifndef __wasi__
++#     include <setjmp.h>
++#     include <signal.h>
+ #     include <sys/resource.h>
+ #     include <sys/mman.h>
+ #     include <sys/sendfile.h>
++#     endif
+ 
+ #   elif defined(U3_OS_osx)
+ #     include <ctype.h>
+--- a/src/noun.c
++++ b/src/noun.c
+@@ -992,7 +992,7 @@
+   c3_d     pos_d = 0;
+   mesa_noun pro  = MESA_NONE;
+ 
+-  if ( (len_z >> 61) ) {
++  if ( ((c3_d)len_z >> 61) ) {
+     return MESA_NONE;
+   }
+ 
