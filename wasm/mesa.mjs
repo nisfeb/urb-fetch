@@ -16,10 +16,14 @@
 //              close()}. A lane is {galaxy, name} or {ip, port}; onPacket
 //              takes (ip, port, bytes). relayTransport below is one, over a
 //              WebSocket to `urb-fetch -relay`; host.mjs has one for UDP.
-//   store      where the comet and the engine's state are kept:
-//              {load() -> {keyfile, rows}, saveKey(keyfile), commit(rows)},
-//              each may return a promise. rows are glue.c's
+//   store      where the identity and the engine's state are kept:
+//              {load() -> {keyfile, rows, fresh}, saveKey(keyfile),
+//              commit(rows)}, each may return a promise. rows are glue.c's
 //              [klen:4][key][vlen:4][val]; readRows and writeRows convert.
+//              With no keyfile, a comet is mined and saved. A moon's
+//              keyfile comes from the host, with fresh true until its first
+//              commit is saved: a moon may start from empty state only if it
+//              never ran anywhere.
 //
 //   const urb = await open({ wasm, transport, store })
 //   const { key, body, how } = await urb.read('urb://~sampel-palnet/page')
@@ -45,8 +49,11 @@ export class UrbError extends Error {}
 
 // ------------------------------------------------------------- addresses
 
-// [ship, rel] for a published page's url, as lattice's +de-urb resolves it.
-// /p/, /k/ and /t/ name the publisher's tree, which needs its grants.
+// What an urb:// url names, as lattice's +de-urb resolves it: [ship, rel,
+// mount]. Mount 'n' is a published page (rel under the pub vault); 'k' a
+// know entry (rel is its key); 't' a file anywhere in the publisher's
+// tree (rel is its absolute path); 'p' one of lattice's live pages. All
+// but 'n' are private: the publisher grants who may read them.
 export function deUrb(url) {
   if (!url.startsWith('urb://')) throw new UrbError('not an urb:// url');
   const rest = url.slice(6);
@@ -55,12 +62,11 @@ export function deUrb(url) {
   let tail = slash < 0 ? '' : rest.slice(slash + 1);
   if (tail.endsWith('/')) tail = tail.slice(0, -1);   // urb://~s/site/ = urb://~s/site
   if (!/^~[a-z]+(-[a-z]+)*$/.test(who)) throw new UrbError(`no ship in ${url}`);
-  if (!tail) return [who, ['index']];
+  if (!tail) return [who, ['index'], 'n'];
   const segs = tail.split('/');
   if (!segs.every(s => KNOT.test(s))) throw new UrbError(`bad path in ${url}`);
-  if (segs[0].length > 1) return [who, segs];          // frozen legacy form
-  if (segs[0] === 'n') return [who, segs.slice(1)];
-  if ('pkt'.includes(segs[0])) throw new UrbError(`/${segs[0]}/ addresses read the publisher's tree: not supported`);
+  if (segs[0].length > 1) return [who, segs, 'n'];     // frozen legacy form
+  if ('nkpt'.includes(segs[0])) return [who, segs.slice(1), segs[0]];
   throw new UrbError(`/${segs[0]}/ is not a mount`);
 }
 
@@ -594,10 +600,28 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     return body !== null ? [body, 'peek'] : [null, null];
   }
 
+  // a file in the publisher's own tree, which it shares with whom it
+  // chooses: text, or a know entry's body
+  async function readPrivate(her, who, url, folder, name) {
+    const text = n => (n.isCell ? (n.head.isCell ? null : n.head.text()) : n.text());
+    const body = await peek(her, folder, name, text);
+    if (body === null) throw new UrbError(`${url}: nothing there, or not shared with ${our}`);
+    return { key: `${folder}/${name}`, body, how: 'peek' };
+  }
+
   // +read-page-or-index for one url
   async function read(url) {
-    const [who, rel] = deUrb(url);
+    const [who, rel, mount] = deUrb(url);
     const her = shipOf(who);
+    if (mount === 'p') throw new UrbError(`${url} is a live Lattice page, which only Lattice shows`);
+    if (mount === 'k') {
+      if (!rel.length) throw new UrbError(`${url} names no know entry`);
+      return readPrivate(her, who, url, `${await base(her, who)}/know/vault/${rel.join('/')}`, 'entry');
+    }
+    if (mount === 't') {
+      if (!rel.length) throw new UrbError(`${url} is the publisher's whole tree, not a file`);
+      return readPrivate(her, who, url, '/' + rel.slice(0, -1).join('/'), rel.at(-1));
+    }
     const list = await revList(her, who);
     const hit = p => ('/' + p.join('/')) in list;
     const dex = [...rel, 'index'];
@@ -614,7 +638,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
 
   // ----------------------------------------------------------- start
 
-  let { keyfile, rows } = await store.load();
+  let { keyfile, rows, fresh } = await store.load();
   if (!keyfile) {
     const res = await fetch(STARS, { headers: { 'user-agent': 'urb-fetch' } });   // 403 without one, outside a browser
     if (!res.ok) throw new Error(`${STARS}: ${res.status}`);
@@ -631,7 +655,12 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   //  the transport is up before the engine opens: opening can send
   await transport.start(our, onPacket);
   if (rows?.length) check(withBytes(rows, (p, n) => X.store_load(p, n)), 'store_load');
-  call(() => check(withStr(keyfile, p => X.open(p, BigInt(Date.now()))), 'open'));
+  const err = call(() => withStr(keyfile, p => X.open(p, BigInt(Date.now()), fresh && !rows?.length ? 1 : 0)));
+  if (err === -2) {
+    transport.close();
+    throw new Error(`${our} has run before, and its state here is empty. Starting it from nothing would replay old messages, so breach it on its parent (|moon-breach) and add its new key.`);
+  }
+  check(err, 'open');
 
   return {
     our,
@@ -644,6 +673,69 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       return saved;
     },
   };
+}
+
+// What a keyfile is, without opening an engine: {ship, rank, rift, life}
+// (rank 0 galaxy, 1 star, 2 planet, 3 moon, 4 comet; rift null when the
+// keyfile doesn't say), or null if it isn't one.
+export async function keyfileInfo(wasm, keyfile) {
+  const X = await bare(wasm);
+  const p = cstrIn(X, keyfile), out = X.alloc(32);
+  try {
+    if (!X.keyfile_ship(p, out)) return null;
+    const v = new DataView(X.memory.buffer, out, 32);
+    const [lo, hi, rift, life] = [0, 8, 16, 24].map(at => v.getBigUint64(at, true));
+    return { ship: takeIn(X, X.ship_render(lo, hi)), rank: X.ship_rank(lo, hi), rift: rift === NONE ? null : rift, life };
+  } finally {
+    X.free(p);
+    X.free(out);
+  }
+}
+
+// A fake ship's keyfile (urbit -F keys, from its name), for tests that
+// must not spend a real identity.
+export async function fakeKeyfile(wasm, ship) {
+  const X = await bare(wasm);
+  const p = cstrIn(X, ship), out = X.alloc(16);
+  try {
+    if (!X.ship_parse(p, out)) throw new UrbError(`not a ship: ${ship}`);
+    const v = new DataView(X.memory.buffer, out, 16);
+    return takeIn(X, X.fake_keyfile(v.getBigUint64(0, true), v.getBigUint64(8, true)));
+  } finally {
+    X.free(p);
+    X.free(out);
+  }
+}
+
+// The module with no engine and hooks that do nothing, for the helpers above.
+async function bare(wasm) {
+  const none = () => 0;
+  const imports = {
+    wasi_snapshot_preview1: wasi(() => X.memory.buffer, () => {}, {}),
+    host: { send: none, need_point: none, on_poke: none, on_done: none, on_sage: none, store_commit: none },
+  };
+  const inst = wasm instanceof WebAssembly.Module
+    ? await WebAssembly.instantiate(wasm, imports)
+    : (await WebAssembly.instantiate(wasm, imports)).instance;
+  const X = inst.exports;
+  X._initialize();
+  return X;
+}
+
+function cstrIn(X, s) {
+  const b = enc.encode(s + '\0');
+  const p = X.alloc(b.length);
+  new Uint8Array(X.memory.buffer).set(b, p);
+  return p;
+}
+
+function takeIn(X, p) {
+  const m = new Uint8Array(X.memory.buffer);
+  let e = p;
+  while (m[e]) e++;
+  const s = dec.decode(m.subarray(p, e));
+  X.free(p);
+  return s;
 }
 
 // An error thrown in a hook would trap the module and leave the engine

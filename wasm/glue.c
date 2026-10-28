@@ -360,7 +360,9 @@ u_ship_render(uint64_t lo, uint64_t hi)
   return mesa_ship_render(ship(lo, hi));
 }
 
-//  the ship a keyfile is for, into out[0..1]; 0 if it isn't a keyfile
+//  what a keyfile says: its ship into out[0..1], its rift (UINT64_MAX if
+//  the keyfile doesn't say) into out[2], its life into out[3]; 0 if it
+//  isn't a keyfile
 EXPORT("keyfile_ship") int
 u_keyfile_ship(const char* keyfile, uint64_t* out)
 {
@@ -371,16 +373,36 @@ u_keyfile_ship(const char* keyfile, uint64_t* out)
   }
   out[0] = ide.who.lo;
   out[1] = ide.who.hi;
+  out[2] = ide.rift;
+  out[3] = ide.life;
   return 1;
+}
+
+//  0 galaxy, 1 star, 2 planet, 3 moon, 4 comet
+EXPORT("ship_rank") int
+u_ship_rank(uint64_t lo, uint64_t hi)
+{
+  return mesa_ship_rank(ship(lo, hi));
+}
+
+//  a fake ship's keyfile (urbit -F keys, from its name), for tests that
+//  must not spend a real identity
+EXPORT("fake_keyfile") char*
+u_fake_keyfile(uint64_t lo, uint64_t hi)
+{
+  mesa_ident ide;
+  mesa_ident_fake(ship(lo, hi), &ide);
+  return mesa_keyfile_render(&ide);
 }
 
 //  the engine
 
-//  open as the comet in [keyfile], on the store after any store_load; a
-//  mesa_err. Comets may always start from an empty store, and their
-//  sponsor is fixed.
+//  open as the comet or moon in [keyfile], on the store after any
+//  store_load; a mesa_err. Comets may always start from an empty store; a
+//  moon only when [breached] says it never ran (or was breached since).
+//  Both have fixed sponsors.
 EXPORT("open") int
-u_open(const char* keyfile, uint64_t now)
+u_open(const char* keyfile, uint64_t now, int breached)
 {
   mesa_config cfg = { 0 };
 
@@ -404,6 +426,7 @@ u_open(const char* keyfile, uint64_t now)
     .shut_key   = h_shut_key,
   };
   cfg.now = now;
+  cfg.breached = breached;
   return mesa_engine_open(&cfg, &eng);
 }
 

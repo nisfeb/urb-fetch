@@ -116,6 +116,8 @@ node wasm/host.mjs urb://~sampel-palnet/page
 
 The comet is mined on the first run and kept in `~/.local/state/urb-fetch-wasm`, with its state and its UDP port. `--tries 4` keeps the engine running across several tries, for a ship that is still catching up. `--trace` logs every datagram and the engine's view of it.
 
+`--moon moon.key` reads as a moon instead, from the key `|moon` printed, with its state in a folder of its own. Pass `--new-moon` on its first run only, and only for a moon that never ran anywhere, as with the gateway's `-new-moon`. A moon, or a comet, can also read what a publisher shares with it privately: `urb://~ship/k/<key>` reads a know entry, and `urb://~ship/t/<path>` a text file anywhere in the publisher's tree. The publisher decides who may read each, so anything not shared looks the same as nothing there. `urb://~ship/p/...` names a live Lattice page, which only Lattice shows.
+
 ### The relay
 
 A browser can't send UDP. The relay sends and receives a browser's datagrams for it over a WebSocket:

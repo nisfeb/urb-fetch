@@ -1,12 +1,15 @@
-// Reads one page published with lattice from Node, as a comet run by
-// libmesa compiled to wasm (mesa.mjs, build/mesa.wasm):
+// Reads one page published with lattice from Node, as a comet or a moon
+// run by libmesa compiled to wasm (mesa.mjs, build/mesa.wasm):
 //
-//   node host.mjs [--state DIR] [--relay ws://localhost:8476] urb://~ship/page
+//   node host.mjs [--state DIR] [--relay ws://localhost:8476]
+//                 [--moon KEYFILE [--new-moon]] urb://~ship/page
 //
 // The body goes to stdout. The comet is mined on the first run and kept in
 // the state folder (default ~/.local/state/urb-fetch-wasm) with the
-// engine's state, so later runs are the same comet. Datagrams go over UDP
-// from a port kept beside them, or through `urb-fetch -relay` with --relay.
+// engine's state, so later runs are the same comet. A moon's state is kept
+// in a folder of its own there. Pass --new-moon only on a moon's first run,
+// and only if it never ran anywhere else. Datagrams go over UDP from a port
+// kept beside the state, or through `urb-fetch -relay` with --relay.
 
 import dgram from 'node:dgram';
 import dns from 'node:dns/promises';
@@ -14,16 +17,17 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { open, readRows, relayTransport, writeRows, UrbError } from './mesa.mjs';
+import { keyfileInfo, open, readRows, relayTransport, writeRows, UrbError } from './mesa.mjs';
 
 const log = (...a) => console.error(new Date().toISOString().slice(14, 23), ...a);
 const ipText = ip => [24, 16, 8, 0].map(s => (ip >>> s) & 0xff).join('.');
 const ipNum = a => a.split('.').reduce((v, o) => ((v << 8) | Number(o)) >>> 0, 0);
 
-// the comet's keyfile and the engine's rows, in a folder. Every commit
+// the identity's keyfile and the engine's rows, in a folder: the comet's
+// keyfile is kept there, a moon's comes from its own file. Every commit
 // rewrites the rows file whole.
-// ponytail: no lock, so two runs on one folder would run the comet twice.
-function fileStore(dir) {
+// ponytail: no lock, so two runs on one folder would run the identity twice.
+function fileStore(dir, moon = null) {
   const keyPath = join(dir, 'comet.key'), rowsPath = join(dir, 'rows');
   const rows = new Map();   // key as hex -> {key, val}
   const hex = b => Buffer.from(b).toString('hex');
@@ -34,10 +38,11 @@ function fileStore(dir) {
   return {
     load() {
       let keyfile = null, saved = null;
-      try { keyfile = readFileSync(keyPath, 'utf8').trim(); } catch {}
+      if (moon) keyfile = moon.keyfile;
+      else try { keyfile = readFileSync(keyPath, 'utf8').trim(); } catch {}
       try { saved = new Uint8Array(readFileSync(rowsPath)); } catch {}
       if (saved) for (const r of readRows(saved)) rows.set(hex(r.key), r);
-      return { keyfile, rows: saved };
+      return { keyfile, rows: saved, fresh: Boolean(moon && moon.fresh) };
     },
     saveKey(keyfile) {
       save(keyPath, keyfile + '\n');
@@ -118,13 +123,29 @@ function traced(t) {
 
 const { values: opt, positionals: [url] } = parseArgs({
   allowPositionals: true,
-  options: { state: { type: 'string' }, relay: { type: 'string' }, trace: { type: 'boolean' }, tries: { type: 'string', default: '1' } },
+  options: {
+    state: { type: 'string' }, relay: { type: 'string' }, trace: { type: 'boolean' }, tries: { type: 'string', default: '1' },
+    moon: { type: 'string' }, 'new-moon': { type: 'boolean' },
+  },
 });
 if (!url) {
-  log('usage: node host.mjs [--state DIR] [--relay ws://host:port] [--tries N] [--trace] urb://~ship/page');
+  log('usage: node host.mjs [--state DIR] [--relay ws://host:port] [--moon KEYFILE [--new-moon]] [--tries N] [--trace] urb://~ship/page');
   process.exit(2);
 }
-const dir = opt.state || join(process.env.XDG_STATE_HOME || join(homedir(), '.local/state'), 'urb-fetch-wasm');
+const wasm = readFileSync(new URL('build/mesa.wasm', import.meta.url));
+let dir = opt.state || join(process.env.XDG_STATE_HOME || join(homedir(), '.local/state'), 'urb-fetch-wasm');
+let moon = null;
+if (opt.moon) {
+  const keyfile = readFileSync(opt.moon, 'utf8').trim();
+  const info = await keyfileInfo(wasm, keyfile);
+  if (!info || info.rank !== 3) {
+    log(`${opt.moon} holds no moon's key`);
+    process.exit(2);
+  }
+  log(`moon ${info.ship}, life ${info.life}, rift ${info.rift ?? 'not in the keyfile'}`);
+  moon = { keyfile, fresh: Boolean(opt['new-moon']) };
+  dir = join(dir, info.ship.slice(1));
+}
 mkdirSync(dir, { recursive: true, mode: 0o700 });
 
 let code = 0, urb = null;
@@ -132,9 +153,9 @@ try {
   let t = Date.now();
   const transport = opt.relay ? relayTransport(opt.relay, log) : udpTransport(dir);
   urb = await open({
-    wasm: readFileSync(new URL('build/mesa.wasm', import.meta.url)),
+    wasm,
     transport: opt.trace ? traced(transport) : transport,
-    store: fileStore(dir),
+    store: fileStore(dir, moon),
     log,
     env: opt.trace ? { MESA_TRACE: '1' } : {},
   });
