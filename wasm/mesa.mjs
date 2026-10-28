@@ -564,7 +564,8 @@ export async function open({ wasm, transport, store, log = console.error, env = 
           break;
         }
       }
-      if (!bases.has(who)) throw new UrbError(`${who} answered no lattice peek (offline, or no lattice)`);
+      //  later: a ship catching up on a comet that moved answers in a minute or two
+      if (!bases.has(who)) throw Object.assign(new UrbError(`${who} answered no lattice peek (offline, or no lattice)`), { later: true });
     }
     return bases.get(who);
   }
