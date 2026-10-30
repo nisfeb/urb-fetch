@@ -3,12 +3,13 @@
 //
 //   node host.mjs [--tries N] [node.mjs's options] urb://~ship/page
 //
-// The body goes to stdout. The comet is mined on the first run and kept in
+// The body goes to stdout, as published; stderr says its mark and how it
+// renders (mesa.mjs's renderAs). The comet is mined on the first run and kept in
 // the state folder with the engine's state, so later runs are the same
 // comet. node.mjs says how to run as a moon or on a fake network.
 
 import { parseArgs } from 'node:util';
-import { UrbError } from './mesa.mjs';
+import { UrbError, renderAs } from './mesa.mjs';
 import { connect, log, options } from './node.mjs';
 
 const { values: opt, positionals: [url] } = parseArgs({
@@ -36,9 +37,9 @@ try {
       log(`try ${i}: ${e.message}`);
     }
   }
-  const { key, body, how } = got;
+  const { key, body, how, mark } = got;
   process.stdout.write(body);
-  log(`ok ${url} -> ${key}, ${new TextEncoder().encode(body).length} bytes, by ${how}, ${((Date.now() - t) / 1000).toFixed(1)}s`);
+  log(`ok ${url} -> ${key}${mark ? ` %${mark}, renders as ${renderAs(mark, body)}` : ''}, ${new TextEncoder().encode(body).length} bytes, by ${how}, ${((Date.now() - t) / 1000).toFixed(1)}s`);
 } catch (e) {
   log(e instanceof UrbError ? `FAIL ${e.message}` : e);
   code = 1;

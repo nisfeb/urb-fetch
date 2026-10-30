@@ -26,7 +26,10 @@
 //              never ran anywhere.
 //
 //   const urb = await open({ wasm, transport, store })
-//   const { key, body, how } = await urb.read('urb://~sampel-palnet/page')
+//   const { key, body, how, mark } = await urb.read('urb://~sampel-palnet/page')
+//
+// mark is the page's format, the mark it was published under: render it
+// as renderAs(mark, body) says. /k/ and /t/ reads have no mark.
 //
 // It also serves, for pub.mjs: our files to other ships' grubbery (their
 // peeks and keeps, see grub.serve) and our scry namespace (scry.serve).
@@ -90,6 +93,20 @@ export function deUrb(url) {
 
 // lattice-gmi's +looks-html: the first non-blank character is <
 export const looksHtml = body => body.slice(0, 256).trimStart().startsWith('<');
+
+// lattice's view modes (view-mode:pg). Release 74 and later publish each
+// page under its mode's mark (+mode-mark); older ones publish every page
+// as %gmi (nisfeb/lattice#321).
+export const PAGE_MARKS = new Set(['text', 'html', 'gmi', 'md', 'js', 'css', 'noun']);
+
+// How a page published under mark renders, as lattice's reader does:
+// 'html' (only ever in a sandbox), 'md', 'gmi' or 'text' (in a <pre>).
+// Only %gmi is sniffed, since %gmi is all an older publisher, an old
+// revision or the vault peek says.
+export function renderAs(mark, body) {
+  if (mark === 'gmi') return looksHtml(body) ? 'html' : 'gmi';
+  return mark === 'html' || mark === 'md' ? mark : 'text';
+}
 
 // ------------------------------------------------------------- stored rows
 
@@ -817,17 +834,19 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     return r.list;
   }
 
-  // +read-page-body-rev: keen the listed id, else peek the vault file
+  // +read-page-body-rev: keen the listed id, else peek the vault file.
+  // [body, how, mark]. The vault file is %gmi whatever the page's format
+  // and carries no other mark, so a page read by peek is %gmi.
   async function page(her, who, rel) {
     const key = '/' + rel.join('/');
     const ent = (await revList(her, who))[key];
     if (ent) {
       const got = await keen(her, `/g/x/1/grubbery//1/pub/page${key}/${ent.id}`);
-      if (got && got.mark === 'gmi' && got.body !== null) return [got.body, 'keen'];
-      revs.delete(who);   // a miss means the list is stale
+      if (got && PAGE_MARKS.has(got.mark) && got.body !== null) return [got.body, 'keen', got.mark];
+      revs.delete(who);   // a miss, or a %del tombstone: the list is stale
     }
     const body = await peek(her, (await base(her, who)) + '/pub/vault' + key, 'gmi', cord);
-    return body !== null ? [body, 'peek'] : [null, null];
+    return body !== null ? [body, 'peek', 'gmi'] : [null, null, null];
   }
 
   // a file in the publisher's own tree, which it shares with whom it
@@ -860,8 +879,8 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       : Object.keys(list).length && !hit(rel) ? [rel]
       : [rel, dex];
     for (const p of tries) {
-      const [body, how] = await page(her, who, p);
-      if (body !== null) return { key: '/' + p.join('/'), body, how };
+      const [body, how, mark] = await page(her, who, p);
+      if (body !== null) return { key: '/' + p.join('/'), body, how, mark };
     }
     throw new UrbError(`${url}: not published`);
   }
