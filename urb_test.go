@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -59,11 +60,144 @@ func TestRender(t *testing.T) {
 		t.Errorf("rewriteHTML: %s", got)
 	}
 	g := renderGemtext("# Hi <there>\n=> urb://~zod/a A link\n* one\n* two\n```\n<pre>\n```\n> quote",
-		"t", func(s string) string { return "L(" + s + ")" })
-	for _, want := range []string{"<h1>Hi &lt;there&gt;</h1>", `<a href="L(urb://~zod/a)">A link</a>`,
+		"t", func(s string) string { return strings.Replace(s, "urb://~zod", "http://gw", 1) })
+	for _, want := range []string{"<h1>Hi &lt;there&gt;</h1>", `<a href="http://gw/a">A link</a>`,
 		"<ul>\n<li>one</li>\n<li>two</li>\n</ul>", "<pre>&lt;pre&gt;\n</pre>", "<blockquote>quote</blockquote>"} {
 		if !strings.Contains(g, want) {
 			t.Errorf("renderGemtext lacks %q in %s", want, g)
 		}
+	}
+}
+
+// A page renders by the mark it was published under, as lattice's reader
+// does. %gmi, all an older lattice publishes, keeps the body sniff.
+func TestRenderAs(t *testing.T) {
+	for _, c := range []struct{ mark, body, want string }{
+		{"gmi", "# heading", "gmi"},
+		{"gmi", "  <!doctype html><p>hi", "html"}, // a pre-74 html page
+		{"html", "<p>hi", "html"},
+		{"html", "no tag first", "html"},
+		{"md", "# heading", "md"},
+		{"md", "<div>raw</div>", "md"}, // never sniffed: escaped by the renderer
+		{"text", "<b>not html</b>", "text"},
+		{"js", "alert(1)", "text"},
+		{"css", "body{}", "text"},
+		{"noun", "x", "text"},
+	} {
+		if got := renderAs(c.mark, c.body); got != c.want {
+			t.Errorf("renderAs(%s, %q) = %s, want %s", c.mark, c.body, got, c.want)
+		}
+	}
+	for _, m := range []string{"text", "html", "gmi", "md", "js", "css", "noun"} {
+		if !pageMarks[m] {
+			t.Errorf("%%%s is not a page mark", m)
+		}
+	}
+	if pageMarks["del"] || pageMarks[""] {
+		t.Error("a tombstone or no mark counts as a page")
+	}
+}
+
+func TestRenderMarkdown(t *testing.T) {
+	src := "# Title <x>\n\nSome *em* and **strong** and `<code>`,\nwrapped.\n\n" +
+		"- one\n- [two](urb://~zod/b)\n\n1. first\n2. second\n\n> quoted\n\n---\n\n" +
+		"```\n<script>alert(1)</script>\n```\n\n<script>alert(2)</script>\n\n" +
+		"[bad](javascript:alert(3)) [web](https://example.com/a?b=1&c=2) [rel](notes/intro)"
+	g := renderMarkdown(src, "t", func(s string) string { return strings.Replace(s, "urb://~zod", "http://gw", 1) })
+	for _, want := range []string{
+		"<h1>Title &lt;x&gt;</h1>",
+		"<p>Some <em>em</em> and <strong>strong</strong> and <code>&lt;code&gt;</code>, wrapped.</p>",
+		"<ul>\n<li>one</li>\n<li><a href=\"http://gw/b\">two</a></li>\n</ul>",
+		"<ol>\n<li>first</li>\n<li>second</li>\n</ol>",
+		"<blockquote>quoted</blockquote>", "<hr>",
+		"<pre>&lt;script&gt;alert(1)&lt;/script&gt;\n</pre>",
+		"<p>&lt;script&gt;alert(2)&lt;/script&gt;</p>",
+	} {
+		if !strings.Contains(g, want) {
+			t.Errorf("renderMarkdown lacks %q in %s", want, g)
+		}
+	}
+	if strings.Contains(g, "<script") {
+		t.Errorf("renderMarkdown let markup through: %s", g)
+	}
+	// with the gateway's own link rewriting: only safe targets are links
+	g = renderMarkdown("[bad](javascript:alert(3)) [web](https://example.com/a?b=1&c=2) [rel](notes/intro)",
+		"t", func(s string) string { return s })
+	for _, want := range []string{"bad", `<a href="https://example.com/a?b=1&amp;c=2">web</a>`, `<a href="notes/intro">rel</a>`} {
+		if !strings.Contains(g, want) {
+			t.Errorf("renderMarkdown lacks %q in %s", want, g)
+		}
+	}
+	if strings.Contains(g, `href="javascript`) {
+		t.Errorf("renderMarkdown linked javascript: %s", g)
+	}
+}
+
+func TestRenderText(t *testing.T) {
+	g := renderText("<b>a</b>\n  b", "t")
+	if !strings.Contains(g, "<pre>&lt;b&gt;a&lt;/b&gt;\n  b</pre>") {
+		t.Errorf("renderText: %s", g)
+	}
+}
+
+// The gateway serves a publisher's HTML only in the sandbox, whatever
+// mark said it was HTML, and renders everything else itself.
+func TestGatewayRender(t *testing.T) {
+	g := &gateway{port: "8475"}
+	for _, c := range []struct{ mark, body, csp, want string }{
+		{"html", `<a href="urb://~zod/x">x</a>`, sandbox, `href="http://zod.urb.localhost:8475/x"`},
+		{"gmi", "<!doctype html><p>old", sandbox, "<p>old"},
+		{"gmi", "# old gemtext\n=> urb://~zod/y y", "default-src 'none'", `<a href="http://zod.urb.localhost:8475/y">y</a>`},
+		{"md", "# md\n[z](urb://~zod/z)\n<script>x</script>", "default-src 'none'", `<a href="http://zod.urb.localhost:8475/z">z</a>`},
+		{"text", "# not a heading", "default-src 'none'", "<pre># not a heading</pre>"},
+		{"css", "a{color:red}", "default-src 'none'", "<pre>a{color:red}</pre>"},
+	} {
+		csp, out := g.render("urb://~zod/p", c.mark, c.body)
+		if !strings.HasPrefix(csp, c.csp) || !strings.Contains(out, c.want) {
+			t.Errorf("%%%s: csp %q, body %s", c.mark, csp, out)
+		}
+		if c.csp != sandbox && strings.Contains(out, "<script>") {
+			t.Errorf("%%%s: markup outside the sandbox: %s", c.mark, out)
+		}
+	}
+}
+
+// A page's links stay on the web, urb:// or this ship: no script
+// targets, and no protocol-relative // or \\ that leaves the origin.
+func TestSafeLinks(t *testing.T) {
+	for _, s := range []string{"https://a.example/x", "http://a", "urb://~zod/x", "gemini://g", "mailto:a@b", "notes/intro", "/notes", "#top", ""} {
+		if !safeLink(s) {
+			t.Errorf("refused %q", s)
+		}
+	}
+	for _, s := range []string{"javascript:alert(1)", "data:text/html,x", "//evil.example", `\\evil.example`, `/\evil.example`, `\/evil.example`, " //evil.example"} {
+		if safeLink(s) {
+			t.Errorf("allowed %q", s)
+		}
+	}
+	id := func(s string) string { return s }
+	g := renderGemtext("=> //evil.example evil\n=> javascript:alert(1) js\n=> /ok fine", "t", id)
+	if strings.Contains(g, "evil.example\"") || strings.Contains(g, `href="javascript`) || !strings.Contains(g, `<a href="/ok">fine</a>`) {
+		t.Errorf("renderGemtext links: %s", g)
+	}
+	m := renderMarkdown("[evil](//evil.example) [back](\\\\evil.example)", "t", id)
+	if strings.Contains(m, "<a ") {
+		t.Errorf("renderMarkdown links: %s", m)
+	}
+}
+
+// The gateway's own pages run no scripts and aren't sniffed.
+func TestOwnPageHeaders(t *testing.T) {
+	w := httptest.NewRecorder()
+	(&gateway{}).error(w, "urb://~zod/x", fail(404, "<b>gone</b>"))
+	h := w.Result().Header
+	if h.Get("Content-Security-Policy") != own || h.Get("X-Content-Type-Options") != "nosniff" || w.Code != 404 {
+		t.Errorf("error page: %d %v", w.Code, h)
+	}
+	if strings.Contains(w.Body.String(), "<b>gone") {
+		t.Error("error page did not escape")
+	}
+	if oneIdentity("~zod", "moon.key") == nil || oneIdentity("~zod", "") != nil || oneIdentity("", "moon.key") != nil {
+		t.Error("oneIdentity")
 	}
 }

@@ -35,7 +35,11 @@ func main() {
 	relayAt := flag.String("relay", "", "instead of the gateway, run the relay for libmesa in a browser (wasm/mesa.mjs) on this address, e.g. localhost:8476")
 	origins := flag.String("relay-origins", "chrome-extension://*", "comma-separated Origin patterns the relay accepts (clients that send none, such as Node, are always accepted)")
 	relayFake := flag.Bool("relay-fake", false, "for tests: relay to a fake network (urbit -F) on this machine, galaxy g at 127.0.0.1:31337+g")
+	fake := flag.String("fake", "", "for tests: run the gateway as this ship on a fake network (urbit -F) on this machine")
 	flag.Parse()
+	if err := oneIdentity(*fake, *moon); err != nil {
+		log.Fatal(err)
+	}
 
 	if err := os.MkdirAll(*state, 0o700); err != nil {
 		log.Fatal(err)
@@ -56,7 +60,7 @@ func main() {
 
 	lns, port := listenAll(*listen)
 	r := newReader()
-	node, err := open(*state, *moon, *newMoon, r)
+	node, err := open(*state, *moon, *newMoon, *fake, r)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -84,6 +88,14 @@ func main() {
 		log.Fatal(err)
 	}
 	node.Close()
+}
+
+// oneIdentity refuses -fake with -moon: each names who the gateway runs as.
+func oneIdentity(fake, moon string) error {
+	if fake != "" && moon != "" {
+		return errors.New("-fake and -moon each name who the gateway runs as: pass one or the other")
+	}
+	return nil
 }
 
 // listenAll listens on addr, and on both loopbacks for localhost:
@@ -121,20 +133,30 @@ func defaultState() string {
 	return filepath.Join(home, ".local", "state", "urb-fetch")
 }
 
-// open loads the identity (a comet, mined on first use, or a moon), its
-// store and its UDP port, and opens the node.
-func open(state, moon string, newMoon bool, app mesa.App) (*mesa.Node, error) {
+// open loads the identity (a comet, mined on first use, a moon, or a
+// fake ship), its store and its UDP port, and opens the node.
+func open(state, moon string, newMoon bool, fake string, app mesa.App) (*mesa.Node, error) {
 	var id *mesa.Identity
 	var err error
-	if moon != "" {
+	switch {
+	case fake != "":
+		var who mesa.Ship
+		if who, err = mesa.ParseShip(fake); err == nil {
+			id = mesa.FakeIdentity(who)
+		}
+	case moon != "":
 		id, err = mesa.LoadKeyfile(moon)
-	} else {
+	default:
 		id, err = mesa.LoadComet(filepath.Join(state, "comet.key"))
 	}
 	if err != nil {
 		return nil, err
 	}
-	db := filepath.Join(state, strings.TrimPrefix(id.Ship().String(), "~")+".db")
+	name := strings.TrimPrefix(id.Ship().String(), "~")
+	if fake != "" {
+		name = "fake-" + name // never the real ship's state
+	}
+	db := filepath.Join(state, name+".db")
 	_, statErr := os.Stat(db)
 	fresh := os.IsNotExist(statErr)
 	if moon != "" && fresh && !newMoon {
@@ -178,6 +200,16 @@ type gateway struct {
 // origin, so its scripts run but hold no cookie and reach nothing of ours.
 const sandbox = "sandbox allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation"
 
+// own is the policy for the gateway's own pages: no scripts at all.
+const own = "default-src 'none'; style-src 'unsafe-inline'"
+
+// ownPage sets the headers of a page the gateway renders itself.
+func ownPage(h http.Header) {
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Content-Security-Policy", own)
+	h.Set("X-Content-Type-Options", "nosniff")
+}
+
 func (g *gateway) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet && req.Method != http.MethodHead {
 		http.Error(w, "read only", http.StatusMethodNotAllowed)
@@ -204,36 +236,50 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func (g *gateway) serve(w http.ResponseWriter, req *http.Request, url string) {
 	t := time.Now()
-	key, body, how, err := g.r.Fetch(url)
+	pg, err := g.r.Fetch(url)
 	if err != nil {
 		g.error(w, url, err)
 		logf("%s: %v (%.1fs)", url, err, time.Since(t).Seconds())
 		return
 	}
-	isHTML := looksHTML(body)
-	logf("%s -> %s by %s, %d bytes (%.1fs)", url, key, how, len(body), time.Since(t).Seconds())
+	logf("%s -> %s %%%s by %s, %d bytes (%.1fs)", url, pg.Key, pg.Mark, pg.How, len(pg.Body), time.Since(t).Seconds())
 	h := w.Header()
 	h.Set("X-Urb-Url", url)
+	h.Set("X-Urb-Mark", pg.Mark)
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Cache-Control", "no-cache")
-	switch {
-	case req.URL.Query().Has("raw"):
+	if req.URL.Query().Has("raw") {
 		h.Set("Content-Type", "text/plain; charset=utf-8")
-	case isHTML:
-		h.Set("Content-Type", "text/html; charset=utf-8")
-		h.Set("Content-Security-Policy", sandbox)
-		body = rewriteHTML(body, g.port)
-	default:
-		h.Set("Content-Type", "text/html; charset=utf-8")
-		h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
-		body = renderGemtext(body, url, func(target string) string {
-			if u, err := gatewayURL(target, g.port); err == nil {
-				return u
-			}
-			return target
-		})
+		h.Set("Content-Security-Policy", "sandbox") // in case a browser renders it anyway
+		fmt.Fprint(w, pg.Body)
+		return
 	}
+	csp, body := g.render(url, pg.Mark, pg.Body)
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Content-Security-Policy", csp)
 	fmt.Fprint(w, body)
+}
+
+// render is a page as the gateway serves it, by the mark it was
+// published under (renderAs): its Content-Security-Policy and its HTML.
+// A publisher's HTML is only ever served in the sandbox. Everything else
+// the gateway renders itself, with no scripts.
+func (g *gateway) render(url, mark, body string) (csp, out string) {
+	link := func(target string) string {
+		if u, err := gatewayURL(target, g.port); err == nil {
+			return u
+		}
+		return target
+	}
+	switch renderAs(mark, body) {
+	case "html":
+		return sandbox, rewriteHTML(body, g.port)
+	case "md":
+		return own, renderMarkdown(body, url, link)
+	case "gmi":
+		return own, renderGemtext(body, url, link)
+	}
+	return own, renderText(body, url)
 }
 
 // redirect sends /go?url=urb://... to where the gateway serves it.
@@ -247,7 +293,7 @@ func (g *gateway) redirect(w http.ResponseWriter, req *http.Request) {
 }
 
 func (g *gateway) home(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	ownPage(w.Header())
 	fmt.Fprint(w, page("urb-fetch", `<h1>urb-fetch</h1>
 <p>Read a page published with lattice on the Urbit network, as `+html.EscapeString(g.r.node.Ship().String())+`.</p>
 <form action="/go"><input name="url" placeholder="urb://~sampel-palnet/page" autofocus></form>`))
@@ -259,7 +305,7 @@ func (g *gateway) error(w http.ResponseWriter, url string, err error) {
 	if errors.As(err, &he) {
 		status = he.status
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	ownPage(w.Header())
 	w.WriteHeader(status)
 	fmt.Fprint(w, page(url, "<h1>"+strconv.Itoa(status)+"</h1><p>"+html.EscapeString(err.Error())+"</p>"))
 }

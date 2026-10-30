@@ -3,6 +3,9 @@
 //
 //   node pub-cli.mjs [node.mjs's options] [--put NAME=FILE]... [--remove NAME]...
 //
+// A page's format, the mark it is published under, comes from FILE's
+// extension, in any case: .md, .html, .txt, .js, .css, else gemtext.
+//
 // A reader opens urb://~our-ship/NAME. The pages, and the keeps of readers
 // following them, are kept in pages.json in the identity's state folder,
 // so a later run serves them again. On a fake network, for a fleet set:
@@ -16,7 +19,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { DESK_BASE } from './mesa.mjs';
 import { connect, log, options } from './node.mjs';
-import { publish } from './pub.mjs';
+import { markOf, publish } from './pub.mjs';
 
 const { values: opt } = parseArgs({
   options: { ...options, put: { type: 'string', multiple: true, default: [] }, remove: { type: 'string', multiple: true, default: [] } },
@@ -58,13 +61,13 @@ try {
     },
   });
   for (const p of opt.put) {
-    const at = p.indexOf('=');
-    const rec = at > 0 && pub.put(p.slice(0, at), readFileSync(p.slice(at + 1), 'utf8'));
+    const at = p.indexOf('='), file = p.slice(at + 1);
+    const rec = at > 0 && pub.put(p.slice(0, at), readFileSync(file, 'utf8'), markOf(file));
     if (!rec) throw new Error(`--put ${p}: NAME=FILE, NAME as lattice names pages (notes/intro)`);
   }
   for (const name of opt.remove) if (!pub.remove(name)) log(`--remove ${name}: no such page`);
   for (const [key, p] of Object.entries(pub.pages())) {
-    if (p.body !== null) log(`urb://${urb.our}${key}  rev ${p.rev}, ${p.body.length} characters`);
+    if (p.body !== null) log(`urb://${urb.our}${key}  %${p.mark ?? 'gmi'} rev ${p.rev}, ${p.body.length} characters`);
   }
 } catch (e) {
   log(e.message || e);

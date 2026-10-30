@@ -60,6 +60,18 @@ type keenResult struct {
 	ok         bool
 }
 
+// isPage is whether a keen got a page: a body under one of lattice's
+// view-mode marks (+read-page-body-rev). Release 74 and later grow a page
+// under its format's mark, older ones under %gmi; a %del tombstone or a
+// mark lattice doesn't publish is a miss.
+func (k keenResult) isPage() bool { return k.ok && pageMarks[k.mark] }
+
+// Page is a published page as Fetch reads it: its key in the vault, the
+// mark it was published under, its source, and how it was read.
+type Page struct {
+	Key, Mark, Body, How string
+}
+
 // Reader is the libmesa App. Its peek, keen and flow maps belong to the
 // node's goroutine (hooks and Node.Do); request goroutines wait on
 // channels. bases and revs are shared with them under mu.
@@ -447,12 +459,14 @@ func (r *Reader) revList(her mesa.Ship) (map[string]string, error) {
 }
 
 // page is one published page (+read-page-body-rev): a keen at the id the
-// list names, else a peek of the vault file. "" when it isn't there.
-func (r *Reader) page(her mesa.Ship, key string, revs map[string]string) (body, how string) {
+// list names, else a peek of the vault file. how is "" when it isn't
+// there. The vault file is %gmi whatever the page's format and carries no
+// other mark, so a page read by peek is %gmi, as in lattice's reader.
+func (r *Reader) page(her mesa.Ship, key string, revs map[string]string) (body, mark, how string) {
 	if id, ok := revs[key]; ok {
 		res := r.keen(her, "/g/x/1/grubbery//1/pub/page"+key+"/"+id)
-		if res.ok && res.mark == "gmi" {
-			return res.body, "keen"
+		if res.isPage() {
+			return res.body, res.mark, "keen"
 		}
 		r.mu.Lock()
 		delete(r.revs, her) // a miss means the list is stale
@@ -460,25 +474,25 @@ func (r *Reader) page(her mesa.Ship, key string, revs map[string]string) (body, 
 	}
 	b, err := r.base(her)
 	if err != nil {
-		return "", ""
+		return "", "", ""
 	}
 	if v, _ := r.peek(her, b+"/pub/vault"+key, "gmi", textOf, nil); v != nil {
 		s, _ := v.(string)
-		return s, "peek"
+		return s, "gmi", "peek"
 	}
-	return "", ""
+	return "", "", ""
 }
 
 // Fetch reads the page an urb:// url names (+read-page-or-index): the
 // page itself, or the index under it.
-func (r *Reader) Fetch(url string) (key, body, how string, err error) {
+func (r *Reader) Fetch(url string) (Page, error) {
 	her, rel, err := deUrb(url)
 	if err != nil {
-		return "", "", "", err
+		return Page{}, err
 	}
 	revs, err := r.revList(her)
 	if err != nil {
-		return "", "", "", err
+		return Page{}, err
 	}
 	keyOf := func(p []string) string { return "/" + strings.Join(p, "/") }
 	hit := func(p []string) bool { _, ok := revs[keyOf(p)]; return ok }
@@ -495,9 +509,9 @@ func (r *Reader) Fetch(url string) (key, body, how string, err error) {
 		tries = [][]string{rel, dex}
 	}
 	for _, p := range tries {
-		if body, how := r.page(her, keyOf(p), revs); how != "" {
-			return keyOf(p), body, how, nil
+		if body, mark, how := r.page(her, keyOf(p), revs); how != "" {
+			return Page{keyOf(p), mark, body, how}, nil
 		}
 	}
-	return "", "", "", fail(404, "%s is not published", url)
+	return Page{}, fail(404, "%s is not published", url)
 }

@@ -13,8 +13,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { DESK_BASE, da, fakeKeyfile, open, uv } from './mesa.mjs';
-import { publish } from './pub.mjs';
+import { DESK_BASE, da, fakeKeyfile, open, renderAs, uv } from './mesa.mjs';
+import { markOf, publish } from './pub.mjs';
 
 const wasm = readFileSync(new URL('build/mesa.wasm', import.meta.url));
 
@@ -117,11 +117,40 @@ expect('an edit: a reader that read lately still sees the old one, as lattice', 
 const bud = await engine('~bud', 2);
 r = await bud.read('urb://~zod/notes/intro');
 expect(`an edit: a new reader reads it by ${r.how}`, r.body === '# Intro, again' && r.how === 'keen');
+//  lattice 74 and later publish a page under its format's mark; before,
+//  every page was %gmi, sniffed for HTML. Both read and render as lattice.
+const formats = [
+  ['fmt/md', 'md', '# Heading\n<b>raw</b>', 'md'],
+  ['fmt/html', 'html', 'no tag first, still html', 'html'],
+  ['fmt/text', 'text', '<b>looks like markup</b>', 'text'],
+  ['fmt/css', 'css', 'body{color:red}', 'text'],
+  ['fmt/js', 'js', 'alert(1)', 'text'],
+  ['fmt/gmi', 'gmi', '# gemtext\n=> /a a', 'gmi'],
+  ['fmt/old-html', 'gmi', '  <!doctype html><p>a pre-74 html page', 'html'],
+];
+for (const [name, mark, body] of formats) pub.put(name, body, mark);
+expect('a mark lattice does not publish is refused', pub.put('fmt/x', 'x', 'del') === null);
+const sev = await engine('~sev', 4);   // a reader whose list has them
+for (const [name, mark, body, as] of formats) {
+  r = await sev.read(`urb://~zod/${name}`);
+  expect(`%${mark} reads back by keen as %${r.mark}, renders as ${renderAs(r.mark, r.body)}`,
+    r.body === body && r.how === 'keen' && r.mark === mark && renderAs(r.mark, r.body) === as);
+}
+r = await nec.read('urb://~zod/fmt/md');   // nec's list is from before it
+expect(`a page not on the reader's list reads by ${r.how} as %${r.mark}, as lattice's slow path`,
+  r.how === 'peek' && r.mark === 'gmi' && r.body === '# Heading\n<b>raw</b>');
+const vault = await sev.grub.peek('~zod', `${DESK_BASE}/pub/vault/fmt/md`, 'gmi', sev.nouns.cord);
+expect('the vault file is %gmi whatever the format, as lattice keeps it', vault === '# Heading\n<b>raw</b>');
+const as = [[undefined, '# x'], [undefined, '<p>'], ['gmi', '# x'], ['gmi', '\n <p>'], ['html', 'x'], ['md', '<p>'], ['text', '<p>'], ['css', '<p>'], ['noun', 'x']]
+  .map(([m, b]) => renderAs(m, b)).join(' ');
+expect(`renderAs: ${as}`, as === 'gmi html gmi html html md text text text');
+const marks = ['a.MD', 'b.Html', 'c.htm', 'd.TXT', 'e.js', 'f.CSS', 'g.gmi', 'h', 'dir.md/i'].map(markOf).join(' ');
+expect(`markOf, in any case: ${marks}`, marks === 'md html html text js css gmi gmi gmi');
 pub.remove('notes/intro');
 const wes = await engine('~wes', 3);
 r = await wes.read('urb://~zod/notes/intro').catch(e => e);
 expect('a removed page is gone', r instanceof Error && /not published/.test(r.message));
 expect('save had pages and keeps', saved.pages['/notes/intro'].rev === 3 && saved.pages['/notes/intro'].body === null && Array.isArray(saved.keepers));
 
-await Promise.all([zod, nec, bud, wes].map(u => u.close()));
+await Promise.all([zod, nec, bud, wes, sev].map(u => u.close()));
 process.exit(bad || checks.includes(false) ? 1 : 0);
