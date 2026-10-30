@@ -102,9 +102,9 @@ export const PAGE_MARKS = new Set(['text', 'html', 'gmi', 'md', 'js', 'css', 'no
 // How a page published under mark renders, as lattice's reader does:
 // 'html' (only ever in a sandbox), 'md', 'gmi' or 'text' (in a <pre>).
 // Only %gmi is sniffed, since %gmi is all an older publisher, an old
-// revision or the vault peek says.
+// revision or the vault peek says; no mark (a /k/ or /t/ read) is %gmi.
 export function renderAs(mark, body) {
-  if (mark === 'gmi') return looksHtml(body) ? 'html' : 'gmi';
+  if (mark === undefined || mark === null || mark === 'gmi') return looksHtml(body) ? 'html' : 'gmi';
   return mark === 'html' || mark === 'md' ? mark : 'text';
 }
 

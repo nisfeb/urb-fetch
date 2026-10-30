@@ -36,6 +36,11 @@ export function pageKey(name) {
   return '/' + segs.join('/');
 }
 
+// the mark a page's file publishes under, by its extension in any case:
+// .md, .html, .txt, .js, .css, else gemtext
+const EXT_MARKS = { md: 'md', html: 'html', htm: 'html', txt: 'text', js: 'js', css: 'css' };
+export const markOf = file => EXT_MARKS[/\.([^./]+)$/.exec(file)?.[1].toLowerCase()] ?? 'gmi';
+
 export function publish(urb, { pages = {}, keepers = [], save = () => {} } = {}) {
   const pubDir = BASE + '/pub', vault = pubDir + '/vault';
   const live = () => Object.entries(pages).filter(([, p]) => p.body !== null);

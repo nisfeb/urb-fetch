@@ -14,7 +14,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { DESK_BASE, da, fakeKeyfile, open, renderAs, uv } from './mesa.mjs';
-import { publish } from './pub.mjs';
+import { markOf, publish } from './pub.mjs';
 
 const wasm = readFileSync(new URL('build/mesa.wasm', import.meta.url));
 
@@ -141,9 +141,11 @@ expect(`a page not on the reader's list reads by ${r.how} as %${r.mark}, as latt
   r.how === 'peek' && r.mark === 'gmi' && r.body === '# Heading\n<b>raw</b>');
 const vault = await sev.grub.peek('~zod', `${DESK_BASE}/pub/vault/fmt/md`, 'gmi', sev.nouns.cord);
 expect('the vault file is %gmi whatever the format, as lattice keeps it', vault === '# Heading\n<b>raw</b>');
-const as = [['gmi', '# x'], ['gmi', '\n <p>'], ['html', 'x'], ['md', '<p>'], ['text', '<p>'], ['css', '<p>'], ['noun', 'x']]
+const as = [[undefined, '# x'], [undefined, '<p>'], ['gmi', '# x'], ['gmi', '\n <p>'], ['html', 'x'], ['md', '<p>'], ['text', '<p>'], ['css', '<p>'], ['noun', 'x']]
   .map(([m, b]) => renderAs(m, b)).join(' ');
-expect(`renderAs: ${as}`, as === 'gmi html html md text text text');
+expect(`renderAs: ${as}`, as === 'gmi html gmi html html md text text text');
+const marks = ['a.MD', 'b.Html', 'c.htm', 'd.TXT', 'e.js', 'f.CSS', 'g.gmi', 'h', 'dir.md/i'].map(markOf).join(' ');
+expect(`markOf, in any case: ${marks}`, marks === 'md html html text js css gmi gmi gmi');
 pub.remove('notes/intro');
 const wes = await engine('~wes', 3);
 r = await wes.read('urb://~zod/notes/intro').catch(e => e);
