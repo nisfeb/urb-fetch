@@ -29,3 +29,18 @@ func TestLateAnswer(t *testing.T) {
 		t.Errorf("on-time answer: caller got %v, late got %v", v, late)
 	}
 }
+
+// A keen hit is any lattice view-mode mark (release 74 and later), or
+// %gmi (every page before). A %del tombstone, a miss, or a cell is not.
+func TestKeenIsPage(t *testing.T) {
+	for _, m := range []string{"gmi", "md", "html", "text", "js", "css", "noun"} {
+		if !(keenResult{mark: m, body: "x", ok: true}).isPage() {
+			t.Errorf("%%%s keen rejected", m)
+		}
+	}
+	for _, k := range []keenResult{{mark: "del", ok: true}, {mark: "md"}, {}, {mark: "json", ok: true}} {
+		if k.isPage() {
+			t.Errorf("%+v accepted", k)
+		}
+	}
+}

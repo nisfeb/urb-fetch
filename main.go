@@ -204,36 +204,50 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func (g *gateway) serve(w http.ResponseWriter, req *http.Request, url string) {
 	t := time.Now()
-	key, body, how, err := g.r.Fetch(url)
+	pg, err := g.r.Fetch(url)
 	if err != nil {
 		g.error(w, url, err)
 		logf("%s: %v (%.1fs)", url, err, time.Since(t).Seconds())
 		return
 	}
-	isHTML := looksHTML(body)
-	logf("%s -> %s by %s, %d bytes (%.1fs)", url, key, how, len(body), time.Since(t).Seconds())
+	logf("%s -> %s %%%s by %s, %d bytes (%.1fs)", url, pg.Key, pg.Mark, pg.How, len(pg.Body), time.Since(t).Seconds())
 	h := w.Header()
 	h.Set("X-Urb-Url", url)
+	h.Set("X-Urb-Mark", pg.Mark)
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Cache-Control", "no-cache")
-	switch {
-	case req.URL.Query().Has("raw"):
+	if req.URL.Query().Has("raw") {
 		h.Set("Content-Type", "text/plain; charset=utf-8")
-	case isHTML:
-		h.Set("Content-Type", "text/html; charset=utf-8")
-		h.Set("Content-Security-Policy", sandbox)
-		body = rewriteHTML(body, g.port)
-	default:
-		h.Set("Content-Type", "text/html; charset=utf-8")
-		h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
-		body = renderGemtext(body, url, func(target string) string {
-			if u, err := gatewayURL(target, g.port); err == nil {
-				return u
-			}
-			return target
-		})
+		fmt.Fprint(w, pg.Body)
+		return
 	}
+	csp, body := g.render(url, pg.Mark, pg.Body)
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Content-Security-Policy", csp)
 	fmt.Fprint(w, body)
+}
+
+// render is a page as the gateway serves it, by the mark it was
+// published under (renderAs): its Content-Security-Policy and its HTML.
+// A publisher's HTML is only ever served in the sandbox. Everything else
+// the gateway renders itself, with no scripts.
+func (g *gateway) render(url, mark, body string) (csp, out string) {
+	link := func(target string) string {
+		if u, err := gatewayURL(target, g.port); err == nil {
+			return u
+		}
+		return target
+	}
+	const own = "default-src 'none'; style-src 'unsafe-inline'"
+	switch renderAs(mark, body) {
+	case "html":
+		return sandbox, rewriteHTML(body, g.port)
+	case "md":
+		return own, renderMarkdown(body, url, link)
+	case "gmi":
+		return own, renderGemtext(body, url, link)
+	}
+	return own, renderText(body, url)
 }
 
 // redirect sends /go?url=urb://... to where the gateway serves it.

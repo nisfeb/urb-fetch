@@ -61,9 +61,32 @@ func deUrb(url string) (mesa.Ship, []string, error) {
 	return mesa.Ship{}, nil, fail(404, "/%s/ is not an urb:// mount", segs[0])
 }
 
+// pageMarks are lattice's view modes (view-mode:pg). Release 74 and later
+// publish each page under its mode's mark (+mode-mark), so the mark says
+// the format. Older releases publish every page as %gmi
+// (nisfeb/lattice#321).
+var pageMarks = map[string]bool{"text": true, "html": true, "gmi": true, "md": true, "js": true, "css": true, "noun": true}
+
+// renderAs is how a page published under mark renders, as lattice's
+// reader does: "html", "md", "gmi" or "text". Only a %gmi page is
+// sniffed, since %gmi is all an older publisher, an old revision or the
+// vault peek says: one whose body starts with < is HTML. js, css and
+// noun render as text.
+func renderAs(mark, body string) string {
+	switch mark {
+	case "gmi":
+		if looksHTML(body) {
+			return "html"
+		}
+		return "gmi"
+	case "html", "md":
+		return mark
+	}
+	return "text"
+}
+
 // looksHTML is lattice-gmi's +looks-html: the first non-blank character
-// is <. Lattice grows every published page under %gmi whatever its
-// format (nisfeb/lattice#321), so the body has to be sniffed.
+// is <.
 func looksHTML(body string) bool {
 	if len(body) > 256 {
 		body = body[:256]
@@ -168,6 +191,121 @@ func renderGemtext(body, title string, link func(string) string) string {
 	if list {
 		b.WriteString("</ul>\n")
 	}
+	return page(title, b.String())
+}
+
+// renderText renders a text page (text, js, css) as preformatted text.
+func renderText(body, title string) string {
+	return page(title, "<pre>"+html.EscapeString(body)+"</pre>")
+}
+
+var (
+	mdHeading = regexp.MustCompile(`^(#{1,6})\s+(.*?)\s*#*\s*$`)
+	mdItem    = regexp.MustCompile(`^\s*(?:[-*+]|\d+[.)])\s+(.*)$`)
+	mdOrdered = regexp.MustCompile(`^\s*\d+[.)]\s`)
+	mdRule    = regexp.MustCompile(`^\s*(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$`)
+	mdInline  = regexp.MustCompile("`([^`]+)`|\\[([^\\]]+)\\]\\(([^)\\s]+)\\)|\\*\\*([^*]+)\\*\\*|\\*([^*\\s][^*]*)\\*")
+	safeHref  = regexp.MustCompile(`^(?:(?:https?|urb|gemini|mailto):|[^:]*$)`)
+)
+
+// renderMarkdown renders a small, safe subset of Markdown, with link
+// targets passed through link: headings, paragraphs, lists, quotes, rules
+// and fenced code, and inline code, links, bold and italics. Everything
+// else shows as written. All text is escaped, so raw HTML in the source
+// shows as text, and a link is kept only to the web, urb:// or a
+// relative path. A full renderer would be a new dependency.
+func renderMarkdown(body, title string, link func(string) string) string {
+	var b strings.Builder
+	esc := html.EscapeString
+	inline := func(s string) string {
+		var o strings.Builder
+		at := 0
+		for _, m := range mdInline.FindAllStringSubmatchIndex(s, -1) {
+			o.WriteString(esc(s[at:m[0]]))
+			at = m[1]
+			g := func(i int) string { return s[m[2*i]:m[2*i+1]] }
+			switch {
+			case m[2] >= 0:
+				o.WriteString("<code>" + esc(g(1)) + "</code>")
+			case m[4] >= 0:
+				if t := link(g(3)); safeHref.MatchString(t) {
+					fmt.Fprintf(&o, `<a href="%s">%s</a>`, esc(t), esc(g(2)))
+				} else {
+					o.WriteString(esc(g(2)))
+				}
+			case m[8] >= 0:
+				o.WriteString("<strong>" + esc(g(4)) + "</strong>")
+			default:
+				o.WriteString("<em>" + esc(g(5)) + "</em>")
+			}
+		}
+		o.WriteString(esc(s[at:]))
+		return o.String()
+	}
+	var para []string
+	list := ""
+	flush := func() {
+		if len(para) > 0 {
+			b.WriteString("<p>" + inline(strings.Join(para, " ")) + "</p>\n")
+			para = nil
+		}
+		if list != "" {
+			b.WriteString("</" + list + ">\n")
+			list = ""
+		}
+	}
+	pre := false
+	for _, line := range strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			if pre {
+				b.WriteString("</pre>\n")
+			} else {
+				flush()
+				b.WriteString("<pre>")
+			}
+			pre = !pre
+			continue
+		}
+		if pre {
+			b.WriteString(esc(line) + "\n")
+			continue
+		}
+		if m := mdItem.FindStringSubmatch(line); m != nil && !mdRule.MatchString(line) {
+			kind := "ul"
+			if mdOrdered.MatchString(line) {
+				kind = "ol"
+			}
+			if len(para) > 0 || list != kind {
+				flush()
+				b.WriteString("<" + kind + ">\n")
+				list = kind
+			}
+			b.WriteString("<li>" + inline(m[1]) + "</li>\n")
+			continue
+		}
+		switch m := mdHeading.FindStringSubmatch(line); {
+		case strings.TrimSpace(line) == "":
+			flush()
+		case m != nil:
+			flush()
+			fmt.Fprintf(&b, "<h%d>%s</h%d>\n", len(m[1]), inline(m[2]), len(m[1]))
+		case mdRule.MatchString(line):
+			flush()
+			b.WriteString("<hr>\n")
+		case strings.HasPrefix(strings.TrimSpace(line), ">"):
+			flush()
+			b.WriteString("<blockquote>" + inline(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), ">"))) + "</blockquote>\n")
+		default:
+			if list != "" {
+				flush()
+			}
+			para = append(para, strings.TrimSpace(line))
+		}
+	}
+	if pre {
+		b.WriteString("</pre>\n")
+	}
+	flush()
 	return page(title, b.String())
 }
 
