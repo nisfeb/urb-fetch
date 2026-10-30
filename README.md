@@ -32,6 +32,7 @@ The first page from a ship takes a few seconds while the two ships meet. After t
 | `-new-moon` | | The moon has never run anywhere. Start its state empty. |
 | `-relay` | | Run the relay for libmesa in a browser on this address, such as `localhost:8476`, instead of the gateway. See [wasm](#wasm). |
 | `-relay-origins` | `chrome-extension://*` | The `Origin` patterns the relay accepts, comma-separated. Clients that send no `Origin`, such as Node, are always accepted. |
+| `-fake` | | For tests: run the gateway as this ship on a fake network (`urbit -F`) on this machine. |
 | `-relay-fake` | | For tests: relay to a fake network (`urbit -F`) on this machine, galaxy g at `127.0.0.1:31337+g`. |
 
 ### As your moon
@@ -107,7 +108,7 @@ make test
 URB_FETCH_LIVE=~sampel-palnet URB_FETCH_STATE=/some/dir go test -run Live -v
 ```
 
-Don't point `URB_FETCH_STATE` at a folder a running gateway is using.
+Don't point `URB_FETCH_STATE` at a folder a running gateway is using. `URB_FETCH_FAKE=~ship` reads as that ship on a fake network instead.
 
 ## Prototype
 

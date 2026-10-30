@@ -35,6 +35,7 @@ func main() {
 	relayAt := flag.String("relay", "", "instead of the gateway, run the relay for libmesa in a browser (wasm/mesa.mjs) on this address, e.g. localhost:8476")
 	origins := flag.String("relay-origins", "chrome-extension://*", "comma-separated Origin patterns the relay accepts (clients that send none, such as Node, are always accepted)")
 	relayFake := flag.Bool("relay-fake", false, "for tests: relay to a fake network (urbit -F) on this machine, galaxy g at 127.0.0.1:31337+g")
+	fake := flag.String("fake", "", "for tests: run the gateway as this ship on a fake network (urbit -F) on this machine")
 	flag.Parse()
 
 	if err := os.MkdirAll(*state, 0o700); err != nil {
@@ -56,7 +57,7 @@ func main() {
 
 	lns, port := listenAll(*listen)
 	r := newReader()
-	node, err := open(*state, *moon, *newMoon, r)
+	node, err := open(*state, *moon, *newMoon, *fake, r)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -121,20 +122,30 @@ func defaultState() string {
 	return filepath.Join(home, ".local", "state", "urb-fetch")
 }
 
-// open loads the identity (a comet, mined on first use, or a moon), its
-// store and its UDP port, and opens the node.
-func open(state, moon string, newMoon bool, app mesa.App) (*mesa.Node, error) {
+// open loads the identity (a comet, mined on first use, a moon, or a
+// fake ship), its store and its UDP port, and opens the node.
+func open(state, moon string, newMoon bool, fake string, app mesa.App) (*mesa.Node, error) {
 	var id *mesa.Identity
 	var err error
-	if moon != "" {
+	switch {
+	case fake != "":
+		var who mesa.Ship
+		if who, err = mesa.ParseShip(fake); err == nil {
+			id = mesa.FakeIdentity(who)
+		}
+	case moon != "":
 		id, err = mesa.LoadKeyfile(moon)
-	} else {
+	default:
 		id, err = mesa.LoadComet(filepath.Join(state, "comet.key"))
 	}
 	if err != nil {
 		return nil, err
 	}
-	db := filepath.Join(state, strings.TrimPrefix(id.Ship().String(), "~")+".db")
+	name := strings.TrimPrefix(id.Ship().String(), "~")
+	if fake != "" {
+		name = "fake-" + name // never the real ship's state
+	}
+	db := filepath.Join(state, name+".db")
 	_, statErr := os.Stat(db)
 	fresh := os.IsNotExist(statErr)
 	if moon != "" && fresh && !newMoon {
