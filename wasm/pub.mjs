@@ -11,13 +11,18 @@
 //
 //   const pub = publish(urb, { pages, keepers, save })
 //   pub.put('notes/intro', '# Hello')
+//   pub.put('notes/more', '# More', 'md')
 //
-// pages is {'/<name>': {body, rev, id, at, hash}}: body null once removed,
+// A page's body is bound under its format's mark, as lattice 74 and later
+// grow it (+mode-mark): gmi unless put says otherwise. Its vault file is
+// %gmi whatever the format, as lattice keeps it.
+//
+// pages is {'/<name>': {body, rev, id, at, hash, mark}}: body null once removed,
 // where the rev stays, so a page published again counts on from it. Each
 // put and remove hands {pages, keepers} to save, plain JSON to keep for
 // the next run.
 
-import { DESK_BASE as BASE, da, uv } from './mesa.mjs';
+import { DESK_BASE as BASE, PAGE_MARKS, da, uv } from './mesa.mjs';
 
 const enc = new TextEncoder();
 const PAGE = '/g/x/1/grubbery//1/pub/page';   // +keen-path
@@ -69,7 +74,7 @@ export function publish(urb, { pages = {}, keepers = [], save = () => {} } = {})
   function scry(path) {
     if (!path.startsWith(PAGE + '/')) return null;
     const cut = path.lastIndexOf('/'), p = pages[path.slice(PAGE.length, cut)];
-    return p && p.body !== null && p.id === path.slice(cut + 1) ? ['gmi', p.body] : null;
+    return p && p.body !== null && p.id === path.slice(cut + 1) ? [p.mark ?? 'gmi', p.body] : null;
   }
 
   urb.grub.serve(file, keepers, ks => {
@@ -86,15 +91,16 @@ export function publish(urb, { pages = {}, keepers = [], save = () => {} } = {})
 
   return {
     pages: () => pages,
-    // publish [body] as the page [name], a new revision with a new,
-    // unguessable id; the record, or null for a name lattice can't read
-    put(name, body) {
+    // publish [body] as the page [name] in format [mark], a new revision
+    // with a new, unguessable id; the record, or null for a name lattice
+    // can't read or a mark it doesn't publish
+    put(name, body, mark = 'gmi') {
       const key = pageKey(name);
-      if (!key) return null;
+      if (!key || !PAGE_MARKS.has(mark)) return null;
       const [hi, lo] = crypto.getRandomValues(new BigUint64Array(2));
       const id = uv((hi << 64n) | lo);
       const hash = urb.nouns.sham(String(body)).toString(16);
-      pages[key] = { body: String(body), rev: (pages[key]?.rev ?? 0) + 1, id, at: Date.now(), hash };
+      pages[key] = { body: String(body), rev: (pages[key]?.rev ?? 0) + 1, id, at: Date.now(), hash, mark };
       saveAll();
       tell(key);
       return pages[key];
