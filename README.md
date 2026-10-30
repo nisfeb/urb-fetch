@@ -64,7 +64,18 @@ It reads a page the way lattice's own reader does (`nex/lattice/app.hoon`: `+rea
 
 The ids are salted on purpose. A publisher's runtime keeps answering any scry path it has answered once, even after the page changes, so guessable paths would let anyone read old revisions.
 
-Lattice labels every published page `%gmi`, whatever its format ([nisfeb/lattice#321](https://github.com/nisfeb/lattice/issues/321)). The gateway serves a page whose first character is `<` as HTML, and renders anything else as gemtext.
+A page renders by the mark it was published under, as lattice's reader does. Lattice release 74 and later publish each page under its format's mark: `%md`, `%html`, `%text`, `%gmi`, `%js`, `%css` or `%noun`. Older releases publish every page as `%gmi`, whatever its format ([nisfeb/lattice#321](https://github.com/nisfeb/lattice/issues/321)), and the vault file read in step 4 is `%gmi` on every release. So a `%gmi` page whose first character is `<` is HTML, and any other `%gmi` page is gemtext, as before.
+
+| Mark | Served as |
+| --- | --- |
+| `%html` | the publisher's HTML, in the sandbox |
+| `%md` | Markdown, rendered by the gateway |
+| `%gmi` | gemtext, or HTML in the sandbox if it starts with `<` |
+| `%text`, `%js`, `%css`, `%noun` | text, in a `<pre>` |
+
+The gateway renders a small, safe subset of Markdown itself, since it has no Markdown library: headings, paragraphs, lists, quotes, rules, fenced code, inline code, links, bold and italics. Everything is escaped, so raw HTML in Markdown shows as text, and only web, `urb://` and relative links are kept. The `X-Urb-Mark` header names the mark.
+
+Release 74 also rotated every publisher's salt once, so every page's id changed. The ids come from the revision list, so a reader only needs a fresh list, which it reads every minute.
 
 ### Notes for other clients
 
@@ -79,7 +90,7 @@ Three things any client of grubbery's peek has to get right:
 - It listens on loopback only. It refuses requests for any host name but its own, which blocks DNS rebinding.
 - Each ship is its own origin, `<ship>.urb.localhost`, so one ship's pages can't script another's.
 - A publisher's HTML is served with lattice's own sandbox policy. The page gets an opaque origin, so its scripts run but can't reach anything else.
-- Gemtext is rendered by the gateway, with no scripts allowed.
+- Gemtext, Markdown and text are rendered by the gateway, with no scripts allowed. HTML is never served outside the sandbox, whether its mark says so or an older `%gmi` page starts with `<`.
 - It only reads. It accepts GET and HEAD and nothing else.
 - `comet.key` in the state folder is a secret.
 - Every publisher you read keeps a record of your comet. Keep the state folder rather than starting fresh, or each fresh start leaves a new comet behind on every ship you visit.
@@ -107,10 +118,10 @@ Don't point `URB_FETCH_STATE` at a folder a running gateway is using.
 `wasm/` builds libmesa as WebAssembly, so a browser or an extension can read `urb://` pages itself.
 
 - `build.sh` applies `libmesa-wasm32.diff` to a copy of libmesa and links it with `glue.c` into `build/mesa.wasm`.
-- `mesa.mjs` runs the engine as a comet and reads pages the way the gateway does. It works in Node and in a browser. Its host supplies a transport for datagrams and a store for the comet and the engine's state. Each commit's changes are saved before the datagrams it released go out.
+- `mesa.mjs` runs the engine as a comet and reads pages the way the gateway does. `read` gives each page's `mark` with its body, and `renderAs(mark, body)` says how to render it: `html` (sandboxed), `md`, `gmi` or `text`, as the gateway does. It works in Node and in a browser. Its host supplies a transport for datagrams and a store for the comet and the engine's state. Each commit's changes are saved before the datagrams it released go out.
 - `host.mjs` reads one page from Node, and `node.mjs` has what Node's command lines share: the state folder, UDP, and the options that pick who runs.
 - `furum.mjs` talks to [furum](https://github.com/nisfeb/furum) boards on another ship: it reads a board's posts, comments and votes, and posts, comments and votes through the host's public `inbox.sig`. `furum-cli.mjs` drives it from Node.
-- `pub.mjs` publishes pages from the engine, so lattice readers on other ships open them at `urb://~our-ship/<name>`. It lays them out as lattice does: `/pub/index` and `/pub/revs` and each page's vault file answer grubbery peeks, a keep on a page's vault file hears its edits, and each revision's body answers remote scry at an unguessable id. `pub-cli.mjs` publishes and serves from Node.
+- `pub.mjs` publishes pages from the engine, each under its format's mark as lattice 74 and later do (`pub-cli.mjs` takes it from the file's extension: `.md`, `.html`, `.txt`, `.js`, `.css`, else gemtext), so lattice readers on other ships open them at `urb://~our-ship/<name>`. It lays them out as lattice does: `/pub/index` and `/pub/revs` and each page's vault file answer grubbery peeks, a keep on a page's vault file hears its edits, and each revision's body answers remote scry at an unguessable id. `pub-cli.mjs` publishes and serves from Node.
 - `check.mjs` checks serving with no ship. vere's `urbit eval` computes the hashes, maps, ids and dates that other ships check, and the engine must agree. Then two engines in one process publish and read pages, edits and removals.
 
 ```
