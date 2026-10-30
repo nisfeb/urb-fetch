@@ -168,7 +168,11 @@ func renderGemtext(body, title string, link func(string) string) string {
 			if label == "" {
 				label = f[0]
 			}
-			fmt.Fprintf(&b, "<p class=\"link\"><a href=\"%s\">%s</a></p>\n", esc(link(f[0])), esc(label))
+			if t := link(f[0]); safeLink(t) {
+				fmt.Fprintf(&b, "<p class=\"link\"><a href=\"%s\">%s</a></p>\n", esc(t), esc(label))
+			} else {
+				b.WriteString("<p class=\"link\">" + esc(label) + "</p>\n")
+			}
 		case strings.HasPrefix(line, "#"):
 			lvl := len(line) - len(strings.TrimLeft(line, "#"))
 			lvl = min(lvl, 3)
@@ -206,7 +210,13 @@ var (
 	mdRule    = regexp.MustCompile(`^\s*(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$`)
 	mdInline  = regexp.MustCompile("`([^`]+)`|\\[([^\\]]+)\\]\\(([^)\\s]+)\\)|\\*\\*([^*]+)\\*\\*|\\*([^*\\s][^*]*)\\*")
 	safeHref  = regexp.MustCompile(`^(?:(?:https?|urb|gemini|mailto):|[^:]*$)`)
+	hostLink  = regexp.MustCompile(`^\s*[/\\]{2}`)
 )
+
+// safeLink is whether a page's link target may be a link: the web,
+// urb://, gemini, mail, or a path on this ship. A protocol-relative //
+// (or \\, which browsers read as //) would leave the ship's origin.
+func safeLink(t string) bool { return safeHref.MatchString(t) && !hostLink.MatchString(t) }
 
 // renderMarkdown renders a small, safe subset of Markdown, with link
 // targets passed through link: headings, paragraphs, lists, quotes, rules
@@ -228,7 +238,7 @@ func renderMarkdown(body, title string, link func(string) string) string {
 			case m[2] >= 0:
 				o.WriteString("<code>" + esc(g(1)) + "</code>")
 			case m[4] >= 0:
-				if t := link(g(3)); safeHref.MatchString(t) {
+				if t := link(g(3)); safeLink(t) {
 					fmt.Fprintf(&o, `<a href="%s">%s</a>`, esc(t), esc(g(2)))
 				} else {
 					o.WriteString(esc(g(2)))

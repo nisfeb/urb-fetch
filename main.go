@@ -37,6 +37,9 @@ func main() {
 	relayFake := flag.Bool("relay-fake", false, "for tests: relay to a fake network (urbit -F) on this machine, galaxy g at 127.0.0.1:31337+g")
 	fake := flag.String("fake", "", "for tests: run the gateway as this ship on a fake network (urbit -F) on this machine")
 	flag.Parse()
+	if err := oneIdentity(*fake, *moon); err != nil {
+		log.Fatal(err)
+	}
 
 	if err := os.MkdirAll(*state, 0o700); err != nil {
 		log.Fatal(err)
@@ -85,6 +88,14 @@ func main() {
 		log.Fatal(err)
 	}
 	node.Close()
+}
+
+// oneIdentity refuses -fake with -moon: each names who the gateway runs as.
+func oneIdentity(fake, moon string) error {
+	if fake != "" && moon != "" {
+		return errors.New("-fake and -moon each name who the gateway runs as: pass one or the other")
+	}
+	return nil
 }
 
 // listenAll listens on addr, and on both loopbacks for localhost:
@@ -189,6 +200,16 @@ type gateway struct {
 // origin, so its scripts run but hold no cookie and reach nothing of ours.
 const sandbox = "sandbox allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation"
 
+// own is the policy for the gateway's own pages: no scripts at all.
+const own = "default-src 'none'; style-src 'unsafe-inline'"
+
+// ownPage sets the headers of a page the gateway renders itself.
+func ownPage(h http.Header) {
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Content-Security-Policy", own)
+	h.Set("X-Content-Type-Options", "nosniff")
+}
+
 func (g *gateway) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet && req.Method != http.MethodHead {
 		http.Error(w, "read only", http.StatusMethodNotAllowed)
@@ -229,6 +250,7 @@ func (g *gateway) serve(w http.ResponseWriter, req *http.Request, url string) {
 	h.Set("Cache-Control", "no-cache")
 	if req.URL.Query().Has("raw") {
 		h.Set("Content-Type", "text/plain; charset=utf-8")
+		h.Set("Content-Security-Policy", "sandbox") // in case a browser renders it anyway
 		fmt.Fprint(w, pg.Body)
 		return
 	}
@@ -249,7 +271,6 @@ func (g *gateway) render(url, mark, body string) (csp, out string) {
 		}
 		return target
 	}
-	const own = "default-src 'none'; style-src 'unsafe-inline'"
 	switch renderAs(mark, body) {
 	case "html":
 		return sandbox, rewriteHTML(body, g.port)
@@ -272,7 +293,7 @@ func (g *gateway) redirect(w http.ResponseWriter, req *http.Request) {
 }
 
 func (g *gateway) home(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	ownPage(w.Header())
 	fmt.Fprint(w, page("urb-fetch", `<h1>urb-fetch</h1>
 <p>Read a page published with lattice on the Urbit network, as `+html.EscapeString(g.r.node.Ship().String())+`.</p>
 <form action="/go"><input name="url" placeholder="urb://~sampel-palnet/page" autofocus></form>`))
@@ -284,7 +305,7 @@ func (g *gateway) error(w http.ResponseWriter, url string, err error) {
 	if errors.As(err, &he) {
 		status = he.status
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	ownPage(w.Header())
 	w.WriteHeader(status)
 	fmt.Fprint(w, page(url, "<h1>"+strconv.Itoa(status)+"</h1><p>"+html.EscapeString(err.Error())+"</p>"))
 }

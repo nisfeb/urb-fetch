@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -59,8 +60,8 @@ func TestRender(t *testing.T) {
 		t.Errorf("rewriteHTML: %s", got)
 	}
 	g := renderGemtext("# Hi <there>\n=> urb://~zod/a A link\n* one\n* two\n```\n<pre>\n```\n> quote",
-		"t", func(s string) string { return "L(" + s + ")" })
-	for _, want := range []string{"<h1>Hi &lt;there&gt;</h1>", `<a href="L(urb://~zod/a)">A link</a>`,
+		"t", func(s string) string { return strings.Replace(s, "urb://~zod", "http://gw", 1) })
+	for _, want := range []string{"<h1>Hi &lt;there&gt;</h1>", `<a href="http://gw/a">A link</a>`,
 		"<ul>\n<li>one</li>\n<li>two</li>\n</ul>", "<pre>&lt;pre&gt;\n</pre>", "<blockquote>quote</blockquote>"} {
 		if !strings.Contains(g, want) {
 			t.Errorf("renderGemtext lacks %q in %s", want, g)
@@ -158,5 +159,45 @@ func TestGatewayRender(t *testing.T) {
 		if c.csp != sandbox && strings.Contains(out, "<script>") {
 			t.Errorf("%%%s: markup outside the sandbox: %s", c.mark, out)
 		}
+	}
+}
+
+// A page's links stay on the web, urb:// or this ship: no script
+// targets, and no protocol-relative // or \\ that leaves the origin.
+func TestSafeLinks(t *testing.T) {
+	for _, s := range []string{"https://a.example/x", "http://a", "urb://~zod/x", "gemini://g", "mailto:a@b", "notes/intro", "/notes", "#top", ""} {
+		if !safeLink(s) {
+			t.Errorf("refused %q", s)
+		}
+	}
+	for _, s := range []string{"javascript:alert(1)", "data:text/html,x", "//evil.example", `\\evil.example`, `/\evil.example`, `\/evil.example`, " //evil.example"} {
+		if safeLink(s) {
+			t.Errorf("allowed %q", s)
+		}
+	}
+	id := func(s string) string { return s }
+	g := renderGemtext("=> //evil.example evil\n=> javascript:alert(1) js\n=> /ok fine", "t", id)
+	if strings.Contains(g, "evil.example\"") || strings.Contains(g, `href="javascript`) || !strings.Contains(g, `<a href="/ok">fine</a>`) {
+		t.Errorf("renderGemtext links: %s", g)
+	}
+	m := renderMarkdown("[evil](//evil.example) [back](\\\\evil.example)", "t", id)
+	if strings.Contains(m, "<a ") {
+		t.Errorf("renderMarkdown links: %s", m)
+	}
+}
+
+// The gateway's own pages run no scripts and aren't sniffed.
+func TestOwnPageHeaders(t *testing.T) {
+	w := httptest.NewRecorder()
+	(&gateway{}).error(w, "urb://~zod/x", fail(404, "<b>gone</b>"))
+	h := w.Result().Header
+	if h.Get("Content-Security-Policy") != own || h.Get("X-Content-Type-Options") != "nosniff" || w.Code != 404 {
+		t.Errorf("error page: %d %v", w.Code, h)
+	}
+	if strings.Contains(w.Body.String(), "<b>gone") {
+		t.Error("error page did not escape")
+	}
+	if oneIdentity("~zod", "moon.key") == nil || oneIdentity("~zod", "") != nil || oneIdentity("", "moon.key") != nil {
+		t.Error("oneIdentity")
 	}
 }
