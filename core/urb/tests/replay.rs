@@ -1,0 +1,408 @@
+//! The replay harness: each trace's inputs (traces/*.jsonl, recorded
+//! from the JS by wasm/trace.mjs) fed into the Rust core, and each
+//! step's outputs compared with the trace's, byte for byte, as JSON in
+//! trace.mjs's encoding. The trace's `timer` and `untimer` outputs are
+//! the JS's own scheduling: the core keeps its own timers, which each
+//! tick fires by its name and due, and the rest is compared. Each step
+//! must also draw the entropy the trace says it drew, and all of it.
+//!
+//! M3's traces must replay: 1, 2, 3, 6 and 9. The others (furum, serving,
+//! the %want leg, lattice forums, the roller) are reported, and wait for
+//! their milestones.
+
+mod common;
+
+use common::{big, hex, unhex};
+use serde_json::{Map, Value as J, json};
+use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::rc::Rc;
+use urb::core::{Conv, Lane, Peeked};
+use urb::noun::Value;
+use urb::{Core, Failure, Input, Output, Reply, Request, alive};
+
+const M3: &[u32] = &[1, 2, 3, 6, 9];
+
+/// the entropy a step may draw: the trace's, in order
+#[derive(Default)]
+struct Eny {
+    left: VecDeque<String>,
+    drawn: Vec<String>,
+    wrong: Option<String>,
+}
+
+/// a call's argument (trace.mjs's encoding) as a value for noun()
+fn value(j: &J) -> Value<'static> {
+    match j {
+        J::Null => Value::Null,
+        J::Bool(b) => Value::Bool(*b),
+        J::Number(n) => Value::Int(n.as_u64().expect("a whole number").into()),
+        J::String(s) => Value::Text(s.clone()),
+        J::Array(v) => Value::Array(v.iter().map(value).collect()),
+        J::Object(o) if o.contains_key("$big") => Value::Int(big(o["$big"].as_str().unwrap())),
+        J::Object(o) if o.contains_key("$map") => Value::Map(
+            o["$map"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|kv| (value(&kv[0]), value(&kv[1])))
+                .collect(),
+        ),
+        J::Object(o) if o.contains_key("$set") => {
+            Value::Set(o["$set"].as_array().unwrap().iter().map(value).collect())
+        }
+        _ => panic!("no value {j}"),
+    }
+}
+
+fn text(j: &J) -> String {
+    j.as_str().expect("text").to_string()
+}
+
+/// a trace's call as a request, or None for one M3 has no port of
+fn request(op: &str, a: &[J]) -> Option<Request> {
+    Some(match op {
+        "open" => {
+            let load = &a[0];
+            let opts = a.get(1).cloned().unwrap_or(json!({}));
+            Request::Open {
+                keyfile: load.get("keyfile").and_then(J::as_str).map(String::from),
+                rows: load.get("rows").and_then(J::as_str).map(unhex),
+                fresh: load.get("fresh").and_then(J::as_bool).unwrap_or(false),
+                fake: opts.get("fake").and_then(J::as_bool).unwrap_or(false),
+            }
+        }
+        "close" => Request::Close,
+        "read" => Request::Read(text(&a[0])),
+        "poke" => Request::Poke {
+            ship: text(&a[0]),
+            folder: text(&a[1]),
+            name: text(&a[2]),
+            mark: (text(&a[3][0]), text(&a[3][1])),
+            value: value(&a[4]),
+        },
+        "peek" => Request::Peek {
+            ship: text(&a[0]),
+            folder: text(&a[1]),
+            name: a[2].as_str().map(String::from),
+            conv: match a[3].as_str()? {
+                "cord" => Conv::Cord,
+                "text" => Conv::Text,
+                "exists" => Conv::Exists,
+                "files" => Conv::Files,
+                _ => return None,
+            },
+            wait: a.get(4).and_then(J::as_u64),
+        },
+        _ => return None,
+    })
+}
+
+/// an error as trace.mjs encodes it
+fn err(f: &Failure) -> J {
+    let mut m = Map::new();
+    m.insert("$err".into(), J::String(f.message.clone()));
+    if f.later {
+        m.insert("later".into(), J::Bool(true));
+    }
+    if f.kind == urb::core::Kind::UrbError {
+        m.insert("urb".into(), J::Bool(true));
+    }
+    J::Object(m)
+}
+
+/// a result as trace.mjs encodes it
+fn reply(r: &Reply) -> J {
+    match r {
+        Reply::Open { our } => json!({ "our": our }),
+        Reply::True => J::Bool(true),
+        Reply::Read(p) => {
+            let mut m = Map::new();
+            m.insert("key".into(), J::String(p.key.clone()));
+            m.insert("body".into(), J::String(p.body.clone()));
+            m.insert("how".into(), J::String(p.how.into()));
+            if let Some(mark) = &p.mark {
+                m.insert("mark".into(), J::String(mark.clone()));
+            }
+            J::Object(m)
+        }
+        Reply::Poke(p) => {
+            let mut m = Map::new();
+            m.insert("ok".into(), J::Bool(p.ok));
+            if let Some(e) = &p.error {
+                m.insert("error".into(), J::String(e.clone()));
+            }
+            if p.later {
+                m.insert("later".into(), J::Bool(true));
+            }
+            J::Object(m)
+        }
+        Reply::Peek(Peeked::Null) => J::Null,
+        Reply::Peek(Peeked::Text(s)) => J::String(s.clone()),
+        Reply::Peek(Peeked::True) => J::Bool(true),
+        Reply::Peek(Peeked::Files(f)) => J::Array(f.iter().map(|(p, t)| json!([p, t])).collect()),
+    }
+}
+
+/// an output as trace.mjs encodes it
+fn out(o: &Output) -> J {
+    match o {
+        Output::Send { lane, bytes } => json!({ "send": lane.text(), "bytes": hex(bytes) }),
+        Output::Commit(rows) => json!({ "commit": hex(rows) }),
+        Output::SaveKey(k) => json!({ "saveKey": k }),
+        Output::Start(s) => json!({ "start": s }),
+        Output::TClose => json!({ "tclose": true }),
+        Output::Log(l) => json!({ "log": l }),
+        Output::Fetch {
+            id,
+            url,
+            method,
+            headers,
+            body,
+        } => {
+            let mut h = Map::new();
+            for (k, v) in headers {
+                h.insert(k.clone(), J::String(v.clone()));
+            }
+            json!({ "fetch": id, "url": url, "method": method, "headers": h, "body": body })
+        }
+        Output::Done { call, result } => match result {
+            Ok(r) => json!({ "result": call, "ok": reply(r) }),
+            Err(f) => json!({ "result": call, "err": err(f) }),
+        },
+        Output::Inbox(m) => json!({ "inbox": m.from }),
+    }
+}
+
+enum Replayed {
+    Ok(usize),
+    /// a call M3 has no port of, at this step
+    Unported(usize, String),
+    Fail(usize, String),
+}
+
+fn replay(lines: &str) -> Replayed {
+    let mut lines = lines.lines().filter(|l| !l.is_empty());
+    let head: J = serde_json::from_str(lines.next().unwrap()).unwrap();
+    assert_eq!(head["format"], 1, "trace format");
+    let steps: Vec<J> = lines.map(|l| serde_json::from_str(l).unwrap()).collect();
+    let eny = Rc::new(RefCell::new(Eny::default()));
+    let e2 = eny.clone();
+    let mut core = Core::new(move |n| {
+        let mut e = e2.borrow_mut();
+        match e.left.pop_front() {
+            Some(h) if h.len() == 2 * n => {
+                e.drawn.push(h.clone());
+                unhex(&h)
+            }
+            got => {
+                e.wrong = Some(format!(
+                    "drew {n} bytes, the trace has {}",
+                    got.map_or("no more".into(), |h| (h.len() / 2).to_string())
+                ));
+                vec![0; n]
+            }
+        }
+    });
+    for (k, step) in steps.iter().enumerate() {
+        let i = &step["in"];
+        let now = i["now"].as_u64().unwrap();
+        {
+            let mut e = eny.borrow_mut();
+            e.left = i["eny"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(text)
+                .collect();
+            e.drawn.clear();
+        }
+        let input = match i["k"].as_str().unwrap() {
+            "call" => {
+                let op = i["op"].as_str().unwrap();
+                match request(op, i["args"].as_array().unwrap()) {
+                    Some(req) => Input::Call { id: k as u64, req },
+                    None => return Replayed::Unported(k, op.into()),
+                }
+            }
+            "hear" => Input::Hear {
+                ip: i["ip"].as_u64().unwrap() as u32,
+                port: i["port"].as_u64().unwrap() as u16,
+                bytes: unhex(i["bytes"].as_str().unwrap()),
+            },
+            "tick" => Input::Tick {
+                kind: text(&i["kind"]),
+                due: i["due"].as_u64().unwrap(),
+            },
+            "fetch" => Input::Fetched {
+                id: i["id"].as_u64().unwrap(),
+                answer: match i.get("error") {
+                    Some(e) => Err(text(e)),
+                    None => Ok((
+                        i["status"].as_u64().unwrap() as u16,
+                        unhex(i["body"].as_str().unwrap()),
+                    )),
+                },
+            },
+            other => return Replayed::Fail(k, format!("no input {other}")),
+        };
+        let got = match core.step(now, input) {
+            Ok(o) => o,
+            Err(e) => return Replayed::Fail(k, e),
+        };
+        let got: Vec<J> = got.iter().map(out).collect();
+        let want: Vec<J> = step["out"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|o| o.get("timer").is_none() && o.get("untimer").is_none())
+            .cloned()
+            .collect();
+        let e = eny.borrow();
+        if let Some(w) = &e.wrong {
+            return Replayed::Fail(k, w.clone());
+        }
+        if !e.left.is_empty() {
+            return Replayed::Fail(k, format!("{} draws not made", e.left.len()));
+        }
+        let (a, b) = (
+            serde_json::to_string(&want).unwrap(),
+            serde_json::to_string(&got).unwrap(),
+        );
+        if a != b {
+            let n = want.len().max(got.len());
+            let at = (0..n).find(|&j| want.get(j) != got.get(j)).unwrap_or(0);
+            let cut = |o: Option<&J>| {
+                o.map_or("nothing".into(), |o| {
+                    o.to_string().chars().take(300).collect::<String>()
+                })
+            };
+            return Replayed::Fail(
+                k,
+                format!(
+                    "({}) output {at}:\n    recorded {}\n    replayed {}\n  kinds recorded {:?}\n  kinds replayed {:?}",
+                    i["k"],
+                    cut(want.get(at)),
+                    cut(got.get(at)),
+                    want.iter()
+                        .map(|o| o.as_object().unwrap().keys().next().unwrap().clone())
+                        .collect::<Vec<_>>(),
+                    got.iter()
+                        .map(|o| o.as_object().unwrap().keys().next().unwrap().clone())
+                        .collect::<Vec<_>>(),
+                ),
+            );
+        }
+    }
+    drop(core);
+    Replayed::Ok(steps.len())
+}
+
+/// every trace, by number: in the binary, so the WASI run has them too
+const TRACES: &[(u32, &str, &str)] = &[
+    (
+        1,
+        "1-cold-comet",
+        include_str!("../../../traces/1-cold-comet.jsonl"),
+    ),
+    (
+        2,
+        "2-moon-runs",
+        include_str!("../../../traces/2-moon-runs.jsonl"),
+    ),
+    (
+        3,
+        "3-private-reads",
+        include_str!("../../../traces/3-private-reads.jsonl"),
+    ),
+    (4, "4-furum", include_str!("../../../traces/4-furum.jsonl")),
+    (
+        5,
+        "5-publishing",
+        include_str!("../../../traces/5-publishing.jsonl"),
+    ),
+    (
+        6,
+        "6-timeouts",
+        include_str!("../../../traces/6-timeouts.jsonl"),
+    ),
+    (
+        7,
+        "7-want-leg",
+        include_str!("../../../traces/7-want-leg.jsonl"),
+    ),
+    (
+        8,
+        "8-lattice-forum",
+        include_str!("../../../traces/8-lattice-forum.jsonl"),
+    ),
+    (
+        9,
+        "9-marks-and-salt",
+        include_str!("../../../traces/9-marks-and-salt.jsonl"),
+    ),
+    (
+        10,
+        "10-roller",
+        include_str!("../../../traces/10-roller.jsonl"),
+    ),
+];
+
+#[test]
+fn traces_replay_byte_for_byte() {
+    // a trace added without a line above fails here
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../traces");
+    if let Ok(d) = std::fs::read_dir(dir) {
+        let on_disk = d
+            .filter_map(|e| e.ok()?.file_name().into_string().ok())
+            .filter(|n| n.ends_with(".jsonl"))
+            .count();
+        assert_eq!(on_disk, TRACES.len(), "traces/ has {on_disk} traces");
+    }
+    // TRACES=1,3 replays only those
+    let only: Option<Vec<u32>> = std::env::var("TRACES")
+        .ok()
+        .map(|t| t.split(',').map(|n| n.parse().unwrap()).collect());
+    let mut bad = Vec::new();
+    for &(n, name, lines) in TRACES {
+        if only.as_ref().is_some_and(|o| !o.contains(&n)) {
+            continue;
+        }
+        let r = replay(lines);
+        assert_eq!(alive(), 0, "{name} left nouns alive");
+        let must = M3.contains(&n);
+        match r {
+            Replayed::Ok(s) => eprintln!("ok    {name}: {s} steps"),
+            Replayed::Unported(k, op) => {
+                eprintln!("wait  {name}: step {k} calls {op}, which M3 does not port");
+                if must {
+                    bad.push(n);
+                }
+            }
+            Replayed::Fail(k, why) => {
+                eprintln!(
+                    "{}  {name}: step {k} differs {why}",
+                    if must { "FAIL" } else { "fail" }
+                );
+                if must {
+                    bad.push(n);
+                }
+            }
+        }
+    }
+    assert!(bad.is_empty(), "traces {bad:?} do not replay");
+}
+
+#[test]
+fn a_tick_must_name_a_timer() {
+    let mut core = Core::new(|n| vec![0; n]);
+    let got = core.step(
+        0,
+        Input::Tick {
+            kind: "wake".into(),
+            due: 0,
+        },
+    );
+    assert!(got.is_err());
+    let _ = Lane::Galaxy(0);
+}
