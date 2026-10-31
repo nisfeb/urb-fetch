@@ -25,6 +25,14 @@
 //              commit is saved: a moon may start from empty state only if it
 //              never ran anywhere.
 //
+//   now        optional: the clock, () -> milliseconds since the epoch
+//              (Date.now by default)
+//   entropy    optional: n -> a Uint8Array of n random bytes (from
+//              crypto.getRandomValues by default). It gives the wire nonce,
+//              the ids of the %snaps we answer and a mined comet's seed;
+//              pub.mjs takes its page ids from it. With both fixed, a
+//              session's inputs decide its outputs.
+//
 //   const urb = await open({ wasm, transport, store })
 //   const { key, body, how, mark } = await urb.read('urb://~sampel-palnet/page')
 //
@@ -203,7 +211,10 @@ export function relayTransport(url, log = console.error) {
 
 // ------------------------------------------------------------- the engine
 
-export async function open({ wasm, transport, store, log = console.error, env = {}, fake = false }) {
+const randomBytes = n => crypto.getRandomValues(new Uint8Array(n));
+
+export async function open({ wasm, transport, store, log = console.error, env = {}, fake = false,
+                             now = Date.now, entropy = randomBytes }) {
   let X;
   const mem = () => new Uint8Array(X.memory.buffer);   // replaced when memory grows
   const imports = {
@@ -466,9 +477,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     const d = u64(X.deadline());
     if (d === NONE) return;
     //  setTimeout can't wait longer than 2^31 ms; waking early just re-arms
-    const wait = Math.min(Math.max(0, Number(d) - Date.now()), 60_000);
+    const wait = Math.min(Math.max(0, Number(d) - now()), 60_000);
     timer = setTimeout(() => {
-      if (Date.now() >= Number(u64(X.deadline()))) call(() => X.wake(BigInt(Date.now())));
+      if (now() >= Number(u64(X.deadline()))) call(() => X.wake(BigInt(now())));
       else arm();
     }, wait);
   }
@@ -542,7 +553,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   }
 
   function onPacket(ip, port, bytes) {
-    withBytes(bytes, (p, n) => call(() => X.hear(ip, port, p, n, BigInt(Date.now()))));
+    withBytes(bytes, (p, n) => call(() => X.hear(ip, port, p, n, BigInt(now()))));
   }
 
   // ----------------------------------------------------------- the reader
@@ -557,7 +568,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   const revs = new Map();    // ship -> {at, list}
   //  wires never repeat across runs: a publisher can deliver a reply meant
   //  for an earlier run late, and it must not match ours
-  const nonce = [...crypto.getRandomValues(new Uint8Array(4))].map(b => b.toString(16).padStart(2, '0')).join('');
+  const nonce = [...entropy(4)].map(b => b.toString(16).padStart(2, '0')).join('');
   let wires = 0;
 
   function poke(her, bone, agent, mark, value) {
@@ -787,7 +798,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     }
     if (tag === 'peek') {
       const [snap, data] = f && f.value !== undefined ? snapOf(f) : [null, null];
-      const id = bigOf(crypto.getRandomValues(new Uint8Array(16)));
+      const id = bigOf(entropy(16));
       poke(her, flowTo(her), 'grubbery', 'grubbery-transfer',
            [wire, 'snap', dest, id, snap && [null, snap], data && [null, data]]);
       return;
@@ -813,7 +824,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
         const got = await peek(her, b + '/pub', 'revs', json);
         if (got !== null) {
           bases.set(who, b);
-          revs.set(who, { at: Date.now(), list: got });
+          revs.set(who, { at: now(), list: got });
           break;
         }
       }
@@ -827,8 +838,8 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   async function revList(her, who) {
     const b = await base(her, who);
     let r = revs.get(who);
-    if (!r || Date.now() - r.at > REVS_TTL) {
-      r = { at: Date.now(), list: (await peek(her, b + '/pub', 'revs', json)) ?? {} };
+    if (!r || now() - r.at > REVS_TTL) {
+      r = { at: now(), list: (await peek(her, b + '/pub', 'revs', json)) ?? {} };
       revs.set(who, r);
     }
     return r.list;
@@ -892,7 +903,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     const res = await fetch(STARS, { headers: { 'user-agent': 'urb-fetch' } });   // 403 without one, outside a browser
     if (!res.ok) throw new Error(`${STARS}: ${res.status}`);
     const jam = new Uint8Array(await res.arrayBuffer());
-    keyfile = withBytes(jam, (j, n) => withBytes(crypto.getRandomValues(new Uint8Array(64)), e => take(X.mine_comet(j, n, e))));
+    keyfile = withBytes(jam, (j, n) => withBytes(entropy(64), e => take(X.mine_comet(j, n, e))));
     if (!keyfile) throw new Error('mining a comet failed');
     await store.saveKey(keyfile);
     rows = null;
@@ -906,7 +917,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   if (rows?.length) check(withBytes(rows, (p, n) => X.store_load(p, n)), 'store_load');
   //  a fake ship is rebooted fresh, so it may always start from empty state
   const breached = fake || (fresh && !rows?.length);
-  const err = call(() => withStr(keyfile, p => X.open(p, BigInt(Date.now()), breached ? 1 : 0, fake ? 1 : 0)));
+  const err = call(() => withStr(keyfile, p => X.open(p, BigInt(now()), breached ? 1 : 0, fake ? 1 : 0)));
   if (err === -2) {
     transport.close();
     throw new Error(`${our} has run before, and its state here is empty. Starting it from nothing would replay old messages, so breach it on its parent (|moon-breach) and add its new key.`);
@@ -927,6 +938,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     our,
     read,
     nouns,
+    // the clock and the entropy this engine was opened with, for pub.mjs
+    now,
+    entropy,
     // grubbery on other ships: read a file, poke a grub, and hear grubs
     // that poke ours (f({from, to, mark, noun}), during the hook)
     grub: {

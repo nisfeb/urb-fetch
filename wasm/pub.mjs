@@ -102,10 +102,13 @@ export function publish(urb, { pages = {}, keepers = [], save = () => {} } = {})
     put(name, body, mark = 'gmi') {
       const key = pageKey(name);
       if (!key || !PAGE_MARKS.has(mark)) return null;
-      const [hi, lo] = crypto.getRandomValues(new BigUint64Array(2));
+      //  two 64-bit words, each little-endian, as a BigUint64Array of
+      //  crypto.getRandomValues would be on any machine we run on
+      const e = urb.entropy(16), b = new DataView(e.buffer, e.byteOffset, 16);
+      const [hi, lo] = [b.getBigUint64(0, true), b.getBigUint64(8, true)];
       const id = uv((hi << 64n) | lo);
       const hash = urb.nouns.sham(String(body)).toString(16);
-      pages[key] = { body: String(body), rev: (pages[key]?.rev ?? 0) + 1, id, at: Date.now(), hash, mark };
+      pages[key] = { body: String(body), rev: (pages[key]?.rev ?? 0) + 1, id, at: urb.now(), hash, mark };
       saveAll();
       tell(key);
       return pages[key];
@@ -114,7 +117,7 @@ export function publish(urb, { pages = {}, keepers = [], save = () => {} } = {})
     remove(name) {
       const key = pageKey(name), p = key && pages[key];
       if (!p || p.body === null) return false;
-      pages[key] = { body: null, rev: p.rev + 1, id: null, at: Date.now(), hash: null };
+      pages[key] = { body: null, rev: p.rev + 1, id: null, at: urb.now(), hash: null };
       saveAll();
       tell(key);
       return true;
