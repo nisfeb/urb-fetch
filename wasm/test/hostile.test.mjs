@@ -104,11 +104,11 @@ test('list, paths and tangs', () => {
 });
 
 // refused with exactly this message, quickly
-const refusedAs = (f, what) => quick(() => assert.throws(f, e => {
+const refusedAs = (f, what, ms) => quick(() => assert.throws(f, e => {
   assert.ok(e instanceof UrbError, `not an UrbError: ${e}`);
   assert.equal(e.message, `another ship's noun ${what}`);
   return true;
-}));
+}), ms);
 const OVER_BYTES = `has over ${MAX_BYTES} bytes of atoms`;
 
 test('one big atom at many places counts at each', () => {
@@ -157,11 +157,13 @@ test('ballOf: a tree at many places, its entries and its files count at each', (
   const ball = ([snap, s]) => decoders.ballOf(snap, s, fs => fs.length);
   const names = n => Array.from({ length: n }, (_, i) => A(`n${i}`));
   //  3,000 directories naming one tree, whose own 3,000 directories are
-  //  all missing from the silo: 9 million entries, none of them a tree
+  //  all missing from the silo: 9 million entries, none of them a tree.
+  //  The 200,000 it counts take these plain-JS nouns a second or two;
+  //  uncounted, the 9 million took a minute
   const bogus = map(names(3000).map(k => [k, C(A(99), nil)]));
   const fan = map(names(3000).map(k => [k, C(A(2), nil)]));
   refusedAs(() => ball(silo(1, [[1, tree(nil, fan)], [2, tree(nil, bogus)]])),
-            `has a directory of over ${MAX_CELLS} trees and files`);
+            `has a directory of over ${MAX_CELLS} trees and files`, 10_000);
   //  2,000 files naming one 2 MiB noun: 4 GB as a tree
   const files = map(names(2000).map(k => [k, A(3)]));
   const big = A('x'.repeat(2 << 20));
