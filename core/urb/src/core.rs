@@ -2087,3 +2087,49 @@ fn try_pages(
         _ => try_pages(w, i, her, who, url, tries, k + 1),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(panic = "unwind")]
+    #[test]
+    fn a_hook_that_panics_gives_its_default() {
+        let c = Core::new(|n| vec![0; n]);
+        let got = engine::guard(&c.w, 7, |_| -> Result<i32, Failure> { panic!("boom") });
+        assert_eq!(got, 7);
+        let got = engine::guard(&c.w, 7, |_| Err(Failure::urb("no")));
+        assert_eq!(got, 7);
+        let logs: Vec<String> =
+            c.w.out
+                .borrow()
+                .iter()
+                .filter_map(|o| match o {
+                    Output::Log(l) => Some(l.clone()),
+                    _ => None,
+                })
+                .collect();
+        assert_eq!(logs, ["panic: boom", "UrbError: no"]);
+    }
+
+    #[test]
+    fn saved_rows_are_read_as_glue_c_reads_them() {
+        let j = Journal::new(std::ptr::null());
+        // a row, a deleted row, and nothing more
+        assert!(
+            j.load(b"\x01\0\0\0k\x01\0\0\0v\x01\0\0\0d\xff\xff\xff\xff")
+                .is_ok()
+        );
+        assert!(j.load(b"").is_ok());
+        for bad in [
+            &b"\x01\0\0"[..],
+            b"\x01\0\0\0k\x02\0\0\0v",
+            b"\x05\0\0\0k\0\0\0\0",
+            // a klen that wraps a 32-bit usize past the bounds checks
+            b"\xf8\xff\xff\xff\0\0\0\0\0\0\0\0",
+            b"\x01\0\0\0k\xfe\xff\xff\xffv",
+        ] {
+            assert!(j.load(bad).is_err(), "{bad:?}");
+        }
+    }
+}

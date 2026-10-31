@@ -346,9 +346,8 @@ impl Journal {
             txn: Cell::new(false),
             world,
         });
-        let ctx = (&*j as *const Journal) as *mut c_void;
         j.sto = sys::mesa_store {
-            ctx,
+            ctx: std::ptr::null_mut(),
             begin: Some(s_begin),
             commit: Some(s_commit),
             rollback: Some(s_rollback),
@@ -361,6 +360,10 @@ impl Journal {
             scan: Some(s_scan),
             close: Some(s_close),
         };
+        // the store's ctx points back at the journal: written through the
+        // pointer itself, so no later write through the Box invalidates it
+        let me = &raw mut *j;
+        unsafe { (*me).sto.ctx = me.cast() };
         j
     }
 
@@ -375,31 +378,36 @@ impl Journal {
     /// glue.c's store_load: put back saved rows (deleted ones skipped),
     /// unjournaled; Err if they are malformed
     pub fn load(&self, buf: &[u8]) -> Result<(), ()> {
-        let u32at = |at: usize| u32::from_le_bytes(buf[at..at + 4].try_into().unwrap());
+        // every sum checked: a usize is 32 bits on wasm32, where a klen
+        // near 2^32 would wrap past the bounds checks
+        let end = |a: usize, b: usize| a.checked_add(b).filter(|&e| e <= buf.len()).ok_or(());
+        let u32at = |at: usize| -> Result<u32, ()> {
+            Ok(u32::from_le_bytes(buf[at..end(at, 4)?].try_into().unwrap()))
+        };
         let mut at = 0usize;
         while at < buf.len() {
-            if at + 4 > buf.len() {
-                return Err(());
-            }
-            let k = u32at(at) as usize;
-            if at + 8 + k > buf.len() {
-                return Err(());
-            }
-            let v = u32at(at + 4 + k);
+            let k = u32at(at)? as usize;
+            let key = end(at, 4)?;
+            let vlen = end(key, k)?;
+            let v = u32at(vlen)?;
+            let val = vlen + 4;
             if v == u32::MAX {
-                at += 8 + k;
+                at = val;
                 continue;
             }
-            let v = v as usize;
-            if at + 8 + k + v > buf.len() {
-                return Err(());
-            }
+            let next = end(val, v as usize)?;
             let inn = self.inn();
             let put = inn.put.expect("the memory store puts");
-            let key = buf[at + 4..].as_ptr();
-            let val = buf[at + 8 + k..].as_ptr();
-            unsafe { put(inn.ctx, key, k, val, v) };
-            at += 8 + k + v;
+            unsafe {
+                put(
+                    inn.ctx,
+                    buf[key..].as_ptr(),
+                    k,
+                    buf[val..].as_ptr(),
+                    v as usize,
+                )
+            };
+            at = next;
         }
         Ok(())
     }
