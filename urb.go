@@ -1,7 +1,7 @@
 package main
 
-// Addresses and rendering: what an urb:// url names, where the gateway
-// serves it, and gemtext as HTML. No network here.
+// Addresses: what an urb:// url names, where the gateway serves it, and
+// how a page renders (render.go renders it). No network here.
 
 import (
 	"fmt"
@@ -71,10 +71,10 @@ var pageMarks = map[string]bool{"text": true, "html": true, "gmi": true, "md": t
 // reader does: "html", "md", "gmi" or "text". Only a %gmi page is
 // sniffed, since %gmi is all an older publisher, an old revision or the
 // vault peek says: one whose body starts with < is HTML. js, css and
-// noun render as text.
+// noun render as text. No mark at all is %gmi, as in wasm/mesa.mjs.
 func renderAs(mark, body string) string {
 	switch mark {
-	case "gmi":
+	case "gmi", "":
 		if looksHTML(body) {
 			return "html"
 		}
@@ -86,12 +86,24 @@ func renderAs(mark, body string) string {
 }
 
 // looksHTML is lattice-gmi's +looks-html: the first non-blank character
-// is <.
+// is <. It reads as the extension's looksHtml does: within the first 256
+// UTF-16 code units, and blank is JavaScript's whitespace.
 func looksHTML(body string) bool {
-	if len(body) > 256 {
-		body = body[:256]
+	n := 0
+	for i, r := range body {
+		if n += 1 + btoi(r >= 0x10000); n > 256 {
+			body = body[:i]
+			break
+		}
 	}
-	return strings.HasPrefix(strings.TrimLeft(body, " \t\r\n"), "<")
+	return strings.HasPrefix(strings.TrimLeftFunc(body, jsSpace), "<")
+}
+
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // hostSuffix: each ship is its own origin, <ship>.urb.localhost, so one
@@ -122,206 +134,13 @@ func urbOfHost(host, path string) string {
 	return "urb://~" + who + path
 }
 
-var urbAttr = regexp.MustCompile(`((?:href|src|action)\s*=\s*["'])urb://~([a-z-]+)`)
+// an attribute that may hold a link, named in any case, its value quoted
+// or not, as the extension's reader follows any <a href> clicked
+var urbAttr = regexp.MustCompile(`((?i:href|src|action)\s*=\s*["']?)urb://~([a-z-]+)`)
 
 // rewriteHTML points a page's urb:// links at the gateway.
 func rewriteHTML(body, port string) string {
 	return urbAttr.ReplaceAllString(body, "${1}http://${2}"+hostSuffix+":"+port)
-}
-
-// renderGemtext renders gemtext (gemini's text/gemini) as a page, with
-// link targets passed through link.
-func renderGemtext(body, title string, link func(string) string) string {
-	var b strings.Builder
-	esc := html.EscapeString
-	pre, list := false, false
-	for _, line := range strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n") {
-		if strings.HasPrefix(line, "```") {
-			if list {
-				b.WriteString("</ul>\n")
-				list = false
-			}
-			if pre {
-				b.WriteString("</pre>\n")
-			} else {
-				b.WriteString("<pre>")
-			}
-			pre = !pre
-			continue
-		}
-		if pre {
-			b.WriteString(esc(line) + "\n")
-			continue
-		}
-		item := strings.HasPrefix(line, "* ")
-		if list && !item {
-			b.WriteString("</ul>\n")
-			list = false
-		}
-		switch {
-		case strings.HasPrefix(line, "=>"):
-			f := strings.Fields(line[2:])
-			if len(f) == 0 {
-				continue
-			}
-			label := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line[2:]), f[0]))
-			if label == "" {
-				label = f[0]
-			}
-			if t := link(f[0]); safeLink(t) {
-				fmt.Fprintf(&b, "<p class=\"link\"><a href=\"%s\">%s</a></p>\n", esc(t), esc(label))
-			} else {
-				b.WriteString("<p class=\"link\">" + esc(label) + "</p>\n")
-			}
-		case strings.HasPrefix(line, "#"):
-			lvl := len(line) - len(strings.TrimLeft(line, "#"))
-			lvl = min(lvl, 3)
-			fmt.Fprintf(&b, "<h%d>%s</h%d>\n", lvl, esc(strings.TrimSpace(strings.TrimLeft(line, "#"))), lvl)
-		case item:
-			if !list {
-				b.WriteString("<ul>\n")
-				list = true
-			}
-			b.WriteString("<li>" + esc(line[2:]) + "</li>\n")
-		case strings.HasPrefix(line, ">"):
-			b.WriteString("<blockquote>" + esc(strings.TrimSpace(line[1:])) + "</blockquote>\n")
-		case strings.TrimSpace(line) != "":
-			b.WriteString("<p>" + esc(line) + "</p>\n")
-		}
-	}
-	if pre {
-		b.WriteString("</pre>\n")
-	}
-	if list {
-		b.WriteString("</ul>\n")
-	}
-	return page(title, b.String())
-}
-
-// renderText renders a text page (text, js, css) as preformatted text.
-func renderText(body, title string) string {
-	return page(title, "<pre>"+html.EscapeString(body)+"</pre>")
-}
-
-var (
-	mdHeading = regexp.MustCompile(`^(#{1,6})\s+(.*?)\s*#*\s*$`)
-	mdItem    = regexp.MustCompile(`^\s*(?:[-*+]|\d+[.)])\s+(.*)$`)
-	mdOrdered = regexp.MustCompile(`^\s*\d+[.)]\s`)
-	mdRule    = regexp.MustCompile(`^\s*(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$`)
-	mdInline  = regexp.MustCompile("`([^`]+)`|\\[([^\\]]{1,256})\\]\\(([^)\\s]{1,512})\\)|\\*\\*([^*]+)\\*\\*|\\*([^*\\s][^*]*)\\*")
-	safeHref  = regexp.MustCompile(`(?i)^(?:(?:https?|urb|gemini|mailto):|[^:]*$)`)
-	ctlLink   = regexp.MustCompile(`[\x00-\x20\x7f]`)
-	hostLink  = regexp.MustCompile(`^\s*[/\\]{2}`)
-)
-
-// safeLink is whether a page's link target may be a link: the web,
-// urb://, gemini, mail, or a path on this ship. A protocol-relative //
-// (or \\, which browsers read as //) would leave the ship's origin. A
-// control character (C0, space, DEL) anywhere makes it text, since a
-// browser strips them; schemes match in any case.
-func safeLink(t string) bool {
-	return !ctlLink.MatchString(t) && safeHref.MatchString(t) && !hostLink.MatchString(t)
-}
-
-// renderMarkdown renders a small, safe subset of Markdown, with link
-// targets passed through link: headings, paragraphs, lists, quotes, rules
-// and fenced code, and inline code, links, bold and italics. Everything
-// else shows as written. All text is escaped, so raw HTML in the source
-// shows as text, and a link is kept only to the web, urb:// or a
-// relative path. A full renderer would be a new dependency.
-func renderMarkdown(body, title string, link func(string) string) string {
-	var b strings.Builder
-	esc := html.EscapeString
-	inline := func(s string) string {
-		var o strings.Builder
-		at := 0
-		for _, m := range mdInline.FindAllStringSubmatchIndex(s, -1) {
-			o.WriteString(esc(s[at:m[0]]))
-			at = m[1]
-			g := func(i int) string { return s[m[2*i]:m[2*i+1]] }
-			switch {
-			case m[2] >= 0:
-				o.WriteString("<code>" + esc(g(1)) + "</code>")
-			case m[4] >= 0:
-				if t := link(g(3)); safeLink(t) {
-					fmt.Fprintf(&o, `<a href="%s">%s</a>`, esc(t), esc(g(2)))
-				} else {
-					o.WriteString(esc(g(2)))
-				}
-			case m[8] >= 0:
-				o.WriteString("<strong>" + esc(g(4)) + "</strong>")
-			default:
-				o.WriteString("<em>" + esc(g(5)) + "</em>")
-			}
-		}
-		o.WriteString(esc(s[at:]))
-		return o.String()
-	}
-	var para []string
-	list := ""
-	flush := func() {
-		if len(para) > 0 {
-			b.WriteString("<p>" + inline(strings.Join(para, " ")) + "</p>\n")
-			para = nil
-		}
-		if list != "" {
-			b.WriteString("</" + list + ">\n")
-			list = ""
-		}
-	}
-	pre := false
-	for _, line := range strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			if pre {
-				b.WriteString("</pre>\n")
-			} else {
-				flush()
-				b.WriteString("<pre>")
-			}
-			pre = !pre
-			continue
-		}
-		if pre {
-			b.WriteString(esc(line) + "\n")
-			continue
-		}
-		if m := mdItem.FindStringSubmatch(line); m != nil && !mdRule.MatchString(line) {
-			kind := "ul"
-			if mdOrdered.MatchString(line) {
-				kind = "ol"
-			}
-			if len(para) > 0 || list != kind {
-				flush()
-				b.WriteString("<" + kind + ">\n")
-				list = kind
-			}
-			b.WriteString("<li>" + inline(m[1]) + "</li>\n")
-			continue
-		}
-		switch m := mdHeading.FindStringSubmatch(line); {
-		case strings.TrimSpace(line) == "":
-			flush()
-		case m != nil:
-			flush()
-			fmt.Fprintf(&b, "<h%d>%s</h%d>\n", len(m[1]), inline(m[2]), len(m[1]))
-		case mdRule.MatchString(line):
-			flush()
-			b.WriteString("<hr>\n")
-		case strings.HasPrefix(strings.TrimSpace(line), ">"):
-			flush()
-			b.WriteString("<blockquote>" + inline(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), ">"))) + "</blockquote>\n")
-		default:
-			if list != "" {
-				flush()
-			}
-			para = append(para, strings.TrimSpace(line))
-		}
-	}
-	if pre {
-		b.WriteString("</pre>\n")
-	}
-	flush()
-	return page(title, b.String())
 }
 
 // page wraps a body in the gateway's own minimal document.

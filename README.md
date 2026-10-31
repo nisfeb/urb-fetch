@@ -74,7 +74,7 @@ A page renders by the mark it was published under, as lattice's reader does. Lat
 | `%gmi` | gemtext, or HTML in the sandbox if it starts with `<` |
 | `%text`, `%js`, `%css`, `%noun` | text, in a `<pre>` |
 
-The gateway renders a small, safe subset of Markdown itself, since it has no Markdown library: headings, paragraphs, lists, quotes, rules, fenced code, inline code, links, bold and italics. Everything is escaped, so raw HTML in Markdown shows as text, and only web, `urb://` and relative links are kept. The `X-Urb-Mark` header names the mark.
+The gateway renders a small, safe subset of Markdown itself, since it has no Markdown library: headings, paragraphs, lists, quotes, rules, fenced code, inline code, links, bold and italics. Everything is escaped, so raw HTML in Markdown shows as text. Gemtext, Markdown and text read by the same rules as [nisfeb-extension](https://github.com/nisfeb/nisfeb-extension)'s reader (`render.go`): links only to the web, `urb://`, gemini, mail, or a path on the page's ship, resolved against the page; a Markdown body over 256 K UTF-16 units is shown as text. `TestExtensionParity` checks the two agree on random bodies and links, when node and a nisfeb-extension checkout (`$NISFEB_EXTENSION`, else `../nisfeb-extension`) are there. The `X-Urb-Mark` header names the mark.
 
 Release 74 also rotated every publisher's salt once, so every page's id changed. The ids come from the revision list, so a reader only needs a fresh list, which it reads every minute.
 
@@ -124,6 +124,8 @@ Don't point `URB_FETCH_STATE` at a folder a running gateway is using. `URB_FETCH
 - `furum.mjs` talks to [furum](https://github.com/nisfeb/furum) boards on another ship: it reads a board's posts, comments and votes, and posts, comments and votes through the host's public `inbox.sig`. `furum-cli.mjs` drives it from Node.
 - `pub.mjs` publishes pages from the engine, each under its format's mark as lattice 74 and later do (`pub-cli.mjs` takes it from the file's extension: `.md`, `.html`, `.txt`, `.js`, `.css`, else gemtext), so lattice readers on other ships open them at `urb://~our-ship/<name>`. It lays them out as lattice does: `/pub/index` and `/pub/revs` and each page's vault file answer grubbery peeks, a keep on a page's vault file hears its edits, and each revision's body answers remote scry at an unguessable id. `pub-cli.mjs` publishes and serves from Node.
 - `check.mjs` checks serving with no ship. vere's `urbit eval` computes the hashes, maps, ids and dates that other ships check, and the engine must agree. Then two engines in one process publish and read pages, edits and removals.
+- `test/` holds the unit tests, run with `node --test wasm/test/` after `build.sh`. `open` takes optional `now` and `entropy` hooks, the clock and the random bytes, for tests and recordings: with both fixed, a session sends the same datagrams every time.
+- Every noun from another ship is read under caps, written at the top of `mesa.mjs`'s hostile nouns section: 200,000 cells counted as a tree, as lattice's `+small-noun` does, `$json` 64 deep, numbers 32 bytes, paths 64 segments. A noun past one, or of the wrong shape, fails the read that waits on it with an `UrbError`; `test/hostile.test.mjs` sends them by hand.
 
 ```
 ZIG=/path/to/zig-x86_64-linux-0.15.2/zig wasm/build.sh

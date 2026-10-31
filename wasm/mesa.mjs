@@ -25,6 +25,14 @@
 //              commit is saved: a moon may start from empty state only if it
 //              never ran anywhere.
 //
+//   now        optional: the clock, () -> milliseconds since the epoch
+//              (Date.now by default)
+//   entropy    optional: n -> a Uint8Array of n random bytes (from
+//              crypto.getRandomValues by default). It gives the wire nonce,
+//              the ids of the %snaps we answer and a mined comet's seed;
+//              pub.mjs takes its page ids from it. With both fixed, a
+//              session's inputs decide its outputs.
+//
 //   const urb = await open({ wasm, transport, store })
 //   const { key, body, how, mark } = await urb.read('urb://~sampel-palnet/page')
 //
@@ -138,6 +146,159 @@ export function writeRows(rows) {
   return out;
 }
 
+// ------------------------------------------------------------- hostile nouns
+
+// Every noun another ship sends us is hostile (docs/rust-core.md, rule
+// 4 of the port, on the rust-core branch). Each one is read under these
+// caps, and anything past one is an UrbError:
+//
+//   MAX_CELLS   200,000 cells in one noun (a poke, a keen's answer, a
+//               nack), counted as a tree: a cell reached twice counts
+//               twice, as lattice's +small-noun counts (lattice-pub.hoon,
+//               which bounds a peer's /pub/revs the same). So shared
+//               structure, a small message that is vast as a tree, is
+//               refused, and no decoder below walks more than this.
+//   MAX_DEPTH   64: a $json nested deeper is refused
+//   TANK_DEPTH  32: a tank nested deeper prints as nothing
+//   MAX_NUMBER  32 bytes: an atom read as a number (a hash, an id, a
+//               date, a count, a flag) is at most 256 bits; a ship 128
+//   MAX_SEGS    64 segments in a path, each at most MAX_KNOT, 256 bytes,
+//               as libmesa caps them (PATH_MAX_SEGS, KNOT_MAX)
+//   text        an atom read as text is not capped here: libmesa takes
+//               no message over 64 MiB (ENG_MAX_MSG)
+//   shape       an atom where a cell goes, a cell where an atom goes, or
+//               a tag we don't know, is refused
+//
+// Nothing hostile traps the module: libmesa aborts on the head of an
+// atom, so Noun checks first. A peek, keen or poke waiting on the noun
+// fails with the error; one nobody waits on is logged and dropped.
+// furum.mjs adds its own cap, on the posts a board may claim.
+export const MAX_CELLS = 200_000;
+export const MAX_DEPTH = 64;
+export const TANK_DEPTH = 32;
+export const MAX_NUMBER = 32;
+export const MAX_SEGS = 64;
+export const MAX_KNOT = 256;
+
+const hostile = what => new UrbError(`another ship's noun ${what}`);
+
+// n, once it is known to have at most cap cells as a tree
+function measure(n, cap = MAX_CELLS) {
+  let seen = 0;
+  for (const todo = [n]; todo.length;) {
+    const t = todo.pop();
+    if (!t.isCell) continue;
+    if (++seen > cap) throw hostile(`has over ${cap} cells`);
+    todo.push(t.tail, t.head);
+  }
+  return n;
+}
+
+// Each decoder bounds its own work too, for a noun that wasn't measured:
+// a list or a map of over MAX_CELLS items, which shared structure can
+// fake in a small noun, is refused.
+function* list(n) {
+  for (let i = 0; n.isCell; n = n.tail) {
+    if (++i > MAX_CELLS) throw hostile(`has a list over ${MAX_CELLS} long`);
+    yield n.head;
+  }
+}
+
+// the nodes of a hoon map (a treap of [n l r])
+function entries(n) {
+  const out = [], stack = [n];
+  while (stack.length) {
+    const t = stack.pop();
+    if (t.isCell) {
+      if (out.length >= MAX_CELLS) throw hostile(`has a map over ${MAX_CELLS} entries`);
+      out.push(t.head);
+      stack.push(t.tail.head, t.tail.tail);
+    }
+  }
+  return out;
+}
+
+const unit = n => (n.isCell ? n.tail : null);
+const cord = n => (n.isCell ? null : n.text());
+
+// a path's segments
+function segments(p) {
+  const out = [];
+  for (const s of list(p)) {
+    if (out.length >= MAX_SEGS) throw hostile(`has a path over ${MAX_SEGS} segments`);
+    if (s.size > MAX_KNOT) throw hostile(`has a path segment over ${MAX_KNOT} bytes`);
+    out.push(s.text());
+  }
+  return out;
+}
+const pathOf = p => '/' + segments(p).join('/');
+
+// a $json noun as JS
+function json(n) {
+  measure(n);
+  const at = (n, depth) => {
+    if (!n.isCell) return null;
+    if (depth >= MAX_DEPTH) throw hostile(`has $json nested over ${MAX_DEPTH} deep`);
+    const tag = n.head.text(), p = n.tail;
+    if (tag === 'o') return Object.fromEntries(entries(p).map(kv => [kv.head.text(), at(kv.tail, depth + 1)]));
+    if (tag === 'a') return [...list(p)].map(v => at(v, depth + 1));
+    if (tag === 'b') return p.int() === 0n;
+    if (tag === 'n') return Number(p.text());
+    if (tag === 's') return p.text();
+    throw hostile('has $json of no kind we know');
+  };
+  return at(n, 0);
+}
+
+// the text of a tank, as +ram flattens it; '' past TANK_DEPTH
+function tape(t) {
+  return dec.decode(Uint8Array.from([...list(t)].map(c => (c.isCell || c.size > MAX_NUMBER ? 63 : Number(c.int() & 0xffn)))));
+}
+function tankText(t, depth = 0) {
+  if (depth > TANK_DEPTH || !t.isCell || t.head.isCell) return '';
+  const tag = t.head.text();
+  if (tag === 'leaf') return tape(t.tail);
+  if (tag !== 'rose' && tag !== 'palm') return '';
+  const pre = t.tail.head;
+  const [sep, opn, cls] = tag === 'rose'
+    ? [tape(pre.head), tape(pre.tail.head), tape(pre.tail.tail)]
+    : [tape(pre.head), tape(pre.tail.head) + tape(pre.tail.tail.head), tape(pre.tail.tail.tail)];
+  return opn + [...list(t.tail.tail)].map(k => tankText(k, depth + 1)).join(sep) + cls;
+}
+
+// the lines of a tang
+const tangText = t => [...list(t)].map(k => tankText(k)).join('\n  ');
+
+// the lines of an error noun [tag tang] (a nack's naxplanation), or what
+// was wrong with it
+function tang(err) {
+  try {
+    measure(err);
+    if (!err.isCell) return '';
+    return [err.head.isCell ? '' : err.head.text(), ...[...list(err.tail)].map(t => tankText(t))].join('\n  ');
+  } catch (e) {
+    if (e instanceof UrbError) return e.message;
+    throw e;
+  }
+}
+
+// the file a %snap's pace names, out of its inline or %data silo
+function fileOf(snap, silo, conv) {
+  const pace = snap.tail.head;
+  const jobe = ['firm', 'temp'].includes(pace.head.text()) ? unit(pace.tail) : null;
+  if (!jobe) return null;
+  const want = jobe.int();
+  const ject = entries(silo.tail).find(e => e.head.int() === want)?.tail.tail;
+  if (!ject || ject.head.text() !== 'leaf') return null;
+  const key = ject.tail.head.int();
+  const val = entries(silo.head).find(e => e.head.int() === key)?.tail.tail;
+  return val ? conv(val) : null;   // convert now: nouns are borrowed
+}
+
+// the decoders of other ships' nouns, for tests: each takes any noun
+// with isCell, head, tail, size, bytes(), text() and int()
+export const decoders = { measure, list, entries, unit, cord, segments, pathOf, json, tang, tangText, fileOf };
+
 // ------------------------------------------------------------- the relay
 
 // Datagrams over a WebSocket to `urb-fetch -relay`, which sends and
@@ -203,7 +364,10 @@ export function relayTransport(url, log = console.error) {
 
 // ------------------------------------------------------------- the engine
 
-export async function open({ wasm, transport, store, log = console.error, env = {}, fake = false }) {
+const randomBytes = n => crypto.getRandomValues(new Uint8Array(n));
+
+export async function open({ wasm, transport, store, log = console.error, env = {}, fake = false,
+                             now = Date.now, entropy = randomBytes }) {
   let X;
   const mem = () => new Uint8Array(X.memory.buffer);   // replaced when memory grows
   const imports = {
@@ -272,14 +436,26 @@ export async function open({ wasm, transport, store, log = console.error, env = 
 
   // ----------------------------------------------------------- nouns
 
-  // a borrowed noun handle, valid during the hook that handed it out
+  // a borrowed noun handle, valid during the hook that handed it out.
+  // Its shape is checked before libmesa sees it: libmesa aborts on the head
+  // of an atom or the bytes of a cell, and nouns from other ships can be
+  // any shape.
   class Noun {
     constructor(n) { this.n = n; }
     get isCell() { return X.is_cell(this.n) !== 0; }
-    get head() { return new Noun(X.head(this.n)); }
-    get tail() { return new Noun(X.tail(this.n)); }
+    get head() { return new Noun(X.head(this.cell())); }
+    get tail() { return new Noun(X.tail(this.cell())); }
+    cell() {
+      if (!this.isCell) throw hostile('has an atom where a cell goes');
+      return this.n;
+    }
+    // an atom's length in bytes
+    get size() {
+      if (this.isCell) throw hostile('has a cell where an atom goes');
+      return X.met3(this.n);
+    }
     bytes() {
-      const len = X.met3(this.n);
+      const len = this.size;
       const p = X.alloc(len || 1);
       try {
         X.atom_bytes(this.n, p, len);
@@ -289,7 +465,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       }
     }
     text() { return dec.decode(this.bytes()); }
-    int() {
+    // as a BigInt, at most max bytes of it
+    int(max = MAX_NUMBER) {
+      if (this.size > max) throw hostile(`has a number over ${max} bytes`);
       const b = this.bytes();
       let v = 0n;
       for (let i = b.length - 1; i >= 0; i--) v = (v << 8n) | BigInt(b[i]);
@@ -330,7 +508,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       if (!X.is_cell(b)) return false;
       return X.eq(X.head(a), X.head(b)) ? dor(X.tail(a), X.tail(b)) : dor(X.head(a), X.head(b));
     }
-    return X.is_cell(b) || new Noun(a).int() < new Noun(b).int();
+    return X.is_cell(b) || new Noun(a).int(Infinity) < new Noun(b).int(Infinity);
   }
 
   // A hoon map (of a Map) or set (of a Set) as +put:by and +put:in build
@@ -376,86 +554,6 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     return t ? [...t.split('/'), null] : null;
   }
 
-  function* list(n) {
-    for (; n.isCell; n = n.tail) yield n.head;
-  }
-
-  // the nodes of a hoon map (a treap of [n l r])
-  function entries(n) {
-    const out = [], stack = [n];
-    while (stack.length) {
-      const t = stack.pop();
-      if (t.isCell) {
-        out.push(t.head);
-        stack.push(t.tail.head, t.tail.tail);
-      }
-    }
-    return out;
-  }
-
-  const unit = n => (n.isCell ? n.tail : null);
-
-  // a $json noun as JS
-  function json(n) {
-    if (!n.isCell) return null;
-    const tag = n.head.text(), p = n.tail;
-    if (tag === 'o') return Object.fromEntries(entries(p).map(kv => [kv.head.text(), json(kv.tail)]));
-    if (tag === 'a') return [...list(p)].map(json);
-    if (tag === 'b') return p.int() === 0n;
-    if (tag === 'n') return Number(p.text());
-    return p.text();
-  }
-
-  const cord = n => (n.isCell ? null : n.text());
-
-  // the lines of a tang
-  function tangText(t) {
-    return [...list(t)].map(k => tankText(k)).join('\n  ');
-  }
-  function tankText(t, depth = 0) {
-    const tape = t => dec.decode(Uint8Array.from([...list(t)].map(c => (c.isCell ? 63 : Number(c.int() & 0xffn)))));
-    if (depth > 32 || !t.isCell || t.head.isCell) return '';
-    const tag = t.head.text();
-    if (tag === 'leaf') return tape(t.tail);
-    if (tag !== 'rose' && tag !== 'palm') return '';
-    const pre = t.tail.head;
-    const [sep, opn, cls] = tag === 'rose'
-      ? [tape(pre.head), tape(pre.tail.head), tape(pre.tail.tail)]
-      : [tape(pre.head), tape(pre.tail.head) + tape(pre.tail.tail.head), tape(pre.tail.tail.tail)];
-    return opn + [...list(t.tail.tail)].map(k => tankText(k, depth + 1)).join(sep) + cls;
-  }
-
-  // the lines of an error noun [tag tang] (a nack's naxplanation)
-  function tang(err) {
-    const tape = t => dec.decode(Uint8Array.from([...list(t)].map(c => (c.isCell ? 63 : Number(c.int() & 0xffn)))));
-    const tank = (t, depth = 0) => {
-      if (depth > 32 || !t.isCell || t.head.isCell) return '';
-      const tag = t.head.text();
-      if (tag === 'leaf') return tape(t.tail);
-      if (tag !== 'rose' && tag !== 'palm') return '';
-      const pre = t.tail.head;
-      const [sep, opn, cls] = tag === 'rose'
-        ? [tape(pre.head), tape(pre.tail.head), tape(pre.tail.tail)]
-        : [tape(pre.head), tape(pre.tail.head) + tape(pre.tail.tail.head), tape(pre.tail.tail.tail)];
-      return opn + [...list(t.tail.tail)].map(k => tank(k, depth + 1)).join(sep) + cls;
-    };
-    if (!err.isCell) return '';
-    return [err.head.isCell ? '' : err.head.text(), ...[...list(err.tail)].map(t => tank(t))].join('\n  ');
-  }
-
-  // the file a %snap's pace names, out of its inline or %data silo
-  function fileOf(snap, silo, conv) {
-    const pace = snap.tail.head;
-    const jobe = ['firm', 'temp'].includes(pace.head.text()) ? unit(pace.tail) : null;
-    if (!jobe) return null;
-    const want = jobe.int();
-    const ject = entries(silo.tail).find(e => e.head.int() === want)?.tail.tail;
-    if (!ject || ject.head.text() !== 'leaf') return null;
-    const key = ject.tail.head.int();
-    const val = entries(silo.head).find(e => e.head.int() === key)?.tail.tail;
-    return val ? conv(val) : null;   // convert now: nouns are borrowed
-  }
-
   // ----------------------------------------------------------- the loop
 
   let timer = null;
@@ -466,9 +564,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     const d = u64(X.deadline());
     if (d === NONE) return;
     //  setTimeout can't wait longer than 2^31 ms; waking early just re-arms
-    const wait = Math.min(Math.max(0, Number(d) - Date.now()), 60_000);
+    const wait = Math.min(Math.max(0, Number(d) - now()), 60_000);
     timer = setTimeout(() => {
-      if (Date.now() >= Number(u64(X.deadline()))) call(() => X.wake(BigInt(Date.now())));
+      if (now() >= Number(u64(X.deadline()))) call(() => X.wake(BigInt(now())));
       else arm();
     }, wait);
   }
@@ -542,7 +640,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   }
 
   function onPacket(ip, port, bytes) {
-    withBytes(bytes, (p, n) => call(() => X.hear(ip, port, p, n, BigInt(Date.now()))));
+    withBytes(bytes, (p, n) => call(() => X.hear(ip, port, p, n, BigInt(now()))));
   }
 
   // ----------------------------------------------------------- the reader
@@ -557,7 +655,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   const revs = new Map();    // ship -> {at, list}
   //  wires never repeat across runs: a publisher can deliver a reply meant
   //  for an earlier run late, and it must not match ours
-  const nonce = [...crypto.getRandomValues(new Uint8Array(4))].map(b => b.toString(16).padStart(2, '0')).join('');
+  const nonce = [...entropy(4)].map(b => b.toString(16).padStart(2, '0')).join('');
   let wires = 0;
 
   function poke(her, bone, agent, mark, value) {
@@ -579,16 +677,18 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   // grubbery's cross-ship peek of one file: [dest-dir, name]
   function peek(her, folder, name, conv) {
     const wire = `/urb-fetch/${nonce}/${++wires}`;
-    return new Promise(resolve => {
-      const st = { conv, snap: null, done: false };
-      st.finish = v => {
+    return new Promise((resolve, reject) => {
+      const st = { conv, snap: null, done: false, her: `${her[0]}:${her[1]}` };
+      const settle = f => {
         if (st.done) return;
         st.done = true;
         clearTimeout(st.timer);
         peeks.delete(wire);
         if (st.snap) X.unref(st.snap.n);
-        resolve(v);   // null: refused, nothing there, or no answer
+        f();
       };
+      st.finish = v => settle(() => resolve(v));   // null: refused, nothing there, or no answer
+      st.fail = e => settle(() => reject(e));      // an answer we could not read
       st.timer = setTimeout(() => st.finish(null), PEEK_TIMEOUT);
       peeks.set(wire, st);
       txn(() => {
@@ -628,8 +728,6 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     });
   }
 
-  const pathOf = p => '/' + [...list(p)].map(s => s.text()).join('/');
-
   // hook: a poke to us: %grubbery-transfer answers our peeks and pokes, and
   // a %grubbery-load is another ship's grubbery reading our files (%peek,
   // %keep, %drop) or a grub there writing to ours (%poke)
@@ -639,6 +737,8 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     const mark = new Noun(markN).text();
     const n = new Noun(nounN);
     if (mark === 'grubbery-load') {
+      //  nobody waits on it: one we can't read is logged (by guarded)
+      measure(n);
       //  [[wire dest] %poke [blot noun]], dest a rail [%& [path name]]
       const dest = n.head.tail, act = n.tail, tag = act.head.text();
       if (['peek', 'keep', 'drop'].includes(tag)) {
@@ -648,52 +748,77 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       if (tag !== 'poke') return ACK;
       if (inbox && !dest.head.int()) {
         const blot = act.tail.head;
-        inbox({
+        const msg = {
           from: shipText(lo, hi),
           to: [pathOf(dest.tail.head), dest.tail.tail.text()],
           mark: [pathOf(blot.head), blot.tail.text()],
           noun: act.tail.tail,
-        });
+        };
+        try { inbox(msg); } catch (e) { log(e); }
       }
       //  say it was taken in: the sender waits for this %pack, on its wire
       poke([lo, hi], flowTo([lo, hi]), 'grubbery', 'grubbery-transfer', [n.head.head, 'pack', null]);
       return ACK;
     }
     if (mark !== 'grubbery-transfer') return ACK;
-    const wire = '/' + [...list(n.head)].map(s => s.text()).join('/');
-    const tag = n.tail.head.text(), r = n.tail.tail;
+    const wire = pathOf(n.head), from = `${lo}:${hi}`;
+    try {
+      measure(n);
+      transfer(wire, from, n.tail.head.text(), n.tail.tail, [lo, hi], n.head);
+    } catch (e) {
+      //  what waits on this wire fails with it: for /want, every %want
+      //  out to the ship that sent it
+      const p = pokes.get(wire), st = peeks.get(wire);
+      const wants = wire === '/want' ? [...peeks.values()].filter(w => w.snap && !w.done && w.her === from) : [];
+      if (p) p.finish({ ok: false, error: e.message });
+      else if (st) st.fail(e);
+      else if (wants.length) for (const w of wants) w.fail(e);
+      else log(`${shipText(lo, hi)}: ${e.message}`);
+    }
+    return ACK;
+  }
+
+  // a %grubbery-transfer [wire tag r] from [from] (as lo:hi)
+  function transfer(wire, from, tag, r, her, wireN) {
     if (pokes.has(wire)) {
       //  [%pack err=(unit tang)]: the grub took the poke in, or refused it
       const err = tag === 'pack' ? unit(r) : null;
       pokes.get(wire).finish(err ? { ok: false, error: tangText(err) } : { ok: tag === 'pack' });
-      return ACK;
+      return;
     }
     if (wire === '/want') {
       //  +process-want answers on the fixed wire /want, not ours, so match
-      //  the content to the snap that asked for it
-      const wants = [...peeks.values()].filter(st => st.snap && !st.done);
+      //  the content to the snap that asked for it, of the ship that sent it
+      const wants = [...peeks.values()].filter(st => st.snap && !st.done && st.her === from);
       for (const st of wants) {
-        const v = tag === 'data' ? fileOf(st.snap, r, st.conv) : null;
+        let v;
+        try {
+          v = tag === 'data' ? fileOf(st.snap, r, st.conv) : null;
+        } catch (e) {
+          st.fail(e);
+          continue;
+        }
         if (v !== null) st.finish(v);
       }
       if (tag === 'miss' && wants.length) wants[0].finish(null);   // the pin expired
-      return ACK;
+      return;
     }
     const st = peeks.get(wire);
-    if (!st) return ACK;
+    if (!st) return;
     if (tag === 'snap') {
+      //  [dest snap-id snap=(unit [cass pace refs]) data=(unit silo)]
       const snap = unit(r.tail.tail.head), data = unit(r.tail.tail.tail);
       if (snap && !data) {
         //  too big to inline: ask for the content, pinned for 5 minutes
+        const id = r.tail.head.int();
         st.snap = new Noun(X.ref(snap.n));
-        poke([lo, hi], st.bone, 'grubbery', 'grubbery-transfer', [n.head, 'want', r.head, r.tail.head.int()]);
-        return ACK;
+        poke(her, st.bone, 'grubbery', 'grubbery-transfer', [wireN, 'want', r.head, id]);
+        return;
       }
       st.finish(snap ? fileOf(snap, data, st.conv) : null);
-      return ACK;
+      return;
     }
-    st.finish(null);
-    return ACK;
+    st.finish(null);   // %veto, %miss
   }
 
   // hook: our poke was acked, or nacked
@@ -716,7 +841,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   function keen(her, spath) {
     if (keens.has(spath)) return keens.get(spath).promise;
     const k = {};
-    k.promise = new Promise(resolve => {
+    k.promise = new Promise((resolve, reject) => {
       const t = setTimeout(() => {
         //  a miss never answers: stop asking, as +keen-page-raw %yawns
         keens.delete(spath);
@@ -728,6 +853,11 @@ export async function open({ wasm, transport, store, log = console.error, env = 
         keens.delete(spath);
         resolve(v);
       };
+      k.fail = e => {
+        clearTimeout(t);
+        keens.delete(spath);
+        reject(e);
+      };
     });
     keens.set(spath, k);
     txn(() => check(withStr(spath, p => X.keen(her[0], her[1], p)), 'keen'));
@@ -738,8 +868,13 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   function on_sage(lo, hi, pathPtr, gage) {
     const k = keens.get(cstr(pathPtr));
     if (!k) return;
-    const g = u64(gage) === NONE ? null : new Noun(gage);
-    k.done(g && { mark: g.head.text(), body: cord(g.tail) });
+    if (u64(gage) === NONE) return void k.done(null);
+    try {
+      const g = measure(new Noun(gage));
+      k.done({ mark: g.head.text(), body: cord(g.tail) });
+    } catch (e) {
+      k.fail(e);
+    }
   }
 
   // ----------------------------------------------------------- serving
@@ -787,13 +922,13 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     }
     if (tag === 'peek') {
       const [snap, data] = f && f.value !== undefined ? snapOf(f) : [null, null];
-      const id = bigOf(crypto.getRandomValues(new Uint8Array(16)));
+      const id = bigOf(entropy(16));
       poke(her, flowTo(her), 'grubbery', 'grubbery-transfer',
            [wire, 'snap', dest, id, snap && [null, snap], data && [null, data]]);
       return;
     }
     if (f && (keepers.has(k) || keepers.size < MAX_KEEPERS)) {
-      keepers.set(k, { ship, wire: [...list(wire)].map(s => s.text()), folder: at[0], name: at[1] });
+      keepers.set(k, { ship, wire: segments(wire), folder: at[0], name: at[1] });
       keepersChanged([...keepers.values()]);
     }
     //  the first wave answers the keep, even for nothing
@@ -806,14 +941,24 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     return got ? noun(got) : NONE;
   }
 
+  // A peer's /pub/revs, or null if it has none there. One we can't read
+  // (over the caps, or not a $json object) is an empty list, as lattice's
+  // +fetch-peer-revs reads it, so its pages still read by the vault peek.
+  const revsOf = n => {
+    const j = json(n);
+    return j && typeof j === 'object' && !Array.isArray(j) ? j : {};
+  };
+  const peekRevs = (her, b) => peek(her, b + '/pub', 'revs', revsOf)
+    .catch(e => (e instanceof UrbError ? {} : Promise.reject(e)));
+
   // +peer-base: where the peer runs lattice, asked, not guessed
   async function base(her, who) {
     if (!bases.has(who)) {
       for (const b of [DESK_BASE, APP_BASE]) {
-        const got = await peek(her, b + '/pub', 'revs', json);
+        const got = await peekRevs(her, b);
         if (got !== null) {
           bases.set(who, b);
-          revs.set(who, { at: Date.now(), list: got });
+          revs.set(who, { at: now(), list: got });
           break;
         }
       }
@@ -827,8 +972,8 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   async function revList(her, who) {
     const b = await base(her, who);
     let r = revs.get(who);
-    if (!r || Date.now() - r.at > REVS_TTL) {
-      r = { at: Date.now(), list: (await peek(her, b + '/pub', 'revs', json)) ?? {} };
+    if (!r || now() - r.at > REVS_TTL) {
+      r = { at: now(), list: (await peekRevs(her, b)) ?? {} };
       revs.set(who, r);
     }
     return r.list;
@@ -892,7 +1037,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     const res = await fetch(STARS, { headers: { 'user-agent': 'urb-fetch' } });   // 403 without one, outside a browser
     if (!res.ok) throw new Error(`${STARS}: ${res.status}`);
     const jam = new Uint8Array(await res.arrayBuffer());
-    keyfile = withBytes(jam, (j, n) => withBytes(crypto.getRandomValues(new Uint8Array(64)), e => take(X.mine_comet(j, n, e))));
+    keyfile = withBytes(jam, (j, n) => withBytes(entropy(64), e => take(X.mine_comet(j, n, e))));
     if (!keyfile) throw new Error('mining a comet failed');
     await store.saveKey(keyfile);
     rows = null;
@@ -906,7 +1051,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   if (rows?.length) check(withBytes(rows, (p, n) => X.store_load(p, n)), 'store_load');
   //  a fake ship is rebooted fresh, so it may always start from empty state
   const breached = fake || (fresh && !rows?.length);
-  const err = call(() => withStr(keyfile, p => X.open(p, BigInt(Date.now()), breached ? 1 : 0, fake ? 1 : 0)));
+  const err = call(() => withStr(keyfile, p => X.open(p, BigInt(now()), breached ? 1 : 0, fake ? 1 : 0)));
   if (err === -2) {
     transport.close();
     throw new Error(`${our} has run before, and its state here is empty. Starting it from nothing would replay old messages, so breach it on its parent (|moon-breach) and add its new key.`);
@@ -918,6 +1063,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   const nouns = {
     entries, list, unit, cord, json, sham,
     ship: n => {
+      if (n.size > 16) throw hostile('has a ship over 128 bits');
       const b = n.bytes(), at = i => b.slice(i, i + 8).reduceRight((v, x) => (v << 8n) | BigInt(x), 0n);
       return shipText(at(0), at(8));
     },
@@ -927,6 +1073,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     our,
     read,
     nouns,
+    // the clock and the entropy this engine was opened with, for pub.mjs
+    now,
+    entropy,
     // grubbery on other ships: read a file, poke a grub, and hear grubs
     // that poke ours (f({from, to, mark, noun}), during the hook)
     grub: {
