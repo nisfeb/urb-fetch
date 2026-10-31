@@ -285,6 +285,65 @@ pub fn trim(s: &str) -> &str {
     s.trim_matches(js_space)
 }
 
+/// `JSON.stringify(j)`: what a host keeps meta.pub as, byte for byte. A
+/// number that isn't finite is `null`, as JSON.stringify writes it.
+pub fn stringify(j: &Json) -> String {
+    let mut out = String::new();
+    write_json(j, &mut out);
+    out
+}
+
+fn write_json(j: &Json, out: &mut String) {
+    match j {
+        Json::Null => out.push_str("null"),
+        Json::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        Json::Num(n) if n.is_finite() => out.push_str(&number_text(*n)),
+        Json::Num(_) => out.push_str("null"),
+        Json::Str(s) => write_str(s, out),
+        Json::Arr(a) => {
+            out.push('[');
+            for (k, x) in a.iter().enumerate() {
+                if k > 0 {
+                    out.push(',');
+                }
+                write_json(x, out);
+            }
+            out.push(']');
+        }
+        Json::Obj(o) => {
+            out.push('{');
+            for (k, (key, x)) in o.entries().into_iter().enumerate() {
+                if k > 0 {
+                    out.push(',');
+                }
+                write_str(key, out);
+                out.push(':');
+                write_json(x, out);
+            }
+            out.push('}');
+        }
+    }
+}
+
+/// JSON.stringify's QuoteJSONString
+fn write_str(s: &str, out: &mut String) {
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\u{8}' => out.push_str("\\b"),
+            '\u{c}' => out.push_str("\\f"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c < ' ' => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -359,6 +418,21 @@ mod tests {
         let keys: Vec<&str> = o.entries().iter().map(|e| e.0).collect();
         assert_eq!(keys, ["1", "2", "b", "a", "01", "4294967295"]);
         assert_eq!(o.get("b"), Some(&Json::Num(5.0)));
+    }
+
+    #[test]
+    fn json_as_json_stringify_writes_it() {
+        let mut o = Object::default();
+        o.set("b".into(), Json::Num(1.5));
+        o.set(
+            "1".into(),
+            Json::Arr(vec![Json::Null, Json::Num(f64::NAN), Json::Bool(true)]),
+        );
+        o.set("q\"\\\n\u{1}\u{7f}é".into(), Json::Num(1793438787341.0));
+        assert_eq!(
+            stringify(&Json::Obj(o)),
+            "{\"1\":[null,null,true],\"b\":1.5,\"q\\\"\\\\\\n\\u0001\u{7f}é\":1793438787341}"
+        );
     }
 
     #[test]
