@@ -421,14 +421,17 @@ impl Core {
 
 /// A hook's call as libmesa makes it, handed to the core by a test or a
 /// fuzzer: a %grubbery poke from a ship (its mark and noun), a nack or an
-/// ack, and a keen's answer. Keen starts a keen, as page() does, for one
-/// to answer.
+/// ack, a keen's answer, and another ship's read of our namespace (what
+/// it would be answered with is given as a [`Output::Log`] of its jam's
+/// length, or none). Keen starts a keen, as page() does, for one to
+/// answer.
 #[doc(hidden)]
 pub enum Hook<'a> {
     Poke(&'a str, &'a str, NounRef<'a>),
     Done(&'a str, u64, Option<NounRef<'a>>),
     Sage(&'a str, &'a str, Option<NounRef<'a>>),
     Keen(&'a str, &'a str),
+    Peek(&'a str),
 }
 
 /// what the core waits on: its peeks' and pokes' wires, its keens'
@@ -462,6 +465,11 @@ impl Core {
             Hook::Keen(her, path) => {
                 if let Some(i) = w.inst() {
                     let _ = keen(w, &i, ship(her), path.into());
+                }
+            }
+            Hook::Peek(path) => {
+                if let Some(n) = engine::guard(w, None, |w| w.hook_peek(path)) {
+                    w.log(format!("scry: {} bytes", n.jam().len()));
                 }
             }
         }
