@@ -8,9 +8,9 @@
 //! deadline their earliest; the rest is compared output by output. Each step
 //! must also draw the entropy the trace says it drew, and all of it.
 //!
-//! M3's traces must replay: 1, 2, 3, 6 and 9. The others (furum, serving,
-//! the %want leg, lattice forums, the roller) are reported, and wait for
-//! their milestones.
+//! Every trace up to M4 must replay: 1, 2, 3, 5 (serving), 6, 7 (the
+//! %want leg), 9 and 10 (the roller). The others (furum and lattice
+//! forums) are reported, and wait for M5.
 
 mod common;
 
@@ -20,10 +20,11 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
 use urb::core::{Conv, Lane, Peeked};
+use urb::js::{Json, Object};
 use urb::noun::Value;
 use urb::{Core, Failure, Input, Output, Reply, Request, alive};
 
-const M3: &[u32] = &[1, 2, 3, 6, 9];
+const MUST: &[u32] = &[1, 2, 3, 5, 6, 7, 9, 10];
 
 /// the entropy a step may draw: the trace's, in order
 #[derive(Default)]
@@ -61,7 +62,45 @@ fn text(j: &J) -> String {
     j.as_str().expect("text").to_string()
 }
 
-/// a trace's call as a request, or None for one M3 has no port of
+/// a JS value, as trace.mjs's dec() gives it
+fn json(j: &J) -> Json {
+    match j {
+        J::Null => Json::Null,
+        J::Bool(b) => Json::Bool(*b),
+        J::Number(n) => Json::Num(n.as_f64().unwrap()),
+        J::String(s) => Json::Str(s.clone()),
+        J::Array(v) => Json::Arr(v.iter().map(json).collect()),
+        J::Object(o) => {
+            assert!(!o.keys().any(|k| k.starts_with('$')), "no plain value {j}");
+            let mut out = Object::default();
+            for (k, v) in o {
+                out.set(k.clone(), json(v));
+            }
+            Json::Obj(out)
+        }
+    }
+}
+
+/// a JS value as trace.mjs's enc() writes it
+fn unjson(j: &Json) -> J {
+    match j {
+        Json::Null => J::Null,
+        Json::Bool(b) => J::Bool(*b),
+        Json::Num(n) if !n.is_finite() => json!({ "$num": urb::js::number_text(*n) }),
+        Json::Num(n) if n.fract() == 0.0 && n.abs() < 9007199254740992.0 => J::from(*n as i64),
+        Json::Num(n) => J::from(*n),
+        Json::Str(s) => J::String(s.clone()),
+        Json::Arr(v) => J::Array(v.iter().map(unjson).collect()),
+        Json::Obj(o) => J::Object(
+            o.entries()
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), unjson(v)))
+                .collect(),
+        ),
+    }
+}
+
+/// a trace's call as a request, or None for one M4 has no port of
 fn request(op: &str, a: &[J]) -> Option<Request> {
     Some(match op {
         "open" => {
@@ -96,6 +135,24 @@ fn request(op: &str, a: &[J]) -> Option<Request> {
             },
             wait: a.get(4).and_then(J::as_u64),
         },
+        "pub" => {
+            let st = a.first().map_or(Json::Obj(Object::default()), json);
+            let Json::Obj(st) = st else { return None };
+            Request::Pub {
+                pages: match st.get("pages") {
+                    Some(Json::Obj(o)) => Some(o.clone()),
+                    _ => None,
+                },
+                keepers: st.get("keepers").cloned(),
+            }
+        }
+        "pub.put" => Request::PubPut {
+            name: text(&a[0]),
+            body: text(&a[1]),
+            mark: a.get(2).and_then(J::as_str).map(String::from),
+        },
+        "pub.remove" => Request::PubRemove(text(&a[0])),
+        "pub.pages" => Request::PubPages,
         _ => return None,
     })
 }
@@ -143,6 +200,7 @@ fn reply(r: &Reply) -> J {
         Reply::Peek(Peeked::Text(s)) => J::String(s.clone()),
         Reply::Peek(Peeked::True) => J::Bool(true),
         Reply::Peek(Peeked::Files(f)) => J::Array(f.iter().map(|(p, t)| json!([p, t])).collect()),
+        Reply::Json(j) => unjson(j),
     }
 }
 
@@ -173,6 +231,7 @@ fn out(o: &Output) -> J {
             Err(f) => json!({ "result": call, "err": err(f) }),
         },
         Output::Inbox(m) => json!({ "inbox": m.from }),
+        Output::Event { name, value } => json!({ "event": name, "value": unjson(value) }),
     }
 }
 
@@ -263,7 +322,11 @@ fn replay(lines: &str) -> Replayed {
                 live.insert(id, (text(&o["kind"]), o["due"].as_u64().unwrap()));
             } else if let Some(id) = o.get("untimer").and_then(J::as_u64) {
                 live.remove(&id);
-            } else if o.get("result").and_then(J::as_u64).is_some_and(|c| closes.contains(&c)) {
+            } else if o
+                .get("result")
+                .and_then(J::as_u64)
+                .is_some_and(|c| closes.contains(&c))
+            {
                 // trace.mjs's close clears every timer before its result
                 live.clear();
             }
@@ -398,11 +461,11 @@ fn traces_replay_byte_for_byte() {
         }
         let r = replay(lines);
         assert_eq!(alive(), 0, "{name} left nouns alive");
-        let must = M3.contains(&n);
+        let must = MUST.contains(&n);
         match r {
             Replayed::Ok(s) => eprintln!("ok    {name}: {s} steps"),
             Replayed::Unported(k, op) => {
-                eprintln!("wait  {name}: step {k} calls {op}, which M3 does not port");
+                eprintln!("wait  {name}: step {k} calls {op}, which M4 does not port");
                 if must {
                     bad.push(n);
                 }
