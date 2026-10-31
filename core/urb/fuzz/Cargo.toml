@@ -1,0 +1,99 @@
+# cargo fuzz's crate: a target for every decoder of another ship's
+# nouns. Its own workspace, built by the nightly cargo fuzz needs:
+#
+#   cd core/urb/fuzz && cargo +nightly-2026-10-30 fuzz run json
+[package]
+name = "urb-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+urb = { path = ".." }
+
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "cue"
+path = "fuzz_targets/cue.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "measure"
+path = "fuzz_targets/measure.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "list"
+path = "fuzz_targets/list.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "entries"
+path = "fuzz_targets/entries.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "segments"
+path = "fuzz_targets/segments.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "json"
+path = "fuzz_targets/json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "tang"
+path = "fuzz_targets/tang.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "tang_text"
+path = "fuzz_targets/tang_text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "file_of"
+path = "fuzz_targets/file_of.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ball_of"
+path = "fuzz_targets/ball_of.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ship"
+path = "fuzz_targets/ship.rs"
+test = false
+doc = false
+bench = false
