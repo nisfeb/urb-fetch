@@ -9,15 +9,22 @@
 //   inputs   call   an app call, {op, args}: open, read, close, a peek or
 //                   poke, pub.mjs's, furum.mjs's and forum.mjs's calls
 //            hear   a datagram heard, {ip, port, bytes}
-//            tick   a timer firing, {timer}: the engine's wake, each keen,
-//                   peek and poke timeout, a fake ship's key lookup,
-//                   close's wait
+//            tick   a timer firing, {timer, kind, due}: which timer, by the
+//                   name mesa.mjs gives it (kind: 'wake', 'point <ship>',
+//                   'roller <ship>', 'peek <wire>', 'poke <wire>', 'keen
+//                   <path>', 'close') and the time it was set for. Two
+//                   timers due at once fire as two ticks, in order. A
+//                   tick never comes before its due: the recorder waits
+//                   out a timer Node fires early. (Traces recorded before
+//                   it did have early ticks, marked early: the JS finds
+//                   its wake not yet due and sets it again.)
 //            fetch  a fetch's answer, {id, status, body} or {id, error}:
 //                   the roller's key lookups and the comet stars
 //            Each step has its now (the clock, fixed for the whole step)
 //            and eny, every entropy draw it made, in order.
 //   outputs  send {lane, bytes}, commit {rows}, saveKey, start, tclose,
-//            log, timer {id, ms}, untimer {id}, fetch {id, url, ...},
+//            log, timer {id, ms, kind, due}, untimer {id}, fetch {id,
+//            url, method, headers, body},
 //            result {call, ok | err}, event {name, value}
 //
 // The step a call starts is a fresh macrotask, and so is each datagram,
@@ -30,8 +37,10 @@
 // replay(trace) feeds the inputs into a fresh engine on a virtual clock
 // and checks that each step's outputs equal the recorded ones, byte for
 // byte (as JSON, bytes as hex). That is the recorder's own check, and
-// what a Rust replay must also pass (timer and untimer are the JS's own
-// scheduling; a port compares the rest).
+// what a Rust replay must also pass. timer and untimer are the JS's own
+// scheduling: a port drives its own timers by each tick's kind and now,
+// and compares the rest. replay(trace, {label: true}) gives an older
+// trace's timers and ticks their kind and due, from a replay.
 //
 // MESA_TRACE must be unset: it makes libmesa log every packet.
 
@@ -134,33 +143,36 @@ function world(mode, { wasm, transport, onStep = () => {}, onOut = () => {} }) {
     },
     log: e => emit({ log: logText(e) }),
     timers: {
-      setTimeout(f, ms) {
-        const id = ++tid;
-        emit({ timer: id, ms: ms ?? null });
-        const real = mode === 'record' ? setTimeout(() => {
+      setTimeout(f, ms, what) {
+        const id = ++tid, kind = what ?? null, due = clock + Math.max(0, ms ?? 0);
+        emit({ timer: id, ms: ms ?? null, kind, due });
+        const t = { f, kind, due, real: null };
+        //  Node may fire a timer up to a millisecond early: wait it out
+        const fire = () => {
           if (!live.has(id)) return;
+          if (Date.now() < due) return void (t.real = setTimeout(fire, due - Date.now()));
           live.delete(id);
-          begin({ k: 'tick', timer: id });
+          begin({ k: 'tick', timer: id, kind, due });
           f();
-        }, ms) : null;
-        live.set(id, [f, real]);
+        };
+        if (mode === 'record') t.real = setTimeout(fire, ms);
+        live.set(id, t);
         return id;
       },
       clearTimeout(id) {
         if (!live.has(id)) return;
-        clearTimeout(live.get(id)[1]);
+        clearTimeout(live.get(id).real);
         live.delete(id);
         emit({ untimer: id });
       },
     },
     fetch(url, opts = {}) {
       const id = ++fid;
-      emit({ fetch: id, url: String(url), method: opts.method ?? 'GET', body: opts.body ?? null });
+      emit({ fetch: id, url: String(url), method: opts.method ?? 'GET', headers: opts.headers ?? {}, body: opts.body ?? null });
       return new Promise((resolve, reject) => {
         fetching.set(id, { resolve, reject });
         if (mode !== 'record') return;
-        const { signal, ...rest } = opts;
-        globalThis.fetch(url, rest)
+        globalThis.fetch(url, opts)
           .then(async r => ({ status: r.status, body: hex(new Uint8Array(await r.arrayBuffer())) }))
           .catch(e => ({ error: e.message }))
           .then(async got => {
@@ -232,8 +244,8 @@ function world(mode, { wasm, transport, onStep = () => {}, onOut = () => {} }) {
       Object.assign(app, { urb: null, pub: null, furums: new Map(), forums: new Map() });
       await urb.close();
       // the engine is gone: its timers would only touch a closed module
-      for (const [id, [, real]] of live) {
-        clearTimeout(real);
+      for (const [id, t] of live) {
+        clearTimeout(t.real);
         live.delete(id);
       }
       return true;
@@ -292,8 +304,12 @@ function world(mode, { wasm, transport, onStep = () => {}, onOut = () => {} }) {
       if (i.k === 'tick') {
         const t = live.get(i.timer);
         if (!t) throw new Error(`trace: timer ${i.timer} is not set`);
+        if (i.kind !== undefined && (i.kind !== t.kind || i.due !== t.due)) {
+          throw new Error(`trace: timer ${i.timer} is ${t.kind} due ${t.due}, the trace says ${i.kind} due ${i.due}`);
+        }
+        Object.assign(cur.in, { kind: t.kind, due: t.due }, i.now < t.due ? { early: true } : {});
         live.delete(i.timer);
-        return void t[0]();
+        return void t.f();
       }
       if (i.k === 'fetch') return void answer(i.id, i);
       throw new Error(`trace: no input ${i.k}`);
@@ -348,10 +364,32 @@ export function recorder({ wasm, transport, onOut }) {
 
 // Replays trace into a fresh engine: each step's input, then its outputs
 // compared with the recorded ones. {ok, steps, at, want, got} with at the
-// first step that differs (and what it had, and what replay gave).
-export async function replay(trace, { wasm, patience = 10_000 } = {}) {
+// first step that differs (and what it had, and what replay gave). With
+// label, a trace from before timers had names may lack each timer's kind
+// and due, and each fetch's headers: they are taken from the replay, and
+// trace is the trace with them.
+export async function replay(trace, { wasm, patience = 10_000, label = false } = {}) {
   const w = world('replay', { wasm });
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // what of a replayed output the recorded one has, when labelling
+  const LABELS = { timer: ['kind', 'due'], fetch: ['headers'] };
+  const like = (o, rec) => {
+    if (!label || !rec) return o;
+    const k = Object.keys(LABELS).find(k => k in o && k in rec);
+    if (!k) return o;
+    const c = { ...o };
+    for (const f of LABELS[k]) if (!(f in rec)) delete c[f];
+    return c;
+  };
+  const check = (k, step, got) => {
+    if (w.left()) got.out.push({ trace: `${w.left()} draws not made` });
+    const outs = got.out.map((o, i) => like(o, step.out[i]));
+    const inOf = i => (label ? { ...i, kind: undefined, due: undefined, early: undefined } : i);
+    if (!same(outs, step.out) || !same(got.in.eny, step.in.eny) || !same(inOf(got.in), inOf(step.in))) {
+      return { ok: false, steps: trace.steps.length, at: k, want: step, got };
+    }
+    return null;
+  };
   for (const [k, step] of trace.steps.entries()) {
     let got;
     try {
@@ -365,13 +403,17 @@ export async function replay(trace, { wasm, patience = 10_000 } = {}) {
     } catch (e) {
       return { ok: false, steps: trace.steps.length, at: k, want: step, got: { error: logText(e) } };
     }
-    if (w.left()) got.out.push({ trace: `${w.left()} draws not made` });
-    if (!same(got.out, step.out) || !same(got.in.eny, step.in.eny)) {
-      return { ok: false, steps: trace.steps.length, at: k, want: step, got };
-    }
+    const bad = check(k, step, got);
+    if (bad) return bad;
+  }
+  // nothing more after the last step
+  for (let i = 0; i < 20; i++) await macrotask();
+  const last = trace.steps.length - 1;
+  if (last >= 0 && w.steps[last].out.length !== trace.steps[last].out.length) {
+    return { ok: false, steps: trace.steps.length, at: last, want: trace.steps[last], got: w.steps[last] };
   }
   if (w.app.urb) await w.app.urb.close().catch(() => {});
-  return { ok: true, steps: trace.steps.length };
+  return { ok: true, steps: trace.steps.length, ...(label ? { trace: { head: trace.head, steps: w.steps } } : {}) };
 }
 
 // The first output where two steps' differ, as text

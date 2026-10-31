@@ -39,6 +39,10 @@ test('a recorded session replays byte for byte', async () => {
   assert.ok(t.steps.some(s => s.in.eny.length), 'it drew entropy');
   assert.ok(t.steps.some(s => s.out.some(o => o.send)), 'it sent');
   assert.ok(t.steps.some(s => s.out.some(o => o.commit)), 'it saved');
+  //  every tick names its timer, and none comes before its due
+  const ticks = t.steps.filter(s => s.in.k === 'tick');
+  assert.ok(ticks.length && ticks.every(s => s.in.kind && s.in.due <= s.in.now && !s.in.early));
+  assert.ok(ticks.some(s => s.in.kind.startsWith('point ')) && ticks.some(s => s.in.kind === 'close'));
   const r = await replay(t, { wasm });
   assert.ok(r.ok, r.ok ? '' : `step ${r.at}: ${difference(r.want, r.got)}`);
   assert.equal(r.steps, t.steps.length);
@@ -60,4 +64,11 @@ test('a changed trace does not replay', async () => {
   const q = await replay(u, { wasm, patience: 2000 });
   assert.equal(q.ok, false);
   assert.equal(q.at, j);
+  // a tick that names another timer
+  const v = fromLines(toLines(await session()));
+  const n = v.steps.findIndex(s => s.in.k === 'tick');
+  v.steps[n].in.kind = 'peek /nothing';
+  const x = await replay(v, { wasm, patience: 2000 });
+  assert.equal(x.ok, false);
+  assert.equal(x.at, n);
 });

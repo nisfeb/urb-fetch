@@ -32,9 +32,11 @@
 //              the ids of the %snaps we answer and a mined comet's seed;
 //              pub.mjs takes its page ids from it. With both fixed, a
 //              session's inputs decide its outputs.
-//   timers     optional: {setTimeout(f, ms) -> id, clearTimeout(id)}, every
-//              timer the engine sets (its wake, each keen, peek and poke
-//              timeout, close's wait), the globals by default
+//   timers     optional: {setTimeout(f, ms, what) -> id, clearTimeout(id)},
+//              every timer the engine sets, the globals by default. what
+//              names it: 'wake', 'point <ship>' (a fake ship's keys),
+//              'roller <ship>' (a key lookup's 30 s), 'peek <wire>',
+//              'poke <wire>', 'keen <path>' or 'close'
 //   fetch      optional: fetch(url, opts) for the roller's key lookups and
 //              the comet stars, the global by default. trace.mjs gives all
 //              four to record a session and replay it.
@@ -688,7 +690,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     timer = setTimeout(() => {
       if (now() >= Number(u64(X.deadline()))) call(() => X.wake(BigInt(now())));
       else arm();
-    }, wait);
+    }, wait, 'wake');
   }
 
   function call(f) {
@@ -743,14 +745,18 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     [lo, hi] = [u64(lo), u64(hi)];
     //  a fake network's keys come from names: answer once the engine call
     //  that asked has returned
-    if (fake) return void setTimeout(() => call(() => X.point_fake(lo, hi)));
+    if (fake) return void setTimeout(() => call(() => X.point_fake(lo, hi)), undefined, `point ${shipText(lo, hi)}`);
     const k = `${lo}:${hi}`;
     if (asking.has(k)) return;
     asking.add(k);
     const body = take(X.point_request(lo, hi));
-    fetch(ROLLER, { method: 'POST', headers: { 'content-type': 'application/json' }, body,
-                    signal: AbortSignal.timeout(30_000) })
+    //  given up on after 30 s, by a timer of the engine's (so a trace has it)
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(new DOMException('The operation was aborted due to timeout', 'TimeoutError')),
+                         30_000, `roller ${shipText(lo, hi)}`);
+    fetch(ROLLER, { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: ac.signal })
       .then(r => r.text())
+      .finally(() => clearTimeout(t))
       .catch(e => (log(`azimuth lookup of ${shipText(lo, hi)} failed: ${e.message}`), null))
       .then(js => {
         asking.delete(k);
@@ -813,7 +819,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       };
       st.finish = v => settle(() => resolve(v));   // null: refused, nothing there, or no answer
       st.fail = e => settle(() => reject(e));      // an answer we could not read
-      st.timer = setTimeout(() => st.finish(null), wait);
+      st.timer = setTimeout(() => st.finish(null), wait, `peek ${wire}`);
       peeks.set(wire, st);
       txn(() => {
         st.bone = flowTo(her);
@@ -838,7 +844,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
         pokes.delete(wire);
         resolve(r);
       };
-      st.timer = setTimeout(() => st.finish({ ok: false, error: `${shipText(...her)} did not answer`, later: true }), PEEK_TIMEOUT);
+      st.timer = setTimeout(() => st.finish({ ok: false, error: `${shipText(...her)} did not answer`, later: true }), PEEK_TIMEOUT, `poke ${wire}`);
       pokes.set(wire, st);
       txn(() => {
         const bone = u64(X.flow_open(her[0], her[1]));
@@ -969,7 +975,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
         keens.delete(spath);
         txn(() => withStr(spath, p => X.yawn(her[0], her[1], p)));
         resolve(null);
-      }, KEEN_TIMEOUT);
+      }, KEEN_TIMEOUT, `keen ${spath}`);
       k.done = v => {
         clearTimeout(t);
         keens.delete(spath);
@@ -1228,7 +1234,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     async close() {
       clearTimeout(timer);
       await saved;
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 500, 'close'));
       transport.close();
       X.close();
     },
