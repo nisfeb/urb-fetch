@@ -1,8 +1,10 @@
 # The Rust core (docs/rust-core.md): cargo test natively and under
-# WASI, libmesa's own suites against mesa-sys's build and against its
-# zig build; check.mjs against vere, the JS tests, every trace replayed
-# into the JS, and the conformance vectors in the JS, the extension's
-# renderers and the Go. rerecord.yml records the traces again.
+# WASI, the conformance vectors in Rust, the property tests against
+# vere and the JS, a short fuzz run of every decoder, libmesa's own
+# suites against mesa-sys's build and against its zig build; check.mjs
+# against vere, the JS tests, every trace replayed into the JS, and the
+# conformance vectors in the JS, the extension's renderers and the Go.
+# rerecord.yml records the traces again.
 name: core
 
 on:
@@ -20,10 +22,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+      # node and mesa.wasm: the property tests check the Rust against
+      # the JS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
       - name: tools
         run: core/ci/tools.sh "$RUNNER_TEMP/tools"
       - name: urcrypt and SQLite
         run: core/mesa-sys/fetch-deps.sh
+      - name: mesa.wasm
+        run: wasm/build.sh
       - name: the toolchain
         working-directory: core
         # rust-toolchain.toml names the version, targets and components;
@@ -39,6 +48,9 @@ jobs:
           cargo fmt --check
           cargo clippy --all-targets -- -D warnings
           cargo clippy --all-targets --target wasm32-wasip1 -- -D warnings
+      - name: the conformance vectors, in Rust
+        working-directory: core
+        run: cargo test -p urb --test vectors -- --nocapture
       - name: cargo test
         working-directory: core
         run: |
@@ -57,6 +69,33 @@ jobs:
         run: |
           for w in native wasi; do
             for m in debug release; do core/mesa-sys/suites.sh zig $w $m; done
+          done
+
+  # a minute of every fuzz target, from the vectors' nouns; a long run
+  # is by hand (core/urb/fuzz/Cargo.toml says how)
+  fuzz:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - name: urcrypt and SQLite
+        run: core/mesa-sys/fetch-deps.sh
+      - name: nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly-2026-10-30 --profile minimal
+          cargo +nightly-2026-10-30 install cargo-fuzz --version 0.13.2 --locked
+      - name: fuzz every decoder
+        working-directory: core/urb
+        run: |
+          node fuzz/seed.mjs
+          for t in $(cargo +nightly-2026-10-30 fuzz list); do
+            echo "== $t"
+            cargo +nightly-2026-10-30 fuzz run "$t" -- \
+              -max_total_time=60 -timeout=10 -rss_limit_mb=2048
           done
 
   check:
