@@ -1,0 +1,65 @@
+# The Rust core (docs/rust-core.md): cargo test natively and under
+# WASI, libmesa's own suites against mesa-sys's build and against its
+# zig build, and check.mjs against vere.
+name: core
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  core:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: tools
+        run: core/ci/tools.sh "$RUNNER_TEMP/tools"
+      - name: urcrypt and SQLite
+        run: core/mesa-sys/fetch-deps.sh
+      - name: the toolchain
+        working-directory: core
+        # rust-toolchain.toml names the version, targets and components
+        run: rustup toolchain install
+      - name: fmt and clippy
+        working-directory: core
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+      - name: cargo test
+        working-directory: core
+        run: |
+          cargo test
+          cargo test --release
+      - name: cargo test under WASI
+        working-directory: core
+        run: |
+          cargo test --target wasm32-wasip1
+          cargo test --release --target wasm32-wasip1
+      - name: libmesa's suites, our build
+        run: |
+          for m in debug release ubsan; do core/mesa-sys/suites.sh cargo native $m; done
+          for m in debug release; do core/mesa-sys/suites.sh cargo wasi $m; done
+      - name: libmesa's suites, its zig build
+        run: |
+          for w in native wasi; do
+            for m in debug release; do core/mesa-sys/suites.sh zig $w $m; done
+          done
+
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: tools
+        run: core/ci/tools.sh "$RUNNER_TEMP/tools"
+      - name: mesa.wasm
+        run: wasm/build.sh
+      - name: check.mjs
+        working-directory: wasm
+        run: node check.mjs
