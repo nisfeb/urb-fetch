@@ -114,6 +114,12 @@ func (r *Reader) Poke(n *mesa.Node, her mesa.Ship, bone uint64, agent, mark stri
 	if mark != "grubbery-transfer" {
 		return nil
 	}
+	if !small(noun, maxCells) {
+		//  too big to read: what waits on its wire gets nothing, now
+		logf("%s sent a noun of over %d cells", her, maxCells)
+		r.finish(noun.Head().Path(), nil)
+		return nil
+	}
 	wire, tag, rest := noun.Head().Path(), noun.Tail().Head().Text(), noun.Tail().Tail()
 	if wire == "/want" {
 		//  +process-want answers on the fixed wire /want, not ours, so
@@ -210,6 +216,42 @@ func (r *Reader) finish(wire string, v any) {
 
 // ------------------------------------------------------------ nouns
 
+// Every noun another ship sends is hostile (rule 4 of the Rust core's
+// plan), and the reader reads it under wasm/mesa.mjs's caps:
+//
+//	maxCells  200,000 cells in one %grubbery-transfer, counted as a
+//	          tree: a cell reached twice counts twice, as lattice's
+//	          +small-noun counts. Shared structure, a small message that
+//	          is vast as a tree, is refused, so no decoder below walks
+//	          more than this.
+//	maxDepth  64: a $json nested deeper reads as nothing, all of it
+//
+// The binding reads an atom where a cell goes as the atom 0, and a cell
+// where an atom goes as no bytes, so a wrong shape reads as nothing and
+// never panics. A keen's answer is read only as one atom. A nack's tang
+// is printed by the binding (mesa.Tang), before the reader sees it.
+const (
+	maxCells = 200_000
+	maxDepth = 64
+)
+
+// small is whether n has at most limit cells, counted as a tree.
+func small(n mesa.Noun, limit int) bool {
+	seen := 0
+	for todo := []mesa.Noun{n}; len(todo) > 0; {
+		t := todo[len(todo)-1]
+		todo = todo[:len(todo)-1]
+		if !t.IsCell() {
+			continue
+		}
+		if seen++; seen > limit {
+			return false
+		}
+		todo = append(todo, t.Tail(), t.Head())
+	}
+	return true
+}
+
 // entries are the nodes of a hoon map or set, a treap of [n l r].
 func entries(n mesa.Noun) []mesa.Noun {
 	var out []mesa.Noun
@@ -254,30 +296,49 @@ func fileOf(jobe string, silo mesa.Noun, conv func(mesa.Noun) any) any {
 	return nil
 }
 
-// jsonOf reads a $json noun.
+// jsonOf reads a $json noun. One nested past maxDepth is nil, all of it.
 func jsonOf(n mesa.Noun) any {
-	if !n.IsCell() {
+	v, ok := jsonAt(n, 0)
+	if !ok {
 		return nil
+	}
+	return v
+}
+
+func jsonAt(n mesa.Noun, depth int) (any, bool) {
+	if !n.IsCell() {
+		return nil, true
+	}
+	if depth >= maxDepth {
+		return nil, false
 	}
 	p := n.Tail()
 	switch n.Head().Text() {
 	case "o":
 		m := map[string]any{}
 		for _, kv := range entries(p) {
-			m[kv.Head().Text()] = jsonOf(kv.Tail())
+			v, ok := jsonAt(kv.Tail(), depth+1)
+			if !ok {
+				return nil, false
+			}
+			m[kv.Head().Text()] = v
 		}
-		return m
+		return m, true
 	case "a":
 		var a []any
 		for _, it := range p.List() {
-			a = append(a, jsonOf(it))
+			v, ok := jsonAt(it, depth+1)
+			if !ok {
+				return nil, false
+			}
+			a = append(a, v)
 		}
-		return a
+		return a, true
 	case "b":
 		v, _ := p.Uint64()
-		return v == 0
+		return v == 0, true
 	}
-	return p.Text() // %n keeps its text, %s is text
+	return p.Text(), true // %n keeps its text, %s is text
 }
 
 // revsOf reads /pub/revs, {"/page": {"rev": 1, "id": "0v..."}}, as
