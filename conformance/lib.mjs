@@ -12,7 +12,7 @@ import { pathToFileURL } from 'node:url';
 import { forum } from '../wasm/forum.mjs';
 import { furum } from '../wasm/furum.mjs';
 import { asNoun, cue, hex, jam, unhex } from '../wasm/jam.mjs';
-import { da, decoders, deUrb, fakeKeyfile, looksHtml, messages, open, renderAs, snapOf, uv, waveOf } from '../wasm/mesa.mjs';
+import { da, decoders, deUrb, fakeKeyfile, looksHtml, MAX_BYTES, MAX_CELLS, messages, open, renderAs, snapOf, uv, waveOf } from '../wasm/mesa.mjs';
 import { actions } from '../wasm/forum.mjs';
 import { dec, enc } from '../wasm/trace.mjs';
 
@@ -74,7 +74,13 @@ function fns(urb, lib) {
     peek: messages.peek, poke: messages.poke, pack: messages.pack, want: messages.want, snap: messages.snap,
     snapFile: (w, d, id, file) => messages.snap(w, d, id, ...snapOf(file, sham)),
     intakeOf: (w, d, file) => messages.intake(w, d, waveOf(file, 'gmi')),
-    json: decoders.json, tang: decoders.tang, tangText: decoders.tangText, pathOf: decoders.pathOf,
+    json: decoders.json, tang: decoders.tang, pathOf: decoders.pathOf,
+    //  as on_poke reads a %pack: measured, then printed, from one budget
+    tangText: n => {
+      const b = { cells: MAX_CELLS, bytes: MAX_BYTES };
+      decoders.measure(n, b);
+      return decoders.tangText(n, b);
+    },
     segments: decoders.segments, measure: n => (decoders.measure(n), true),
     list: n => [...decoders.list(n)].length, entries: n => decoders.entries(n).length,
     fileOf: (snap, silo) => decoders.fileOf(snap, silo, cord),

@@ -42,7 +42,8 @@ pub const MAX_BYTES: usize = 64 << 20;
 type R<T> = Result<T, UrbError>;
 
 /// What one decode may still read: cells and atom bytes, counted as a
-/// tree, at each place they are read (mesa.mjs's budget()).
+/// tree, at each place they are read, and what it prints past them
+/// (mesa.mjs's budget()).
 #[derive(Clone, Debug)]
 pub struct Budget {
     cells: usize,
@@ -63,14 +64,25 @@ impl Budget {
         Self::default()
     }
 
+    fn take(&mut self, bytes: usize, over: impl FnOnce() -> String) -> R<()> {
+        let Some(left) = self.bytes.checked_sub(bytes) else {
+            return Err(hostile(over()));
+        };
+        self.bytes = left;
+        Ok(())
+    }
+
+    /// atom bytes read
     fn spend(&mut self, bytes: usize) -> R<()> {
-        match self.bytes.checked_sub(bytes) {
-            Some(left) => {
-                self.bytes = left;
-                Ok(())
-            }
-            None => Err(hostile(format!("has over {MAX_BYTES} bytes of atoms"))),
-        }
+        self.take(bytes, || {
+            format!("has over {} MiB of atoms", MAX_BYTES >> 20)
+        })
+    }
+
+    /// output a decode makes beyond the atoms it read: a tank's
+    /// separators, a directory's paths
+    fn print(&mut self, bytes: usize) -> R<()> {
+        self.take(bytes, || format!("reads as over {} MiB", MAX_BYTES >> 20))
     }
 
     fn cell(&mut self) -> R<()> {
@@ -344,7 +356,7 @@ pub fn tank_text(t: NounRef<'_>, b: &mut Budget, depth: usize) -> R<String> {
     let kids = items(t.tail()?.tail()?)?;
     if kids.len() > 1 {
         let chars = items(pre.head()?)?.len();
-        b.spend((kids.len() - 1).saturating_mul(chars))?;
+        b.print((kids.len() - 1).saturating_mul(chars))?;
     }
     let kids = kids
         .into_iter()
@@ -354,12 +366,12 @@ pub fn tank_text(t: NounRef<'_>, b: &mut Budget, depth: usize) -> R<String> {
 }
 
 /// the lines of a tang, out of the noun it is in, which its caller
-/// measured, as mesa.mjs's on_poke measures the %pack
-pub fn tang_text(t: Measured<'_>) -> R<String> {
-    let mut b = Budget::new();
+/// measured from `b`, as mesa.mjs's on_poke measures the %pack: what it
+/// prints is spent from the same budget
+pub fn tang_text(t: Measured<'_>, b: &mut Budget) -> R<String> {
     Ok(items(t.noun())?
         .into_iter()
-        .map(|k| tank_text(k, &mut b, 0))
+        .map(|k| tank_text(k, b, 0))
         .collect::<R<Vec<_>>>()?
         .join("\n  "))
 }
@@ -438,9 +450,11 @@ pub fn file_of<'a, T>(
 /// out of its %snap: mesa.mjs's ballOf. A tree that holds itself, one
 /// deeper than [`MAX_SEGS`], or a walk past [`MAX_CELLS`] trees and
 /// their entries, files and directories, is refused. Each file's noun
-/// and the bytes of its path are spent from one [`Budget`], at each
-/// place the file is: one noun named by many files, or one tree at many
-/// places, counts at each. None if the silo lacks the tree.
+/// and its path, as /-separated text, are spent from one [`Budget`] at
+/// each place the file is: one noun named by many files, or one tree at
+/// many places, counts at each, and so does each segment of a path, even
+/// an empty one. So a ball over 64 MiB as files is refused, even if its
+/// message is smaller. None if the silo lacks the tree.
 pub fn ball_of<'a, T>(
     snap: NounRef<'a>,
     silo: NounRef<'a>,
@@ -491,7 +505,8 @@ impl<'a> Ball<'a> {
         Ok(())
     }
 
-    /// at: the path's segments, and len their bytes. Each directory's
+    /// at: the path's segments, and len its bytes as text, a / for each.
+    /// Each directory's
     /// name is pushed on at for its walk and popped after, so a name that
     /// is no tree costs no copy of the path.
     fn walk(&mut self, jobe: Int, at: &mut Vec<String>, len: usize) -> R<bool> {
@@ -525,7 +540,7 @@ impl<'a> Ball<'a> {
             };
             let name = e.head()?;
             let seg = knot(name)?;
-            self.budget.spend(len + name.size()?)?;
+            self.budget.print(len + 1 + name.size()?)?;
             let val = measure_in(val, &mut self.budget)?.noun();
             let mut p = at.to_vec();
             p.push(seg);
@@ -536,7 +551,7 @@ impl<'a> Ball<'a> {
             let sub = e.tail()?.head()?.int(MAX_NUMBER)?;
             let name = e.head()?;
             at.push(knot(name)?);
-            self.walk(sub, at, len + name.size()?)?;
+            self.walk(sub, at, len + 1 + name.size()?)?;
             at.pop();
         }
         self.above.remove(&jobe);

@@ -14,7 +14,10 @@ import { FURUM_BASE } from '../wasm/furum.mjs';
 export const quick = 2000;   // ms: a refusal takes no longer
 // a decoder's error, word for word
 const H = what => `another ship's noun has ${what}`;
-const OVER_BYTES = 'over 67108864 bytes of atoms';
+const OVER_BYTES = 'over 64 MiB of atoms';
+// what a decoder prints past the atoms it read: a tank's separators, a
+// directory's paths
+const OVER_PRINT = "another ship's noun reads as over 64 MiB";
 
 const T = t => ({ $noun: hex(jam(t)) });
 const a = x => (typeof x === 'string' ? [...new TextEncoder().encode(x)].reduceRight((v, b) => (v << 8n) | BigInt(b), 0n) : BigInt(x));
@@ -99,8 +102,12 @@ export function hostileNouns() {
     { fn: 'json', in: [T(arr(...Array(8200).fill(str8k)))], error: H(OVER_BYTES) },
     { fn: 'json', in: [T([a('o'), mapOf(Array(8200).fill([big8k, num(1)]))])], error: H(OVER_BYTES) },
     //  a separator of 8200 characters between each two of 8200 kids
-    { fn: 'tang', in: [T([a('err'), list(longSep)])], out: H(OVER_BYTES) },
-    { fn: 'tangText', in: [T(list(longSep))], error: H(OVER_BYTES) },
+    { fn: 'tang', in: [T([a('err'), list(longSep)])], out: OVER_PRINT },
+    { fn: 'tangText', in: [T(list(longSep))], error: OVER_PRINT },
+    //  measured and printed from one budget: 40 MB of atoms in a leaf,
+    //  then 33 MB of separators, though each alone is under it
+    { fn: 'tangText', in: [T(list([a('leaf'), list(...Array(5000).fill(big8k))],
+      [a('rose'), [[list(...Array(8200).fill(44n)), [0n, 0n]], list(...Array(4000).fill(leaf))]]))], error: OVER_PRINT },
     //  500 directories naming one tree, whose own 500 are all missing
     { fn: 'ballOf', in: [T(dirSnap(1n)), T(silo(0n, mapOf([[1n, [0n, tree(0n, dirs(500, 2n))]], [2n, [0n, tree(0n, dirs(500, 99n))]]])))],
       error: H('a directory of over 200000 trees and files') },
@@ -110,7 +117,13 @@ export function hostileNouns() {
     //  5000 files 63 directories down, each named by 256 bytes
     { fn: 'ballOf', in: [T(dirSnap(1n)), T(silo(mapOf([[4n, [0n, 1n]]]), mapOf([...Array.from({ length: 63 }, (_, i) =>
       [BigInt(i + 1), [0n, tree(0n, mapOf([[a('d'.repeat(256)), [BigInt(i + 2), 0n]]]))]]),
-      [64n, [0n, tree(files(5000, 100n), 0n)]], [100n, [0n, [a('leaf'), [4n, 0n]]]]])))], error: H(OVER_BYTES) },
+      [64n, [0n, tree(files(5000, 100n), 0n)]], [100n, [0n, [a('leaf'), [4n, 0n]]]]])))], error: OVER_PRINT },
+    //  each segment of a path counts, even an empty one: 4090 files of
+    //  16 KiB, 63 empty directories down (at the top, they would read)
+    { fn: 'ballOf', in: [T(dirSnap(1n)), T(silo(mapOf([[4n, [0n, a('x'.repeat(16384))]]]), mapOf([...Array.from({ length: 63 }, (_, i) =>
+      [BigInt(i + 1), [0n, tree(0n, mapOf([[0n, [BigInt(i + 2), 0n]]]))]]),
+      [64n, [0n, tree(mapOf(Array.from({ length: 4090 }, (_, i) => [a(`f${String(i).padStart(4, '0')}`), 100n])), 0n)]],
+      [100n, [0n, [a('leaf'), [4n, 0n]]]]])))], error: H(OVER_BYTES) },
     { fn: 'forum.board', in: [board([[list(a('card')), [2n, 0n]]]), 'b'], error: "~zod's board grub is unreadable: /pub/card (not version 1)" },
     { fn: 'forum.board', in: [board(goodPub, [[list(a('posts'), a('b0')), [1n, one(2n ** 300n, 0n)]]]), 'b'], error: "~zod's board grub is unreadable: /content/posts/b0 (another ship's noun has a number over 32 bytes)" },
     { fn: 'forum.board', in: [board(goodPub, [[list(a('votes'), a('b0')), [1n, one([a('reply'), 1n], [0n, 0n])]]]), 'b'], error: "~zod's board grub is unreadable: /content/votes/b0 (no vote target %reply)" },

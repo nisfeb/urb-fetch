@@ -31,7 +31,7 @@ const FILES: &[(&str, &str, usize)] = &[
     (
         "hostile-nouns",
         include_str!("../../../conformance/hostile-nouns.json"),
-        28,
+        30,
     ),
 ];
 
@@ -121,10 +121,13 @@ fn run<'a>(f: &str, a: &[Value<'a>]) -> Result<J, String> {
         },
         "json" => codec::json(one(&a[0])).map(|v| json_out(&v)).map_err(e),
         "tang" => Ok(J::String(codec::tang(one(&a[0])))),
-        "tangText" => codec::measure(one(&a[0]))
-            .and_then(codec::tang_text)
-            .map(J::String)
-            .map_err(e),
+        "tangText" => {
+            let mut b = codec::Budget::new();
+            codec::measure_in(one(&a[0]), &mut b)
+                .and_then(|m| codec::tang_text(m, &mut b))
+                .map(J::String)
+                .map_err(e)
+        }
         "pathOf" => codec::path_of(one(&a[0])).map(J::String).map_err(e),
         "segments" => codec::segments(one(&a[0])).map(|s| json!(s)).map_err(e),
         "measure" => codec::measure(one(&a[0])).map(|_| J::Bool(true)).map_err(e),
