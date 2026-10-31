@@ -9,8 +9,45 @@
 //!   often: shared cells that are vast as trees, the tags the decoders
 //!   look for, long lists and atoms past every cap. The nouns are the top
 //!   of the stack.
+//!
+//! Besides never panicking and failing only with mesa.mjs's errors, a
+//! decoder's output must stay under [`OUT_MAX`], whatever the input:
+//! the caps bound what a decode reads, at each place it reads it, and so
+//! what it gives back. The time a run takes is libFuzzer's -timeout.
 
+use urb::codec::{MAX_BYTES, MAX_CELLS};
+use urb::js::Json;
 use urb::{Noun, UrbError, alive};
+
+/// The most bytes a decode's output may hold: its atoms' bytes, each of
+/// which may decode to three (U+FFFD), and a few for each cell.
+pub const OUT_MAX: usize = 3 * MAX_BYTES + 16 * MAX_CELLS;
+
+/// that a decoder's output, of `len` bytes, is under [`OUT_MAX`]
+pub fn bounded(len: usize) {
+    assert!(len <= OUT_MAX, "a decode gave {len} bytes, over {OUT_MAX}");
+}
+
+/// the bytes a $json value holds: its text and 8 for each value
+pub fn json_len(j: &Json) -> usize {
+    let mut n = 0;
+    let mut todo = vec![j];
+    while let Some(j) = todo.pop() {
+        n += 8;
+        match j {
+            Json::Str(s) => n += s.len(),
+            Json::Arr(a) => todo.extend(a),
+            Json::Obj(o) => {
+                for (k, v) in o.entries() {
+                    n += k.len();
+                    todo.push(v);
+                }
+            }
+            _ => {}
+        }
+    }
+    n
+}
 
 /// tags and texts the decoders look for
 const WORDS: &[&[u8]] = &[
@@ -46,7 +83,7 @@ pub fn nouns(data: &[u8], want: usize) -> Option<Vec<Noun>> {
         b
     };
     while let Some(op) = byte() {
-        match op % 10 {
+        match op % 12 {
             0 => {
                 let n = byte().unwrap_or(0) as usize % 48;
                 let b: Vec<u8> = (0..n).map(|k| byte().unwrap_or(k as u8)).collect();
@@ -79,9 +116,13 @@ pub fn nouns(data: &[u8], want: usize) -> Option<Vec<Noun>> {
                 }
             }
             7 => {
-                // a big atom, past the size caps
-                let n = 1 + byte().unwrap_or(0) as usize;
-                stack.push(Noun::atom(&vec![0xa5; n * 4]));
+                // a big atom, past the size caps; now and then 2 MiB, which
+                // shared at many places is past the byte cap
+                let n = match byte().unwrap_or(0) {
+                    255 => 2 << 20,
+                    b => 4 + b as usize * 4,
+                };
+                stack.push(Noun::atom(&vec![0xa5; n]));
             }
             8 => {
                 // a list of the top, k long, sharing it: now and then
@@ -89,7 +130,10 @@ pub fn nouns(data: &[u8], want: usize) -> Option<Vec<Noun>> {
                 // quick
                 if let Some(top) = stack.pop() {
                     let k = match byte().unwrap_or(0) {
-                        255 => urb::codec::MAX_CELLS + 1,
+                        255 => MAX_CELLS + 1,
+                        // a tape long enough that, as a separator between
+                        // as many kids, it prints past the byte cap
+                        254 => 10_000,
                         b => b as usize * 16,
                     };
                     let mut l = Noun::atom(&[]);
@@ -99,10 +143,38 @@ pub fn nouns(data: &[u8], want: usize) -> Option<Vec<Noun>> {
                     stack.push(l);
                 }
             }
-            _ => {
+            9 => {
                 let n = stack.len();
                 if n >= 2 {
                     stack.swap(n - 1, n - 2);
+                }
+            }
+            10 => {
+                // a map (a treap [n l r], leaning right) of k entries, each
+                // [key top] with keys 1 to k: many names for one ject
+                if let Some(top) = stack.pop() {
+                    let k = match byte().unwrap_or(0) {
+                        255 => 1000,
+                        b => b as usize,
+                    };
+                    let mut m = Noun::atom(&[]);
+                    for i in (1..=k as u32).rev() {
+                        let e = Noun::cell(Noun::atom(&i.to_le_bytes()), top.clone());
+                        m = Noun::cell(e, Noun::cell(Noun::atom(&[]), m));
+                    }
+                    stack.push(m);
+                }
+            }
+            _ => {
+                // a tree ject [%tree ~ 0 ~ fil dir], dir the top, fil
+                // under it
+                if stack.len() >= 2 {
+                    let dir = stack.pop()?;
+                    let fil = stack.pop()?;
+                    let z = || Noun::atom(&[]);
+                    let t = Noun::cell(fil, dir);
+                    let t = Noun::cell(z(), Noun::cell(z(), Noun::cell(z(), t)));
+                    stack.push(Noun::cell(Noun::atom(b"tree"), t));
                 }
             }
         }

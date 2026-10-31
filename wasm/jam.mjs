@@ -14,13 +14,30 @@ const bits = v => (v === 0n ? 0 : v < 0x20000000000000n ? Number(v).toString(2).
 // equal nouns are one noun, as +jam's map of nouns has it
 function numberer() {
   const ids = new Map(), byNoun = new Map();
-  const id = n => {
-    if (byNoun.has(n)) return byNoun.get(n);
-    const key = isCell(n) ? `${id(n[0])},${id(n[1])}` : `a${n.toString(16)}`;
+  const number = key => {
     if (!ids.has(key)) ids.set(key, ids.size);
-    const k = ids.get(key);
-    if (isCell(n)) byNoun.set(n, k);   // a cell object is the same noun every time
-    return k;
+    return ids.get(key);
+  };
+  //  iteratively, a cell after its head and tail, so a long list is no
+  //  trouble
+  const id = n => {
+    if (!isCell(n)) return number(`a${n.toString(16)}`);
+    for (const todo = [n]; todo.length;) {
+      const c = todo.at(-1);
+      if (byNoun.has(c)) {
+        todo.pop();
+        continue;
+      }
+      const kids = c.filter(x => isCell(x) && !byNoun.has(x));
+      if (kids.length) {
+        todo.push(...kids);
+        continue;
+      }
+      todo.pop();
+      const part = x => (isCell(x) ? byNoun.get(x) : number(`a${x.toString(16)}`));
+      byNoun.set(c, number(`${part(c[0])},${part(c[1])}`));   // a cell object is the same noun every time
+    }
+    return byNoun.get(n);
   };
   return id;
 }

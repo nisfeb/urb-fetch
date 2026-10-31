@@ -214,13 +214,13 @@ await write('decoders', "mesa.mjs's decoders of other ships' nouns (its decoders
 const hn = hostileNouns();
 for (const c of hn) {
   const r = await evaluate(urb, c);
-  const ok = c.error !== undefined ? r.error?.includes(c.error) : JSON.stringify(r.out) === JSON.stringify(c.out);
+  const ok = c.error !== undefined ? r.error === c.error : JSON.stringify(r.out) === JSON.stringify(c.out);
   if (!ok || r.ms > quick) {
     throw new Error(`hostile ${c.fn}: wanted ${JSON.stringify(c.error ?? c.out)} within ${quick} ms, got ${JSON.stringify(r).slice(0, 300)}`);
   }
 }
 writeFileSync(`${here}hostile-nouns.json`, JSON.stringify({
-  about: `hand-written hostile nouns (hostile.mjs): each must be refused, with an error that contains its text, within ${quick} ms, and never crash or hang`,
+  about: `hand-written hostile nouns (hostile.mjs): each must be refused, with exactly its error, within ${quick} ms, and never crash or hang`,
   quick, cases: hn,
 }, null, 1) + '\n');
 console.log(`hostile-nouns.json: ${hn.length} cases`);

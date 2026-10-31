@@ -1,6 +1,6 @@
 // Runs the conformance vectors the JS implements: every case's output,
-// or its error, must be the vector's (a hostile vector's error must
-// contain its text, within its time). The extension's need its
+// or its error, must be the vector's, word for word (and a hostile
+// vector's within its time). The extension's need its
 // checkout at the commit they name; without one they are skipped, or
 // fail with REQUIRE_ALL set, as CI sets it.
 //
@@ -36,7 +36,7 @@ for (const name of [...JS, ...EXT]) {
   for (const [i, c] of v.cases.entries()) {
     const r = await evaluate(urb, c, lib);
     const ok = r.skip ? false
-      : c.error !== undefined ? (v.quick ? r.error?.includes(c.error) : r.error === c.error)
+      : c.error !== undefined ? r.error === c.error
       : JSON.stringify(r.out) === JSON.stringify(c.out);
     const slow = v.quick && r.ms > v.quick;
     if (!ok || slow) {

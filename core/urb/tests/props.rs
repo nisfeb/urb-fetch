@@ -231,7 +231,7 @@ fn distinct(r: &mut Rng, n: usize, depth: u32) -> Vec<Value<'static>> {
     let mut out = Vec::new();
     while out.len() < n {
         let k = key(r, depth);
-        if seen.insert(Noun::of(&k).unwrap().borrow().jam()) {
+        if seen.insert(Noun::of(&k).unwrap().jam()) {
             out.push(k);
         }
     }
@@ -510,7 +510,7 @@ fn js_values_make_the_js_nouns() {
         if bad <= 8 {
             eprintln!(
                 "MISMATCH {what} {i}: {}\n  js   {js}\n  rust {rust}",
-                &input[..input.len().min(300)]
+                input.chars().take(300).collect::<String>()
             );
         }
     };
@@ -519,7 +519,7 @@ fn js_values_make_the_js_nouns() {
         common::cue_all(v, &mut nouns);
         let mut at = 0;
         let got = match Noun::of(&common::value(v, &nouns, &mut at)) {
-            Ok(n) => J::String(common::hex(&n.borrow().jam())),
+            Ok(n) => J::String(common::hex(&n.jam())),
             Err(e) => json!({"error": e.0}),
         };
         if got != out["values"][i] {
@@ -681,7 +681,7 @@ proptest! {
         let tape = if tape.len() == 1 { Value::Null } else { Value::Array(tape) };
         let n = Noun::of(&Value::Array(vec!["leaf".into(), tape])).unwrap();
         let want = s.strip_prefix('\u{feff}').unwrap_or(&s).to_owned();
-        prop_assert_eq!(codec::tank_text(n.borrow(), 0).unwrap(), want);
+        prop_assert_eq!(codec::tank_text(n.borrow(), &mut codec::Budget::new(), 0).unwrap(), want);
         drop(n);
         prop_assert_eq!(alive(), 0);
     }
@@ -691,9 +691,9 @@ proptest! {
         let mut r = Rng(seed);
         let v = key(&mut r, 0);
         let n = Noun::of(&v).unwrap();
-        let back = Noun::cue(&n.borrow().jam()).unwrap();
+        let back = Noun::cue(&n.jam()).unwrap();
         prop_assert!(back == n);
-        prop_assert_eq!(back.borrow().sham(), n.borrow().sham());
+        prop_assert_eq!(back.sham(), n.sham());
         prop_assert_eq!(back.borrow().mug(), n.borrow().mug());
         drop((n, back));
         prop_assert_eq!(alive(), 0);
@@ -719,4 +719,38 @@ fn the_counter_counts() {
     assert!(codec::items(l.borrow()).is_err());
     drop(l);
     assert_eq!(alive(), 0);
+}
+
+#[test]
+fn debug_prints_a_bounded_prefix() {
+    // a cell that is 2^200 cells as a tree, in 200, and a 1 MiB atom
+    let mut n = Noun::atom(&[7]);
+    for _ in 0..200 {
+        n = Noun::cell(n.clone(), n);
+    }
+    let start = std::time::Instant::now();
+    let s = format!("{n:?}");
+    assert!(start.elapsed().as_secs() < 2, "took {:?}", start.elapsed());
+    assert!(s.len() < 1000 && s.contains("..."), "{s}");
+    let big = Noun::atom(&vec![0xab; 1 << 20]);
+    assert_eq!(format!("{big:?}"), format!("0x..{}", "ab".repeat(32)));
+    assert_eq!(format!("{:?}", Noun::atom(&[1, 2])), "0x0201");
+    drop((n, big));
+    assert_eq!(alive(), 0);
+}
+
+#[test]
+fn long_radix_literals_round_as_js() {
+    // 2^53 + 1 and 2^53 + 3: ties to even
+    assert_eq!(js::number("0x20000000000001"), 9007199254740992.0);
+    assert_eq!(js::number("0x20000000000003"), 9007199254740996.0);
+    // just past half: rounds up
+    assert_eq!(js::number("0x200000000000011"), 144115188075855904.0);
+    assert_eq!(js::number("0b0001"), 1.0);
+    assert_eq!(js::number("0x0"), 0.0);
+    assert!(js::number("0x1fg").is_nan());
+    // a million digits, at once, and past a double
+    let long = format!("0x1{}", "0".repeat(1_000_000));
+    assert_eq!(js::number(&long), f64::INFINITY);
+    assert!(js::number(&format!("{long}z")).is_nan());
 }

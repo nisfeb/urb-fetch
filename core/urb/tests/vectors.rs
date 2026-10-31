@@ -31,7 +31,7 @@ const FILES: &[(&str, &str, usize)] = &[
     (
         "hostile-nouns",
         include_str!("../../../conformance/hostile-nouns.json"),
-        20,
+        28,
     ),
 ];
 
@@ -104,9 +104,7 @@ fn run<'a>(f: &str, a: &[Value<'a>]) -> Result<J, String> {
     let e = |r: urb::UrbError| r.message;
     let t = |r: noun::TypeError| r.0;
     match f {
-        "noun" => Noun::of(&a[0])
-            .map(|n| J::String(hex(&n.borrow().jam())))
-            .map_err(t),
+        "noun" => Noun::of(&a[0]).map(|n| J::String(hex(&n.jam()))).map_err(t),
         "sham" => noun::sham(&a[0])
             .map(|h| J::String(format!("{h:x}")))
             .map_err(t),
@@ -123,12 +121,13 @@ fn run<'a>(f: &str, a: &[Value<'a>]) -> Result<J, String> {
         },
         "json" => codec::json(one(&a[0])).map(|v| json_out(&v)).map_err(e),
         "tang" => Ok(J::String(codec::tang(one(&a[0])))),
-        "tangText" => codec::tang_text(one(&a[0])).map(J::String).map_err(e),
+        "tangText" => codec::measure(one(&a[0]))
+            .and_then(codec::tang_text)
+            .map(J::String)
+            .map_err(e),
         "pathOf" => codec::path_of(one(&a[0])).map(J::String).map_err(e),
         "segments" => codec::segments(one(&a[0])).map(|s| json!(s)).map_err(e),
-        "measure" => codec::measure(one(&a[0]), codec::MAX_CELLS)
-            .map(|_| J::Bool(true))
-            .map_err(e),
+        "measure" => codec::measure(one(&a[0])).map(|_| J::Bool(true)).map_err(e),
         "list" => codec::items(one(&a[0])).map(|v| json!(v.len())).map_err(e),
         "entries" => codec::entries(one(&a[0]))
             .map(|v| json!(v.len()))
@@ -180,13 +179,7 @@ fn every_codec_vector() {
             drop(nouns);
             ran += 1;
             let ok = match (&got, c.get("error")) {
-                (Err(m), Some(J::String(w))) => {
-                    if quick.is_some() {
-                        m.contains(w.as_str())
-                    } else {
-                        m == w
-                    }
-                }
+                (Err(m), Some(J::String(w))) => m == w,
                 (Ok(o), None) => same(o, &c["out"]),
                 _ => false,
             };
@@ -198,7 +191,7 @@ fn every_codec_vector() {
                     let input = c["in"].to_string();
                     eprintln!(
                         "  {name} {i} {f}({}){}\n    want {}\n    got  {:?}",
-                        &input[..input.len().min(100)],
+                        input.chars().take(100).collect::<String>(),
                         if slow {
                             format!(" took {ms} ms")
                         } else {

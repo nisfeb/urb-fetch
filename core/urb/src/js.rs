@@ -97,32 +97,34 @@ fn decimal_literal(s: &str) -> bool {
 /// a 0x, 0o or 0b literal's digits, rounded to the nearest double, ties
 /// to even, as JS rounds them
 fn radix_number(digits: &str, radix: u32) -> f64 {
+    // folded as they come: the first 53 significant bits, the next (half)
+    // and whether any after it is set (sticky), so a long literal costs no
+    // memory
     let per = radix.trailing_zeros();
-    let mut bits: Vec<bool> = Vec::new(); // most significant first
+    let (mut len, mut mant, mut half, mut sticky) = (0usize, 0u64, false, false);
     for c in digits.chars() {
         let Some(d) = c.to_digit(radix) else {
             return f64::NAN;
         };
         for k in (0..per).rev() {
-            bits.push(d >> k & 1 == 1);
+            let x = d >> k & 1 == 1;
+            match len {
+                0 if !x => continue,
+                0..53 => mant = mant << 1 | u64::from(x),
+                53 => half = x,
+                _ => sticky |= x,
+            }
+            len += 1;
         }
     }
-    let Some(first) = bits.iter().position(|&x| x) else {
-        return 0.0;
-    };
-    let bits = &bits[first..];
-    if bits.len() <= 53 {
-        return bits
-            .iter()
-            .fold(0.0, |v, &x| v * 2.0 + f64::from(u8::from(x)));
+    if len <= 53 {
+        // exact: mant is under 2^53
+        return mant as f64;
     }
-    let mut mant: u64 = bits[..53].iter().fold(0, |v, &x| v << 1 | u64::from(x));
-    let half = bits[53];
-    let sticky = bits[54..].iter().any(|&x| x);
     if half && (sticky || mant & 1 == 1) {
         mant += 1;
     }
-    let exp = (bits.len() - 53) as i32;
+    let exp = i32::try_from(len - 53).unwrap_or(i32::MAX);
     if exp > 1023 {
         return f64::INFINITY;
     }

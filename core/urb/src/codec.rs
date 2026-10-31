@@ -7,6 +7,14 @@
 //!   reached twice counts twice, as lattice's +small-noun counts. So a
 //!   small noun that shared structure makes vast as a tree is refused,
 //!   and no decoder walks more than this.
+//! - [`MAX_BYTES`]: 64 MiB of atoms in the same, counted as a tree as
+//!   cells are: one big atom a jam backrefs at each of its places counts
+//!   at each. 64 MiB is the most libmesa takes in one message, so no
+//!   noun a peer sends unshared is over it. A decode that reads a noun
+//!   more than once (a tank's separator, printed between each two kids,
+//!   or a directory's files, a tree read at each place it is named)
+//!   spends what it reads, or prints, at each reading from one
+//!   [`Budget`].
 //! - [`MAX_DEPTH`]: 64, for $json.
 //! - [`TANK_DEPTH`]: 32; a tank nested deeper prints as nothing.
 //! - [`MAX_NUMBER`]: 32 bytes, for an atom read as a number.
@@ -29,25 +37,110 @@ pub const TANK_DEPTH: usize = 32;
 pub const MAX_NUMBER: usize = 32;
 pub const MAX_SEGS: usize = 64;
 pub const MAX_KNOT: usize = 256;
+pub const MAX_BYTES: usize = 64 << 20;
 
 type R<T> = Result<T, UrbError>;
 
-/// `n`, once it is known to have at most `cap` cells as a tree
-pub fn measure(n: NounRef<'_>, cap: usize) -> R<NounRef<'_>> {
-    let mut seen = 0usize;
+/// What one decode may still read: cells and atom bytes, counted as a
+/// tree, at each place they are read (mesa.mjs's budget()).
+#[derive(Clone, Debug)]
+pub struct Budget {
+    cells: usize,
+    bytes: usize,
+}
+
+impl Default for Budget {
+    fn default() -> Self {
+        Budget {
+            cells: MAX_CELLS,
+            bytes: MAX_BYTES,
+        }
+    }
+}
+
+impl Budget {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn spend(&mut self, bytes: usize) -> R<()> {
+        match self.bytes.checked_sub(bytes) {
+            Some(left) => {
+                self.bytes = left;
+                Ok(())
+            }
+            None => Err(hostile(format!("has over {MAX_BYTES} bytes of atoms"))),
+        }
+    }
+
+    fn cell(&mut self) -> R<()> {
+        match self.cells.checked_sub(1) {
+            Some(left) => {
+                self.cells = left;
+                Ok(())
+            }
+            None => Err(hostile(format!("has over {MAX_CELLS} cells"))),
+        }
+    }
+}
+
+/// A noun known to have at most [`MAX_CELLS`] cells and [`MAX_BYTES`]
+/// bytes of atoms as a tree, which only [`measure`] makes. Walking it as
+/// a tree is bounded, so it is what jams, hashes and compares a peer's
+/// noun: [`NounRef`] can't, since libmesa's jam and eq walk a noun as a
+/// tree, and a shared one takes as long as its tree is big.
+#[derive(Clone, Copy, Debug)]
+pub struct Measured<'a>(NounRef<'a>);
+
+impl<'a> Measured<'a> {
+    pub fn noun(self) -> NounRef<'a> {
+        self.0
+    }
+
+    /// +jam, as bytes
+    pub fn jam(self) -> Vec<u8> {
+        self.0.jam()
+    }
+
+    /// +sham
+    pub fn sham(self) -> u128 {
+        self.0.sham()
+    }
+}
+
+impl PartialEq for Measured<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(other.0)
+    }
+}
+
+impl Eq for Measured<'_> {}
+
+impl<'a> From<Measured<'a>> for Value<'a> {
+    fn from(m: Measured<'a>) -> Self {
+        Value::Noun(m.0)
+    }
+}
+
+/// `n`, once it is known to be within the caps, as a fresh [`Budget`]
+/// has them
+pub fn measure(n: NounRef<'_>) -> R<Measured<'_>> {
+    measure_in(n, &mut Budget::new())
+}
+
+/// `n`, once it is known to be within what is left of `b`, spent from it
+pub fn measure_in<'a>(n: NounRef<'a>, b: &mut Budget) -> R<Measured<'a>> {
     let mut todo = vec![n];
     while let Some(t) = todo.pop() {
         if !t.is_cell() {
+            b.spend(t.size()?)?;
             continue;
         }
-        seen += 1;
-        if seen > cap {
-            return Err(hostile(format!("has over {cap} cells")));
-        }
+        b.cell()?;
         todo.push(t.tail()?);
         todo.push(t.head()?);
     }
-    Ok(n)
+    Ok(Measured(n))
 }
 
 /// A list's items, lazily, as mesa.mjs's generator yields them: a list of
@@ -172,7 +265,7 @@ pub fn path(text: &str) -> Value<'static> {
 
 /// a $json noun as JS
 pub fn json(n: NounRef<'_>) -> R<Json> {
-    measure(n, MAX_CELLS)?;
+    measure(n)?;
     json_at(n, 0)
 }
 
@@ -222,8 +315,11 @@ fn tape(t: NounRef<'_>) -> R<String> {
     Ok(js::utf8(&b))
 }
 
-/// the text of a tank, as +ram flattens it; '' past [`TANK_DEPTH`]
-pub fn tank_text(t: NounRef<'_>, depth: usize) -> R<String> {
+/// The text of a tank, as +ram flattens it; '' past [`TANK_DEPTH`]. A
+/// rose's separator is printed between each two kids, so a long one over
+/// many kids prints far more than the noun holds: what it prints past
+/// the first is spent from `b`, a byte a character.
+pub fn tank_text(t: NounRef<'_>, b: &mut Budget, depth: usize) -> R<String> {
     if depth > TANK_DEPTH || !t.is_cell() || t.head()?.is_cell() {
         return Ok(String::new());
     }
@@ -245,19 +341,25 @@ pub fn tank_text(t: NounRef<'_>, depth: usize) -> R<String> {
         opn.push_str(&tape(pre.tail()?.tail()?.head()?)?);
         (sep, opn, tape(pre.tail()?.tail()?.tail()?)?)
     };
-    let kids = items(t.tail()?.tail()?)?
+    let kids = items(t.tail()?.tail()?)?;
+    if kids.len() > 1 {
+        let chars = items(pre.head()?)?.len();
+        b.spend((kids.len() - 1).saturating_mul(chars))?;
+    }
+    let kids = kids
         .into_iter()
-        .map(|k| tank_text(k, depth + 1))
+        .map(|k| tank_text(k, b, depth + 1))
         .collect::<R<Vec<_>>>()?;
     Ok(format!("{opn}{}{cls}", kids.join(&sep)))
 }
 
-/// the lines of a tang. It measures nothing, so its callers measure the
-/// noun it is in first, as mesa.mjs's on_poke does.
-pub fn tang_text(t: NounRef<'_>) -> R<String> {
-    Ok(items(t)?
+/// the lines of a tang, out of the noun it is in, which its caller
+/// measured, as mesa.mjs's on_poke measures the %pack
+pub fn tang_text(t: Measured<'_>) -> R<String> {
+    let mut b = Budget::new();
+    Ok(items(t.noun())?
         .into_iter()
-        .map(|k| tank_text(k, 0))
+        .map(|k| tank_text(k, &mut b, 0))
         .collect::<R<Vec<_>>>()?
         .join("\n  "))
 }
@@ -266,7 +368,8 @@ pub fn tang_text(t: NounRef<'_>) -> R<String> {
 /// what was wrong with it
 pub fn tang(err: NounRef<'_>) -> String {
     let lines = || -> R<String> {
-        measure(err, MAX_CELLS)?;
+        let mut b = Budget::new();
+        measure_in(err, &mut b)?;
         if !err.is_cell() {
             return Ok(String::new());
         }
@@ -277,7 +380,7 @@ pub fn tang(err: NounRef<'_>) -> String {
             head.text()?
         }];
         for t in items(err.tail()?)? {
-            out.push(tank_text(t, 0)?);
+            out.push(tank_text(t, &mut b, 0)?);
         }
         Ok(out.join("\n  "))
     };
@@ -334,7 +437,10 @@ pub fn file_of<'a, T>(
 /// A directory's files, as [(path, noun)], each path relative to it,
 /// out of its %snap: mesa.mjs's ballOf. A tree that holds itself, one
 /// deeper than [`MAX_SEGS`], or a walk past [`MAX_CELLS`] trees and
-/// files, is refused. None if the silo lacks the tree.
+/// their entries, files and directories, is refused. Each file's noun
+/// and the bytes of its path are spent from one [`Budget`], at each
+/// place the file is: one noun named by many files, or one tree at many
+/// places, counts at each. None if the silo lacks the tree.
 pub fn ball_of<'a, T>(
     snap: NounRef<'a>,
     silo: NounRef<'a>,
@@ -349,6 +455,7 @@ pub fn ball_of<'a, T>(
         out: Vec::new(),
         above: HashSet::new(),
         work: 0,
+        budget: Budget::new(),
     };
     for e in entries(silo.tail()?)? {
         let k = e.head()?.int(MAX_NUMBER)?;
@@ -358,7 +465,7 @@ pub fn ball_of<'a, T>(
         let k = e.head()?.int(MAX_NUMBER)?;
         ball.nouns.insert(k, e.tail()?.tail()?);
     }
-    if !ball.walk(top.int(MAX_NUMBER)?, &[])? {
+    if !ball.walk(top.int(MAX_NUMBER)?, &mut Vec::new(), 0)? {
         return Ok(None);
     }
     Ok(Some(conv(ball.out)))
@@ -370,6 +477,7 @@ struct Ball<'a> {
     out: Vec<(Vec<String>, NounRef<'a>)>,
     above: HashSet<Int>,
     work: usize,
+    budget: Budget,
 }
 
 impl<'a> Ball<'a> {
@@ -383,7 +491,10 @@ impl<'a> Ball<'a> {
         Ok(())
     }
 
-    fn walk(&mut self, jobe: Int, at: &[String]) -> R<bool> {
+    /// at: the path's segments, and len their bytes. Each directory's
+    /// name is pushed on at for its walk and popped after, so a name that
+    /// is no tree costs no copy of the path.
+    fn walk(&mut self, jobe: Int, at: &mut Vec<String>, len: usize) -> R<bool> {
         let Some(&ject) = self.jects.get(&jobe) else {
             return Ok(false);
         };
@@ -409,17 +520,24 @@ impl<'a> Ball<'a> {
                 continue;
             }
             let k = leaf.tail()?.head()?.int(MAX_NUMBER)?;
-            if let Some(&val) = self.nouns.get(&k) {
-                let mut p = at.to_vec();
-                p.push(knot(e.head()?)?);
-                self.out.push((p, val));
-            }
+            let Some(&val) = self.nouns.get(&k) else {
+                continue;
+            };
+            let name = e.head()?;
+            let seg = knot(name)?;
+            self.budget.spend(len + name.size()?)?;
+            let val = measure_in(val, &mut self.budget)?.noun();
+            let mut p = at.to_vec();
+            p.push(seg);
+            self.out.push((p, val));
         }
         for e in entries(dir)? {
+            self.count()?;
             let sub = e.tail()?.head()?.int(MAX_NUMBER)?;
-            let mut p = at.to_vec();
-            p.push(knot(e.head()?)?);
-            self.walk(sub, &p)?;
+            let name = e.head()?;
+            at.push(knot(name)?);
+            self.walk(sub, at, len + name.size()?)?;
+            at.pop();
         }
         self.above.remove(&jobe);
         Ok(true)

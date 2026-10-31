@@ -367,8 +367,10 @@ impl<'a> NounRef<'a> {
         unsafe { sys::mesa_mug(self.raw) }
     }
 
-    /// +jam, as bytes
-    pub fn jam(self) -> Vec<u8> {
+    /// +jam, as bytes. Unbounded on a noun not measured: libmesa's jam
+    /// dedups with mesa_eq, which walks a noun as a tree, so a peer's
+    /// noun jams as a [`crate::codec::Measured`].
+    pub(crate) fn jam(self) -> Vec<u8> {
         let mut len = 0usize;
         unsafe {
             let p = sys::mesa_jam_bytes(self.raw, &mut len);
@@ -379,8 +381,9 @@ impl<'a> NounRef<'a> {
     }
 
     /// +sham, the 128-bit hash grubbery names content by: +shaf %mash of
-    /// an atom, +shaf %sham of a cell's jam (glue.c's u_sham)
-    pub fn sham(self) -> u128 {
+    /// an atom, +shaf %sham of a cell's jam (glue.c's u_sham). As
+    /// unbounded as jam on a noun not measured.
+    pub(crate) fn sham(self) -> u128 {
         let (salt, msg) = if self.is_cell() {
             (b"sham", self.jam())
         } else {
@@ -398,22 +401,44 @@ impl<'a> NounRef<'a> {
     }
 }
 
-impl PartialEq<NounRef<'_>> for NounRef<'_> {
-    /// noun equality, by value
-    fn eq(&self, other: &NounRef<'_>) -> bool {
+impl NounRef<'_> {
+    /// Noun equality, by value. mesa_eq walks a noun as a tree, short-cut
+    /// only by pointers and cached hashes, so this is unbounded on a
+    /// shared noun not measured: a peer's noun is compared as a
+    /// [`crate::codec::Measured`], and NounRef has no `==`.
+    pub(crate) fn eq(self, other: NounRef<'_>) -> bool {
         unsafe { sys::mesa_eq(self.raw, other.raw) }
     }
 }
 
-impl Eq for NounRef<'_> {}
+/// Owned nouns jam, hash and compare unchecked: they are ours, or a peer's
+/// cued from bytes, which is measured first (see
+/// [`crate::codec::Measured`]), since each of these walks a noun as a
+/// tree and a shared one takes as long as its tree is big.
+impl Noun {
+    /// +jam, as bytes
+    pub fn jam(&self) -> Vec<u8> {
+        self.borrow().jam()
+    }
+
+    /// +sham
+    pub fn sham(&self) -> u128 {
+        self.borrow().sham()
+    }
+}
 
 impl PartialEq for Noun {
     fn eq(&self, other: &Noun) -> bool {
-        self.borrow() == other.borrow()
+        self.borrow().eq(other.borrow())
     }
 }
 
 impl Eq for Noun {}
+
+/// how much of a noun Debug prints: cells, then `...` for the rest, and
+/// the low bytes of an atom, after `0x..`
+const DEBUG_CELLS: usize = 64;
+const DEBUG_BYTES: usize = 32;
 
 impl fmt::Debug for NounRef<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -422,11 +447,16 @@ impl fmt::Debug for NounRef<'_> {
             Noun(NounRef<'a>),
             Text(&'static str),
         }
+        // at most DEBUG_CELLS cells, so a shared noun vast as a tree
+        // prints quickly, in a log line or a panic
         let mut todo = vec![Step::Noun(*self)];
+        let mut cells = 0;
         while let Some(s) = todo.pop() {
             match s {
                 Step::Text(t) => f.write_str(t)?,
+                Step::Noun(_) if cells >= DEBUG_CELLS => f.write_str("...")?,
                 Step::Noun(n) if n.is_cell() => {
+                    cells += 1;
                     let (h, t) =
                         unsafe { (n.at(sys::mesa_head(n.raw)), n.at(sys::mesa_tail(n.raw))) };
                     f.write_str("[")?;
@@ -438,8 +468,11 @@ impl fmt::Debug for NounRef<'_> {
                     ]);
                 }
                 Step::Noun(n) => {
-                    let b = n.bytes().unwrap_or_default();
-                    f.write_str("0x")?;
+                    // a long atom prints its low DEBUG_BYTES bytes, after ..
+                    let len = n.size().unwrap_or(0);
+                    let mut b = vec![0u8; len.min(DEBUG_BYTES)];
+                    unsafe { sys::mesa_atom_get_bytes(n.raw, b.len(), b.as_mut_ptr()) };
+                    f.write_str(if len > DEBUG_BYTES { "0x.." } else { "0x" })?;
                     if b.is_empty() {
                         f.write_str("0")?;
                     }
@@ -578,7 +611,7 @@ fn mug_of_u32(m: u32) -> u32 {
 /// +dor, depth-first order: the tiebreak when two mugs are equal
 fn dor(mut a: NounRef<'_>, mut b: NounRef<'_>) -> bool {
     loop {
-        if a == b {
+        if a.eq(b) {
             return true;
         }
         if a.is_cell() {
@@ -586,7 +619,7 @@ fn dor(mut a: NounRef<'_>, mut b: NounRef<'_>) -> bool {
                 return false;
             }
             let (ah, bh) = unsafe { (a.at(sys::mesa_head(a.raw)), b.at(sys::mesa_head(b.raw))) };
-            if ah == bh {
+            if ah.eq(bh) {
                 unsafe {
                     a = a.at(sys::mesa_tail(a.raw));
                     b = b.at(sys::mesa_tail(b.raw));

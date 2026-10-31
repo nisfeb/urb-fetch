@@ -12,6 +12,9 @@ import { DESK_BASE } from '../wasm/mesa.mjs';
 import { FURUM_BASE } from '../wasm/furum.mjs';
 
 export const quick = 2000;   // ms: a refusal takes no longer
+// a decoder's error, word for word
+const H = what => `another ship's noun has ${what}`;
+const OVER_BYTES = 'over 67108864 bytes of atoms';
 
 const T = t => ({ $noun: hex(jam(t)) });
 const a = x => (typeof x === 'string' ? [...new TextEncoder().encode(x)].reduceRight((v, b) => (v << 8n) | BigInt(b), 0n) : BigInt(x));
@@ -52,6 +55,14 @@ export function hostileNouns() {
     const kids = i < 20 ? [[a('x'), [BigInt(i + 1), 0n]], [0n, [[a('y'), [BigInt(i + 1), 0n]], [0n, 0n]]]] : 0n;
     fan = [[BigInt(i), [0n, tree(0n, kids)]], [fan, 0n]];
   }
+  //  a map (a treap leaning one way) of [key value] pairs
+  const mapOf = kvs => kvs.reduce((m, kv) => [kv, [m, 0n]], 0n);
+  const big8k = a('x'.repeat(8192)), str8k = [a('s'), big8k];
+  const longSep = [a('rose'), [[list(...Array(8200).fill(44n)), [0n, 0n]], list(...Array(8200).fill(leaf))]];
+  //  n directories, or n files, n0 to n(n-1), naming one jobe
+  const names = n => Array.from({ length: n }, (_, i) => a(`n${i}`));
+  const dirs = (n, jobe) => mapOf(names(n).map(k => [k, [jobe, 0n]]));
+  const files = (n, jobe) => mapOf(names(n).map(k => [k, jobe]));
   const LB = `${DESK_BASE}/forum/boards/b`;
   const card = [1n, tuple(a('b'), a('t'), a('d'), 0n, 0n, a('poster'), 0n)];
   const goodPub = [[list(a('card')), card], [list(a('conf')), [1n, [1n, 0n]]]];
@@ -61,33 +72,51 @@ export function hostileNouns() {
   });
   const FB = `${FURUM_BASE}/boards/b`;
   return [
-    { fn: 'measure', in: [T(share(1n, 18))], error: 'over 200000 cells' },
-    { fn: 'measure', in: [T(share(1n, 200))], error: 'over 200000 cells' },
-    { fn: 'json', in: [T(arr(deep))], error: 'nested over 64 deep' },
-    { fn: 'json', in: [T(wide)], error: 'over 200000 cells' },
-    { fn: 'json', in: [T([a('x'), 1n])], error: 'of no kind we know' },
-    { fn: 'json', in: [T([a('b'), 2n ** 512n])], error: 'a number over 32 bytes' },
-    { fn: 'json', in: [T([[1n, 2n], 1n])], error: 'a cell where an atom goes' },
-    { fn: 'json', in: [T([a('o'), map])], error: 'over 200000' },
-    { fn: 'entries', in: [T(map)], error: 'a map over 200000 entries' },
-    { fn: 'pathOf', in: [T(list(...Array(65).fill(a('a'))))], error: 'a path over 64 segments' },
-    { fn: 'pathOf', in: [T(list(a('x'.repeat(257))))], error: 'a path segment over 256 bytes' },
-    { fn: 'pathOf', in: [T(list([1n, 2n]))], error: 'a cell where an atom goes' },
+    { fn: 'measure', in: [T(share(1n, 18))], error: H('over 200000 cells') },
+    { fn: 'measure', in: [T(share(1n, 200))], error: H('over 200000 cells') },
+    { fn: 'json', in: [T(arr(deep))], error: H('$json nested over 64 deep') },
+    { fn: 'json', in: [T(wide)], error: H('over 200000 cells') },
+    { fn: 'json', in: [T([a('x'), 1n])], error: H('$json of no kind we know') },
+    { fn: 'json', in: [T([a('b'), 2n ** 512n])], error: H('a number over 32 bytes') },
+    { fn: 'json', in: [T([[1n, 2n], 1n])], error: H('a cell where an atom goes') },
+    { fn: 'json', in: [T([a('o'), map])], error: H('over 200000 cells') },
+    { fn: 'entries', in: [T(map)], error: H('a map over 200000 entries') },
+    { fn: 'pathOf', in: [T(list(...Array(65).fill(a('a'))))], error: H('a path over 64 segments') },
+    { fn: 'pathOf', in: [T(list(a('x'.repeat(257))))], error: H('a path segment over 256 bytes') },
+    { fn: 'pathOf', in: [T(list([1n, 2n]))], error: H('a cell where an atom goes') },
     //  a tang prints what was wrong with it, as text: it never throws
-    { fn: 'tang', in: [T([a('err'), list(rose)])], out: 'another ship\'s noun has over 200000 cells' },
-    { fn: 'fileOf', in: [T(snap), T(silo(0n, [[2n ** 300n, 0n], [0n, 0n]]))], error: 'a number over 32 bytes' },
-    { fn: 'fileOf', in: [T([0n, [[[1n, 2n], 0n], 0n]]), T(0n)], error: 'a cell where an atom goes' },
-    { fn: 'fileOf', in: [T(snap), T(silo(0n, sharedMap([8n, [0n, 0n]], 20)))], error: 'a map over 200000 entries' },
-    { fn: 'ballOf', in: [T(dirSnap(5n)), T(self)], error: 'a directory that holds itself' },
-    { fn: 'ballOf', in: [T(dirSnap(1n)), T(silo(0n, chain))], error: 'a directory over 64 deep' },
-    { fn: 'ballOf', in: [T(dirSnap(1n)), T(silo(0n, fan))], error: 'a directory of over 200000 trees and files' },
-    { fn: 'ship', in: [T(2n ** 200n)], error: 'a ship over 128 bits' },
-    { fn: 'forum.board', in: [board([[list(a('card')), [2n, 0n]]]), 'b'], error: 'unreadable: /pub/card (not version 1)' },
-    { fn: 'forum.board', in: [board(goodPub, [[list(a('posts'), a('b0')), [1n, one(2n ** 300n, 0n)]]]), 'b'], error: 'unreadable: /content/posts/b0' },
-    { fn: 'forum.board', in: [board(goodPub, [[list(a('votes'), a('b0')), [1n, one([a('reply'), 1n], [0n, 0n])]]]), 'b'], error: 'no vote target %reply' },
-    { fn: 'forum.board', in: [board([[list(a('roles')), [1n, one(1n, a('king'))]]]), 'b'], error: 'no role king' },
-    { fn: 'forum.board', in: [board([[list(a('conf')), [1n, [1n, 0n]]]]), 'b'], error: 'has no card' },
-    { fn: 'furum.posts', in: [{ [`${FB}/pub conf`]: T([1n, [2n ** 40n, 0n]]) }, 'b'], error: 'claims 1099511627776 posts, over 100000' },
+    { fn: 'tang', in: [T([a('err'), list(rose)])], out: H('over 200000 cells') },
+    { fn: 'fileOf', in: [T(snap), T(silo(0n, [[2n ** 300n, 0n], [0n, 0n]]))], error: H('a number over 32 bytes') },
+    { fn: 'fileOf', in: [T([0n, [[[1n, 2n], 0n], 0n]]), T(0n)], error: H('a cell where an atom goes') },
+    { fn: 'fileOf', in: [T(snap), T(silo(0n, sharedMap([8n, [0n, 0n]], 20)))], error: H('a map over 200000 entries') },
+    { fn: 'ballOf', in: [T(dirSnap(5n)), T(self)], error: H('a directory that holds itself') },
+    { fn: 'ballOf', in: [T(dirSnap(1n)), T(silo(0n, chain))], error: H('a directory over 64 deep') },
+    { fn: 'ballOf', in: [T(dirSnap(1n)), T(silo(0n, fan))], error: H('a directory of over 200000 trees and files') },
+    { fn: 'ship', in: [T(2n ** 200n)], error: H('a ship over 128 bits') },
+    //  one atom at many places counts at each: [%a 8200 × [%s <8 KiB>]]
+    //  is 67 MB as a tree
+    { fn: 'measure', in: [T(arr(...Array(8200).fill(str8k)))], error: H(OVER_BYTES) },
+    { fn: 'json', in: [T(arr(...Array(8200).fill(str8k)))], error: H(OVER_BYTES) },
+    { fn: 'json', in: [T([a('o'), mapOf(Array(8200).fill([big8k, num(1)]))])], error: H(OVER_BYTES) },
+    //  a separator of 8200 characters between each two of 8200 kids
+    { fn: 'tang', in: [T([a('err'), list(longSep)])], out: H(OVER_BYTES) },
+    { fn: 'tangText', in: [T(list(longSep))], error: H(OVER_BYTES) },
+    //  500 directories naming one tree, whose own 500 are all missing
+    { fn: 'ballOf', in: [T(dirSnap(1n)), T(silo(0n, mapOf([[1n, [0n, tree(0n, dirs(500, 2n))]], [2n, [0n, tree(0n, dirs(500, 99n))]]])))],
+      error: H('a directory of over 200000 trees and files') },
+    //  4200 files naming one 16 KiB noun
+    { fn: 'ballOf', in: [T(dirSnap(1n)), T(silo(mapOf([[4n, [0n, a('x'.repeat(16384))]]]),
+      mapOf([[1n, [0n, tree(files(4200, 3n), 0n)]], [3n, [0n, [a('leaf'), [4n, 0n]]]]])))], error: H(OVER_BYTES) },
+    //  5000 files 63 directories down, each named by 256 bytes
+    { fn: 'ballOf', in: [T(dirSnap(1n)), T(silo(mapOf([[4n, [0n, 1n]]]), mapOf([...Array.from({ length: 63 }, (_, i) =>
+      [BigInt(i + 1), [0n, tree(0n, mapOf([[a('d'.repeat(256)), [BigInt(i + 2), 0n]]]))]]),
+      [64n, [0n, tree(files(5000, 100n), 0n)]], [100n, [0n, [a('leaf'), [4n, 0n]]]]])))], error: H(OVER_BYTES) },
+    { fn: 'forum.board', in: [board([[list(a('card')), [2n, 0n]]]), 'b'], error: "~zod's board grub is unreadable: /pub/card (not version 1)" },
+    { fn: 'forum.board', in: [board(goodPub, [[list(a('posts'), a('b0')), [1n, one(2n ** 300n, 0n)]]]), 'b'], error: "~zod's board grub is unreadable: /content/posts/b0 (another ship's noun has a number over 32 bytes)" },
+    { fn: 'forum.board', in: [board(goodPub, [[list(a('votes'), a('b0')), [1n, one([a('reply'), 1n], [0n, 0n])]]]), 'b'], error: "~zod's board grub is unreadable: /content/votes/b0 (no vote target %reply)" },
+    { fn: 'forum.board', in: [board([[list(a('roles')), [1n, one(1n, a('king'))]]]), 'b'], error: "~zod's board grub is unreadable: /pub/roles (no role king)" },
+    { fn: 'forum.board', in: [board([[list(a('conf')), [1n, [1n, 0n]]]]), 'b'], error: "~zod's board has no card" },
+    { fn: 'furum.posts', in: [{ [`${FB}/pub conf`]: T([1n, [2n ** 40n, 0n]]) }, 'b'], error: "~zod's board b claims 1099511627776 posts, over 100000" },
   ];
 }
 const ptext = p => { const out = []; for (let t = p; Array.isArray(t); t = t[1]) out.push(new TextDecoder().decode(bytes(t[0]))); return out; };
