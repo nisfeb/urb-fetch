@@ -21,6 +21,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { DESK_BASE, da, fakeKeyfile, messages, open, path, renderAs, snapOf, uv } from './mesa.mjs';
 import { jam } from './jam.mjs';
+import { dec } from './trace.mjs';
 import { markOf, publish } from './pub.mjs';
 import { actions } from './forum.mjs';
 
@@ -189,6 +190,56 @@ cases.forEach(([h, j], i) => {
   }
 });
 console.log(`${cases.length - bad}/${cases.length} agree with Hoon${got.length !== cases.length ? ` (read ${got.length} answers)` : ''}`);
+
+// ------------------------------------------------------------ 1b. the vectors
+
+//  The conformance vectors' nouns, hashes and messages are the JS's
+//  outputs, so vere checks them too: each noun's sham, from its jam; each
+//  map and set as +malt and +silt build it from its entries; and each
+//  message clammed against its mold unchanged.
+const vec = name => JSON.parse(readFileSync(new URL(`../conformance/${name}.json`, import.meta.url), 'utf8')).cases;
+const jamUx = h => ux(BigInt('0x' + (Buffer.from(h, 'hex').reverse().toString('hex') || '0')));
+const vcases = [];
+const shams = new Map(vec('hash').filter(c => c.fn === 'sham').map(c => [JSON.stringify(c.in), BigInt('0x' + c.out)]));
+for (const c of vec('nouns')) {
+  const want = shams.get(JSON.stringify(c.in));
+  if (want !== undefined) vcases.push([`(sham (cue ${jamUx(c.out)}))`, want, `nouns ${JSON.stringify(c.in).slice(0, 60)}`]);
+  const v = dec(c.in[0]);
+  const jamOut = BigInt('0x' + (Buffer.from(c.out, 'hex').reverse().toString('hex') || '0'));
+  if (v instanceof Map && v.size) {
+    const kv = [...v].map(([k, x]) => `[${jtree(zod.nouns.tree(k))} ${jtree(zod.nouns.tree(x))}]`).join(' ');
+    vcases.push([`(jam (malt \`(list [* *])\`~[${kv}]))`, jamOut, `malt ${JSON.stringify(c.in).slice(0, 60)}`]);
+  } else if (v instanceof Set && v.size) {
+    vcases.push([`(jam (silt \`(list *)\`~[${[...v].map(k => jtree(zod.nouns.tree(k))).join(' ')}]))`, jamOut, `silt ${JSON.stringify(c.in).slice(0, 60)}`]);
+  }
+}
+const MOLD = { peek: 'load:remo:nexus', poke: 'load:remo:nexus', pack: 'transfer:remo:nexus', want: 'transfer:remo:nexus',
+  snap: 'transfer:remo:nexus', snapFile: 'transfer:remo:nexus', intakeOf: 'intake:remo:nexus' };
+for (const c of vec('messages')) {
+  if (c.error !== undefined) continue;
+  const mold = MOLD[c.fn] ?? (c.fn.startsWith('forum.') ? 'action:ft' : null);
+  if (!mold) throw new Error(`no mold for ${c.fn}`);
+  const out = BigInt('0x' + (Buffer.from(c.out, 'hex').reverse().toString('hex') || '0'));
+  vcases.push([`(fall (mole |.((jam ;;(${mold} (cue ${jamUx(c.out)}))))) 0)`, out, `messages ${c.fn}`]);
+}
+{
+  const grubMolds = readFileSync(new URL('test/grubbery-molds.hoon', import.meta.url), 'utf8');
+  const e = `=/  ft\n${types}\n${grubMolds}\n~[${vcases.map(([h]) => `\`@ux\`${h}`).join(' ')}]`;
+  const o = execFileSync(urbit, ['eval'], { input: e, encoding: 'utf8', maxBuffer: 1 << 26, stdio: ['pipe', 'pipe', 'ignore'] })
+    .replace(/\x1b\[[0-9;]*m/g, '');
+  const g = o.match(/0x[0-9a-f.]+/g) || [];
+  let vbad = 0;
+  vcases.forEach(([h, want, what], i) => {
+    const have = g[i] && BigInt(g[i].replaceAll('.', ''));
+    if (have !== want) {
+      vbad++;
+      if (vbad <= 5) console.error(`MISMATCH ${what}\n  hoon ${g[i]}\n  js   0x${want.toString(16)}`);
+    }
+  });
+  if (g.length !== vcases.length) console.error(o.slice(-600));
+  console.log(`${vcases.length - vbad}/${vcases.length} of the vectors' nouns, maps, sets and messages agree with Hoon`);
+  if (vbad || g.length !== vcases.length) bad++;
+}
 
 // ------------------------------------------------------------ 2. a loop
 
