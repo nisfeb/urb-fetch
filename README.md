@@ -125,6 +125,7 @@ Don't point `URB_FETCH_STATE` at a folder a running gateway is using. `URB_FETCH
 - `pub.mjs` publishes pages from the engine, each under its format's mark as lattice 74 and later do (`pub-cli.mjs` takes it from the file's extension: `.md`, `.html`, `.txt`, `.js`, `.css`, else gemtext), so lattice readers on other ships open them at `urb://~our-ship/<name>`. It lays them out as lattice does: `/pub/index` and `/pub/revs` and each page's vault file answer grubbery peeks, a keep on a page's vault file hears its edits, and each revision's body answers remote scry at an unguessable id. `pub-cli.mjs` publishes and serves from Node.
 - `check.mjs` checks serving with no ship. vere's `urbit eval` computes the hashes, maps, ids and dates that other ships check, and the engine must agree. Then two engines in one process publish and read pages, edits and removals.
 - `test/` holds the unit tests, run with `node --test wasm/test/` after `build.sh`. `open` takes optional `now` and `entropy` hooks, the clock and the random bytes, for tests and recordings: with both fixed, a session sends the same datagrams every time.
+- Every noun from another ship is read under caps, written at the top of `mesa.mjs`'s hostile nouns section: 200,000 cells counted as a tree, as lattice's `+small-noun` does, `$json` 64 deep, numbers 32 bytes, paths 64 segments. A noun past one, or of the wrong shape, fails the read that waits on it with an `UrbError`; `test/hostile.test.mjs` sends them by hand.
 
 ```
 ZIG=/path/to/zig-x86_64-linux-0.15.2/zig wasm/build.sh
