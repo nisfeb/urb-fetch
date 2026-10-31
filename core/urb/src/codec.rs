@@ -118,6 +118,16 @@ impl<'a> Measured<'a> {
     pub fn sham(self) -> u128 {
         self.0.sham()
     }
+
+    /// its head: a part of a measured noun is measured
+    pub fn head(self) -> R<Measured<'a>> {
+        Ok(Measured(self.0.head()?))
+    }
+
+    /// its tail
+    pub fn tail(self) -> R<Measured<'a>> {
+        Ok(Measured(self.0.tail()?))
+    }
 }
 
 impl PartialEq for Measured<'_> {

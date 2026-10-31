@@ -7,12 +7,16 @@
 //! this crate would behave differently from the JS, this crate is wrong.
 
 pub mod codec;
+pub mod core;
+pub mod engine;
 pub mod js;
 pub mod msg;
 pub mod noun;
+mod rt;
 pub mod text;
 pub mod url;
 
+pub use core::{Core, Failure, Input, Output, Reply, Request};
 pub use noun::{Int, Noun, NounRef, TypeError, Value, alive};
 
 use std::fmt;
