@@ -212,10 +212,16 @@ export const MAX_BYTES = 64 << 20;
 const hostile = what => new UrbError(`another ship's noun ${what}`);
 
 // what one decode may still read: cells and atom bytes, counted as a
-// tree, at each place they are read
+// tree, at each place they are read, and what it prints past them
 const budget = () => ({ cells: MAX_CELLS, bytes: MAX_BYTES });
+const MIB = `${MAX_BYTES >> 20} MiB`;
 const spend = (b, bytes) => {
-  if ((b.bytes -= bytes) < 0) throw hostile(`has over ${MAX_BYTES} bytes of atoms`);
+  if ((b.bytes -= bytes) < 0) throw hostile(`has over ${MIB} of atoms`);
+};
+// output a decode makes beyond the atoms it read: a tank's separators,
+// a directory's paths
+const print = (b, bytes) => {
+  if ((b.bytes -= bytes) < 0) throw hostile(`reads as over ${MIB}`);
 };
 
 // n, once it is known to have at most MAX_CELLS cells and MAX_BYTES
@@ -310,11 +316,12 @@ function tankText(t, b, depth = 0) {
     ? [tape(pre.head), tape(pre.tail.head), tape(pre.tail.tail)]
     : [tape(pre.head), tape(pre.tail.head) + tape(pre.tail.tail.head), tape(pre.tail.tail.tail)];
   const kids = [...list(t.tail.tail)];
-  if (kids.length > 1) spend(b, (kids.length - 1) * [...list(pre.head)].length);
+  if (kids.length > 1) print(b, (kids.length - 1) * [...list(pre.head)].length);
   return opn + kids.map(k => tankText(k, b, depth + 1)).join(sep) + cls;
 }
 
-// the lines of a tang, whose caller measured it
+// the lines of a tang, whose caller measured it, from b if it measured
+// it with one
 const tangText = (t, b = budget()) => [...list(t)].map(k => tankText(k, b)).join('\n  ');
 
 // the lines of an error noun [tag tang] (a nack's naxplanation), or what
@@ -354,9 +361,11 @@ function fileOf(snap, silo, conv) {
 // trees and their entries, files and directories (shared trees fake a
 // vast one). A name that is not a leaf where a file goes, or not a tree
 // where a directory goes, is skipped, as one missing from the silo is.
-// Each file's noun and the bytes of its path are spent from one budget,
-// at each place the file is: one noun named by many files, or one tree
-// at many places, counts at each. conv takes the list.
+// Each file's noun and its path, as /-separated text, are spent from
+// one budget at each place the file is: one noun named by many files, or
+// one tree at many places, counts at each, and so does each segment of
+// a path, even an empty one. So a ball over 64 MiB as files is refused,
+// even if its message is smaller. conv takes the list.
 function ballOf(snap, silo, conv) {
   const pace = snap.tail.head;
   const top = ['firm', 'temp'].includes(pace.head.text()) ? unit(pace.tail) : null;
@@ -368,7 +377,7 @@ function ballOf(snap, silo, conv) {
   const count = () => {
     if (++work > MAX_CELLS) throw hostile(`has a directory of over ${MAX_CELLS} trees and files`);
   };
-  //  at: the path's segments, and their bytes
+  //  at: the path's segments; len: its bytes as text, a / for each
   const walk = (jobe, at, len) => {
     const ject = jects.get(jobe);
     if (!ject || ject.head.text() !== 'tree') return false;
@@ -384,12 +393,12 @@ function ballOf(snap, silo, conv) {
       const val = nouns.get(leaf.tail.head.int());
       if (!val) continue;
       const name = knot(e.head);
-      spend(b, len + e.head.size);
+      print(b, len + 1 + e.head.size);
       out.push([[...at, name], measure(val, b)]);
     }
     for (const e of entries(dir)) {
       count();
-      walk(e.tail.head.int(), [...at, knot(e.head)], len + e.head.size);
+      walk(e.tail.head.int(), [...at, knot(e.head)], len + 1 + e.head.size);
     }
     above.delete(jobe);
     return true;
@@ -925,8 +934,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     if (mark !== 'grubbery-transfer') return ACK;
     const wire = pathOf(n.head), from = `${lo}:${hi}`;
     try {
-      measure(n);
-      transfer(wire, from, n.tail.head.text(), n.tail.tail, [lo, hi], n.head);
+      const b = budget();
+      measure(n, b);
+      transfer(wire, from, n.tail.head.text(), n.tail.tail, [lo, hi], n.head, b);
     } catch (e) {
       //  what waits on this wire fails with it: for /want, every %want
       //  out to the ship that sent it
@@ -940,12 +950,13 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     return ACK;
   }
 
-  // a %grubbery-transfer [wire tag r] from [from] (as lo:hi)
-  function transfer(wire, from, tag, r, her, wireN) {
+  // a %grubbery-transfer [wire tag r] from [from] (as lo:hi), measured
+  // from b
+  function transfer(wire, from, tag, r, her, wireN, b) {
     if (pokes.has(wire)) {
       //  [%pack err=(unit tang)]: the grub took the poke in, or refused it
       const err = tag === 'pack' ? unit(r) : null;
-      pokes.get(wire).finish(err ? { ok: false, error: tangText(err) } : { ok: tag === 'pack' });
+      pokes.get(wire).finish(err ? { ok: false, error: tangText(err, b) } : { ok: tag === 'pack' });
       return;
     }
     if (wire === '/want') {

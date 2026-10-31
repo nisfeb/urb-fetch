@@ -109,7 +109,7 @@ const refusedAs = (f, what, ms) => quick(() => assert.throws(f, e => {
   assert.equal(e.message, `another ship's noun ${what}`);
   return true;
 }), ms);
-const OVER_BYTES = `has over ${MAX_BYTES} bytes of atoms`;
+const OVER_BYTES = 'has over 64 MiB of atoms', OVER_PRINT = 'reads as over 64 MiB';
 
 test('one big atom at many places counts at each', () => {
   //  [%a 2000 × [%s <2 MiB>]]: 2 MB as a jam, 4 GB of text as a tree
@@ -139,9 +139,9 @@ test('a tank\'s separator, printed between each two of many kids', () => {
   const rose = C(A('rose'), C(C(tape(44, 20_000), C(nil, nil)), kids));
   const palm = C(A('palm'), C(C(tape(44, 20_000), C(nil, C(nil, nil))), kids));
   const err = r => C(A('err'), C(r, nil));
-  assert.equal(quick(() => decoders.tang(err(rose))), `another ship's noun ${OVER_BYTES}`);
-  assert.equal(quick(() => decoders.tang(err(palm))), `another ship's noun ${OVER_BYTES}`);
-  refusedAs(() => decoders.tangText(C(rose, nil)), OVER_BYTES);
+  assert.equal(quick(() => decoders.tang(err(rose))), `another ship's noun ${OVER_PRINT}`);
+  assert.equal(quick(() => decoders.tang(err(palm))), `another ship's noun ${OVER_PRINT}`);
+  refusedAs(() => decoders.tangText(C(rose, nil)), OVER_PRINT);
   //  under the cap it prints whole: 3,300 kids, 66 MB
   let few = nil;
   for (let i = 0; i < 3300; i++) few = C(kid, few);
@@ -175,7 +175,17 @@ test('ballOf: a tree at many places, its entries and its files count at each', (
   const deep = [];
   for (let i = 1; i <= 63; i++) deep.push([i, tree(nil, map([[A('d'.repeat(256)), C(A(i + 1), nil)]]))]);
   deep.push([64, tree(map(names(5000).map(k => [k, A(100)])), nil)], [100, C(A('leaf'), C(A(4), nil))]);
-  refusedAs(() => ball(silo(1, deep, [[4, A(1)]])), OVER_BYTES);
+  refusedAs(() => ball(silo(1, deep, [[4, A(1)]])), OVER_PRINT);
+  //  each segment of a path counts, even an empty one: 1,024 files of
+  //  65,496 bytes, named f0000 and so on, read at the top, but not 63
+  //  empty directories down
+  const four = Array.from({ length: 1024 }, (_, i) => [A(`f${String(i).padStart(4, '0')}`), A(100)]);
+  const leafOf = [[100, C(A('leaf'), C(A(4), nil))]], near = [[4, A('x'.repeat(65_496))]];
+  assert.equal(quick(() => ball(silo(64, [[64, tree(map(four), nil)], ...leafOf], near))), 1024);
+  const empty = [];
+  for (let i = 1; i <= 63; i++) empty.push([i, tree(nil, map([[A(''), C(A(i + 1), nil)]]))]);
+  empty.push([64, tree(map(four), nil)], ...leafOf);
+  refusedAs(() => ball(silo(1, empty, near)), OVER_BYTES);
 });
 
 test('fileOf: a silo of the wrong shape', () => {
@@ -272,7 +282,23 @@ test('a big atom at many places, and a long separator, through the engine', { ti
   const q = v.urb.grub.poke('~nec', '/x', 'y', ['/furum', 'msg'], 1);
   v.deliver('grubbery-transfer', [v.path(`/grub-poke/${v.nonce}/2`), 'pack', null, ['rose', [[tape, [null, null]], kids]], null]);
   const r = await late(q);
-  assert.deepEqual(r, { ok: false, error: `another ship's noun ${OVER_BYTES}` });
+  assert.deepEqual(r, { ok: false, error: `another ship's noun ${OVER_PRINT}` });
+  //  a %pack nack is one budget: 40 MiB of atoms, then 30 MB of
+  //  separators, is over it, though each alone is not
+  const huge = v.build('x'.repeat(40 << 20));
+  const nack = (k, ...tanks) => {
+    const s = v.urb.grub.poke('~nec', '/x', 'y', ['/furum', 'msg'], 1);
+    v.deliver('grubbery-transfer', [v.path(`/grub-poke/${v.nonce}/${k}`), 'pack', null, ...tanks, null]);
+    return late(s);
+  };
+  const one = v.build(['leaf', [104, null]]);
+  const rose = () => ['rose', [[tape, [null, null]], [...Array.from({ length: 1501 }, () => ({ n: v.X.ref(one) })), null]]];
+  const alone = await nack(3, rose());
+  assert.equal(alone.error.length, 1501 + 1500 * 20_000);
+  const both = await nack(4, ['leaf', [{ n: v.X.ref(huge) }, null]], rose());
+  v.X.unref(huge);
+  v.X.unref(one);
+  assert.deepEqual(both, { ok: false, error: `another ship's noun ${OVER_PRINT}` });
   assert.deepEqual(v.trapped(), []);
   await v.f.close();
 });
