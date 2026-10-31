@@ -248,6 +248,43 @@ fn array_index(k: &str) -> Option<u32> {
         .map(|n| n as u32)
 }
 
+/// a JS value's truthiness
+pub fn truthy(j: Option<&Json>) -> bool {
+    match j {
+        None | Some(Json::Null) => false,
+        Some(Json::Bool(b)) => *b,
+        Some(Json::Num(n)) => *n != 0.0 && !n.is_nan(),
+        Some(Json::Str(s)) => !s.is_empty(),
+        Some(Json::Arr(_) | Json::Obj(_)) => true,
+    }
+}
+
+/// `String(x)` of a JS value (None is undefined)
+pub fn string(j: Option<&Json>) -> String {
+    match j {
+        None => "undefined".into(),
+        Some(Json::Null) => "null".into(),
+        Some(Json::Bool(b)) => b.to_string(),
+        Some(Json::Num(n)) => number_text(*n),
+        Some(Json::Str(s)) => s.clone(),
+        Some(Json::Arr(a)) => a
+            .iter()
+            .map(|x| match x {
+                Json::Null => String::new(),
+                x => string(Some(x)),
+            })
+            .collect::<Vec<_>>()
+            .join(","),
+        Some(Json::Obj(_)) => "[object Object]".into(),
+    }
+}
+
+/// JS's `String.prototype.trim`: JS's white space at both ends, as
+/// StrWhiteSpaceChar has it
+pub fn trim(s: &str) -> &str {
+    s.trim_matches(js_space)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

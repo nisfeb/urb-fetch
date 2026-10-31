@@ -701,7 +701,7 @@ unsafe extern "C" fn h_peek(
     let w = unsafe { world(ctx) };
     let path = text(unsafe { CStr::from_ptr(path) });
     guard(w, sys::MESA_NONE, |w| {
-        Ok(w.hook_peek(&path)
+        Ok(w.hook_peek(&path)?
             .map_or(sys::MESA_NONE, crate::Noun::into_raw))
     })
 }

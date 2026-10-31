@@ -19,8 +19,9 @@
 use crate::codec::{self, Budget, MAX_NUMBER, Measured};
 use crate::engine::{self, Engine, Journal, Ship, ship_text};
 use crate::js::{self, Json, Object};
-use crate::msg;
-use crate::noun::{Noun, NounRef, Value};
+use crate::msg::{self, File};
+use crate::noun::{self, Noun, NounRef, Value};
+use crate::publish::{self, PubState};
 use crate::rt::{self, Promise, Settled, Step, on_err, on_ok, resolve, spawn, then, wait, wait_ok};
 use crate::url::{self, APP_BASE, DESK_BASE, Mount, PAGE_MARKS};
 use crate::{Int, UrbError};
@@ -36,6 +37,9 @@ pub const REVS_TTL: u64 = 60_000;
 pub const KEEN_TIMEOUT: u64 = 10_000;
 /// +remote-timeout: how long a peek or a poke waits
 pub const PEEK_TIMEOUT: u64 = 30_000;
+/// a cap on the keeps we answer, so a ship can't grow our state without
+/// bound; past it a keep gets its first wave and no news
+pub const MAX_KEEPERS: usize = 256;
 /// how long close() waits after the last save
 pub const CLOSE_WAIT: u64 = 500;
 /// the longest the wake timer is set for: waking early re-arms it
@@ -186,6 +190,23 @@ pub enum Request {
     },
     /// grub.onInbox: hear the grubbery pokes other ships send ours
     Inbox(bool),
+    /// publish(urb, {pages, keepers, save}): serve the pages, from
+    /// meta.pub as it was saved; each save is an [`Output::Event`]
+    /// `pub.save`
+    Pub {
+        pages: Option<Object>,
+        keepers: Option<Json>,
+    },
+    /// pub.put(name, body, mark): mark None is gmi
+    PubPut {
+        name: String,
+        body: String,
+        mark: Option<String>,
+    },
+    /// pub.remove(name)
+    PubRemove(String),
+    /// pub.pages()
+    PubPages,
 }
 
 /// a page read: where it was found, its body, how it was read (keen or
@@ -216,7 +237,7 @@ pub enum Peeked {
 }
 
 /// A request's result.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Reply {
     Open {
         our: String,
@@ -226,6 +247,9 @@ pub enum Reply {
     Read(Page),
     Poke(Poked),
     Peek(Peeked),
+    /// a JS value: pub.put's record (or null), pub.remove's boolean,
+    /// pub.pages()
+    Json(Json),
 }
 
 /// A grubbery poke to us, while the inbox is on
@@ -268,6 +292,11 @@ pub enum Output {
         result: Result<Reply, Failure>,
     },
     Inbox(Inbox),
+    /// an app's event: `pub.save` hands {pages, keepers} to keep
+    Event {
+        name: String,
+        value: Json,
+    },
 }
 
 /// What the core hears.
@@ -315,6 +344,7 @@ impl Core {
                 fetching: RefCell::new(Vec::new()),
                 inst: RefCell::new(None),
                 urb: RefCell::new(None),
+                publ: RefCell::new(None),
             }),
         }
     }
@@ -514,6 +544,8 @@ pub(crate) struct World {
     inst: RefCell<Option<Rc<Inst>>>,
     /// trace.mjs's app.urb: the engine the calls act on
     urb: RefCell<Option<Rc<Inst>>>,
+    /// trace.mjs's app.pub: what publish() gave
+    publ: RefCell<Option<Rc<Pub>>>,
 }
 
 impl Drop for World {
@@ -522,6 +554,7 @@ impl Drop for World {
         // close the engine, which points here
         self.jobs.clear();
         self.timers.borrow_mut().clear();
+        self.publ.take();
         for i in [self.inst.take(), self.urb.take()].into_iter().flatten() {
             i.shutdown();
         }
@@ -642,6 +675,12 @@ impl World {
         })
     }
 
+    fn publ(&self, what: &str) -> Result<Rc<Pub>, Failure> {
+        self.publ.borrow().clone().ok_or_else(|| {
+            Failure::type_error(format!("Cannot read properties of null (reading '{what}')"))
+        })
+    }
+
     /// trace.mjs's OPS
     fn request(&self, req: Request) -> Result<Val, Failure> {
         match req {
@@ -665,6 +704,7 @@ impl World {
                 })
             }))),
             Request::Close => Ok(Val::Promise(spawn(self, |w| {
+                w.publ.take();
                 let Some(i) = w.urb.take() else {
                     return Step::Throw(Val::Err(Failure::type_error(
                         "Cannot read properties of null (reading 'close')",
@@ -727,6 +767,26 @@ impl World {
                 let i = self.urb("grub")?;
                 i.inbox.set(on);
                 Ok(Val::Reply(Reply::True))
+            }
+            Request::Pub { pages, keepers } => {
+                let i = self.urb("grub")?;
+                *self.publ.borrow_mut() = Some(Pub::publish(&i, PubState::new(pages, keepers)));
+                Ok(Val::Reply(Reply::True))
+            }
+            Request::PubPut { name, body, mark } => {
+                let p = self.publ("put")?;
+                let r = p.put(self, &name, &body, mark.as_deref().unwrap_or("gmi"))?;
+                Ok(Val::Reply(Reply::Json(r)))
+            }
+            Request::PubRemove(name) => {
+                let p = self.publ("remove")?;
+                let r = p.remove(self, &name)?;
+                Ok(Val::Reply(Reply::Json(Json::Bool(r))))
+            }
+            Request::PubPages => {
+                let p = self.publ("pages")?;
+                let r = Json::Obj(p.st.borrow().pages.clone());
+                Ok(Val::Reply(Reply::Json(r)))
             }
         }
     }
@@ -1042,8 +1102,8 @@ impl World {
 
     /// A %peek, %keep or %drop of one of our files, in a hook: answered
     /// on our flow to the asker's %grubbery, as grubbery's +process-peek
-    /// and +keep do. We serve no files yet (M4), so a peek is answered
-    /// with nothing and a keep with an empty wave.
+    /// and +keep do. Only files the host serves are ever answered with
+    /// content.
     fn serve_load(
         &self,
         i: &Rc<Inst>,
@@ -1060,10 +1120,28 @@ impl World {
         } else {
             None
         };
+        let f = match &at {
+            Some((folder, name)) => i.file(self, folder, name)?,
+            None => None,
+        };
+        let ship = ship_text(her);
+        let k = at.as_ref().map(|(fo, n)| format!("{ship} {fo} {n}"));
         if tag == "drop" {
+            if let Some(k) = k
+                && i.server.borrow_mut().keepers.remove(&k)
+            {
+                i.keepers_changed(self);
+            }
             return Ok(());
         }
         if tag == "peek" {
+            let (snap, data) = match &f {
+                Some(f) if f.value.is_some() => {
+                    let (s, d) = msg::snap_of(f)?;
+                    (Some(s), Some(d))
+                }
+                _ => (None, None),
+            };
             let id = Int::from_le(&self.entropy(16));
             let bone = i.flow_to(her)?;
             return i.poke(
@@ -1075,10 +1153,29 @@ impl World {
                     Value::Noun(wire),
                     Value::Noun(dest),
                     Value::Int(id),
-                    None,
-                    None,
+                    snap,
+                    data,
                 ),
             );
+        }
+        if let (Some(_), Some(k), Some((folder, name))) = (&f, &k, &at) {
+            let room = {
+                let s = i.server.borrow();
+                s.keepers.get(k).is_some() || s.keepers.len() < MAX_KEEPERS
+            };
+            if room {
+                let mut o = Object::default();
+                o.set("ship".into(), Json::Str(ship.clone()));
+                let segs = codec::segments(wire)?;
+                o.set(
+                    "wire".into(),
+                    Json::Arr(segs.into_iter().map(Json::Str).collect()),
+                );
+                o.set("folder".into(), Json::Str(folder.clone()));
+                o.set("name".into(), Json::Str(name.clone()));
+                i.server.borrow_mut().keepers.set(k.clone(), Json::Obj(o));
+                i.keepers_changed(self);
+            }
         }
         // the first wave answers the keep, even for nothing
         let bone = i.flow_to(her)?;
@@ -1091,7 +1188,7 @@ impl World {
             msg::intake(
                 Value::Noun(wire),
                 Value::Noun(dest),
-                msg::wave_of(None, &name),
+                msg::wave_of(f.as_ref(), &name),
             ),
         )
     }
@@ -1161,9 +1258,16 @@ impl World {
         Ok(())
     }
 
-    /// hook: a read of our namespace; we serve none yet (M4)
-    pub(crate) fn hook_peek(&self, _path: &str) -> Option<Noun> {
-        None
+    /// hook: a read of our namespace, a %keen from another ship
+    pub(crate) fn hook_peek(&self, path: &str) -> Result<Option<Noun>, Failure> {
+        let Some(i) = self.inst() else {
+            return Ok(None);
+        };
+        let scries = i.server.borrow().scries.clone();
+        match scries.and_then(|f| f(self, path)) {
+            Some(v) => Ok(Some(Noun::of(&v)?)),
+            None => Ok(None),
+        }
     }
 }
 
@@ -1342,6 +1446,8 @@ pub(crate) struct Inst {
     revs: RefCell<HashMap<String, (u64, Rc<Object>)>>,
     asking: RefCell<HashSet<Ship>>,
     inbox: Cell<bool>,
+    // what we publish, as grub.serve and scry.serve set it
+    server: RefCell<Server>,
 }
 
 impl Inst {
@@ -1352,6 +1458,7 @@ impl Inst {
         self.pokes.borrow_mut().clear();
         self.poking.borrow_mut().clear();
         self.keens.borrow_mut().clear();
+        self.server.take();
     }
 
     fn next_wire(&self) -> u64 {
@@ -1464,6 +1571,229 @@ impl Inst {
     }
 }
 
+// ------------------------------------------------------------ serving
+
+/// grub.serve's file(folder, name): None for a file we don't serve
+pub(crate) type Files = Rc<dyn Fn(&World, &str, &str) -> Result<Option<File<'static>>, Failure>>;
+/// scry.serve's f(path): [mark, value], or None
+pub(crate) type Scries = Rc<dyn Fn(&World, &str) -> Option<Value<'static>>>;
+/// grub.serve's onKeepers, which hears every change of the keeps
+pub(crate) type OnKeepers = Rc<dyn Fn(&World, Vec<Json>)>;
+
+/// a JS Map of the keeps we answer, by `<ship> <folder> <name>`, in the
+/// order they were first set
+#[derive(Default)]
+pub(crate) struct Keepers(Vec<(String, Json)>);
+
+impl Keepers {
+    fn get(&self, k: &str) -> Option<&Json> {
+        self.0.iter().find(|e| e.0 == k).map(|e| &e.1)
+    }
+
+    fn set(&mut self, k: String, v: Json) {
+        match self.0.iter_mut().find(|e| e.0 == k) {
+            Some(e) => e.1 = v,
+            None => self.0.push((k, v)),
+        }
+    }
+
+    fn remove(&mut self, k: &str) -> bool {
+        let n = self.0.len();
+        self.0.retain(|e| e.0 != k);
+        self.0.len() != n
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn values(&self) -> Vec<Json> {
+        self.0.iter().map(|e| e.1.clone()).collect()
+    }
+}
+
+/// What we publish: our files to other ships' grubbery, the keeps of
+/// them, and our scry namespace
+#[derive(Default)]
+pub(crate) struct Server {
+    files: Option<Files>,
+    scries: Option<Scries>,
+    keepers: Keepers,
+    on_keepers: Option<OnKeepers>,
+}
+
+impl Inst {
+    /// files(folder, name)
+    fn file(&self, w: &World, folder: &str, name: &str) -> Result<Option<File<'static>>, Failure> {
+        let files = self.server.borrow().files.clone();
+        match files {
+            Some(f) => f(w, folder, name),
+            None => Ok(None),
+        }
+    }
+
+    /// keepersChanged([...keepers.values()])
+    fn keepers_changed(&self, w: &World) {
+        let (f, ks) = {
+            let s = self.server.borrow();
+            (s.on_keepers.clone(), s.keepers.values())
+        };
+        if let Some(f) = f {
+            f(w, ks);
+        }
+    }
+
+    /// grub.serve: serve file's files to other ships' grubbery, each keep
+    /// kept until its ship drops it: saved, the keeps the last run handed
+    /// on_keepers, which hears every change
+    fn serve(&self, files: Files, saved: &[Json], on_keepers: OnKeepers) {
+        let mut keepers = Keepers::default();
+        for k in saved {
+            let f = |n| {
+                js::string(match k {
+                    Json::Obj(o) => o.get(n),
+                    _ => None,
+                })
+            };
+            keepers.set(
+                format!("{} {} {}", f("ship"), f("folder"), f("name")),
+                k.clone(),
+            );
+        }
+        let mut s = self.server.borrow_mut();
+        s.files = Some(files);
+        s.keepers = keepers;
+        s.on_keepers = Some(on_keepers);
+    }
+
+    /// grub.changed: tell whoever keeps [folder name] its new version
+    fn changed(self: &Rc<Self>, w: &World, folder: &str, name: &str) -> Result<(), Failure> {
+        let f = self.file(w, folder, name)?;
+        let keepers = self.server.borrow().keepers.values();
+        self.txn(w, || {
+            for k in &keepers {
+                let Json::Obj(k) = k else {
+                    continue;
+                };
+                if k.get("folder") != Some(&Json::Str(folder.into()))
+                    || k.get("name") != Some(&Json::Str(name.into()))
+                {
+                    continue;
+                }
+                let her = ship_of(&js::string(k.get("ship")))?;
+                let bone = self.flow_to(her)?;
+                let wire = match k.get("wire") {
+                    Some(Json::Arr(a)) if !a.is_empty() => {
+                        let mut v: Vec<Value<'static>> = a.iter().map(json_value).collect();
+                        v.push(Value::Null);
+                        Value::Array(v)
+                    }
+                    _ => Value::Null,
+                };
+                let dest = Value::Array(vec![0u64.into(), codec::path(folder), name.into()]);
+                self.poke(
+                    her,
+                    bone,
+                    "grubbery",
+                    "grubbery-intake",
+                    msg::intake(wire, dest, msg::wave_of(f.as_ref(), name)),
+                )?;
+            }
+            Ok(())
+        })
+    }
+}
+
+/// a saved JS value as noun() takes it
+fn json_value(j: &Json) -> Value<'static> {
+    match j {
+        Json::Null => Value::Null,
+        Json::Bool(b) => Value::Bool(*b),
+        Json::Num(n) if n.fract() == 0.0 && *n >= 0.0 => Value::Int((*n as u64).into()),
+        j => Value::Text(js::string(Some(j))),
+    }
+}
+
+/// what publish() gives: pub.mjs's layout of our pages, served by the
+/// engine it was handed
+pub(crate) struct Pub {
+    i: Rc<Inst>,
+    st: Rc<RefCell<PubState>>,
+}
+
+impl Pub {
+    /// publish(urb, {pages, keepers, save})
+    fn publish(i: &Rc<Inst>, st: PubState) -> Rc<Pub> {
+        let saved = match &st.keepers {
+            Json::Arr(a) => a.clone(),
+            _ => Vec::new(),
+        };
+        let st = Rc::new(RefCell::new(st));
+        let (a, b, c) = (st.clone(), st.clone(), st.clone());
+        i.serve(
+            Rc::new(move |_, folder, name| a.borrow().file(folder, name)),
+            &saved,
+            Rc::new(move |w, ks| {
+                b.borrow_mut().keepers = Json::Arr(ks);
+                save(w, &b);
+            }),
+        );
+        i.server.borrow_mut().scries = Some(Rc::new(move |_, path| c.borrow().scry(path)));
+        Rc::new(Pub { i: i.clone(), st })
+    }
+
+    /// tell whoever follows the page at key, the list and the index
+    fn tell(&self, w: &World, key: &str) -> Result<(), Failure> {
+        let (dir, vault) = (publish::pub_dir(), publish::vault());
+        self.i.changed(w, &format!("{vault}{key}"), "gmi")?;
+        self.i.changed(w, &dir, "revs")?;
+        self.i.changed(w, &dir, "index")
+    }
+
+    /// publish body as the page name in format mark, a new revision with a
+    /// new, unguessable id: the record, or null for a name lattice can't
+    /// read or a mark it doesn't publish
+    fn put(&self, w: &World, name: &str, body: &str, mark: &str) -> Result<Json, Failure> {
+        let Some(key) = publish::page_key(name) else {
+            return Ok(Json::Null);
+        };
+        if !publish::page_mark(mark) {
+            return Ok(Json::Null);
+        }
+        let id = publish::page_id(&w.entropy(16));
+        let hash = format!("{:x}", noun::sham(&Value::Text(body.into()))?);
+        let rec = self
+            .st
+            .borrow_mut()
+            .put(&key, body, mark, id, w.now(), hash);
+        save(w, &self.st);
+        self.tell(w, &key)?;
+        Ok(rec)
+    }
+
+    /// take a page down; its rev goes up, so a reader following it hears
+    fn remove(&self, w: &World, name: &str) -> Result<bool, Failure> {
+        let Some(key) = publish::page_key(name) else {
+            return Ok(false);
+        };
+        if !self.st.borrow_mut().remove(&key, w.now()) {
+            return Ok(false);
+        }
+        save(w, &self.st);
+        self.tell(w, &key)?;
+        Ok(true)
+    }
+}
+
+/// save({pages, keepers})
+fn save(w: &World, st: &RefCell<PubState>) {
+    let value = st.borrow().saved();
+    w.emit(Output::Event {
+        name: "pub.save".into(),
+        value,
+    });
+}
+
 impl Drop for Inst {
     fn drop(&mut self) {
         self.eng.close();
@@ -1504,6 +1834,7 @@ fn open(
                 revs: RefCell::new(HashMap::new()),
                 asking: RefCell::new(HashSet::new()),
                 inbox: Cell::new(false),
+                server: RefCell::new(Server::default()),
             });
             if let Some(old) = w.inst.replace(Some(i.clone()))
                 && !w.urb.borrow().as_ref().is_some_and(|u| Rc::ptr_eq(u, &old))
@@ -1859,37 +2190,6 @@ fn rev_list(w: &World, i: &Rc<Inst>, her: Ship, who: String) -> Promise {
     })
 }
 
-/// a JS value's truthiness
-fn truthy(j: Option<&Json>) -> bool {
-    match j {
-        None | Some(Json::Null) => false,
-        Some(Json::Bool(b)) => *b,
-        Some(Json::Num(n)) => *n != 0.0 && !n.is_nan(),
-        Some(Json::Str(s)) => !s.is_empty(),
-        Some(Json::Arr(_) | Json::Obj(_)) => true,
-    }
-}
-
-/// String(x) of a JS value (None is undefined)
-fn js_string(j: Option<&Json>) -> String {
-    match j {
-        None => "undefined".into(),
-        Some(Json::Null) => "null".into(),
-        Some(Json::Bool(b)) => b.to_string(),
-        Some(Json::Num(n)) => js::number_text(*n),
-        Some(Json::Str(s)) => s.clone(),
-        Some(Json::Arr(a)) => a
-            .iter()
-            .map(|x| match x {
-                Json::Null => String::new(),
-                x => js_string(Some(x)),
-            })
-            .collect::<Vec<_>>()
-            .join(","),
-        Some(Json::Obj(_)) => "[object Object]".into(),
-    }
-}
-
 /// +read-page-body-rev: keen the listed id, else peek the vault file.
 /// [body, how, mark]. The vault file is %gmi whatever the page's format.
 fn page(w: &World, i: &Rc<Inst>, her: Ship, who: String, rel: Vec<String>) -> Promise {
@@ -1902,12 +2202,12 @@ fn page(w: &World, i: &Rc<Inst>, her: Ship, who: String, rel: Vec<String>) -> Pr
                 return throw(Failure::error("no list"));
             };
             let ent = list.get(&key);
-            if !truthy(ent) {
+            if !js::truthy(ent) {
                 return vault(w, i, her, who, key);
             }
             let id = match ent {
-                Some(Json::Obj(o)) => js_string(o.get("id")),
-                _ => js_string(None),
+                Some(Json::Obj(o)) => js::string(o.get("id")),
+                _ => js::string(None),
             };
             let k = match keen(w, &i, her, format!("/g/x/1/grubbery//1/pub/page{key}/{id}")) {
                 Ok(k) => k,

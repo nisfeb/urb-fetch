@@ -12,6 +12,7 @@ pub mod engine;
 pub mod js;
 pub mod msg;
 pub mod noun;
+pub mod publish;
 mod rt;
 pub mod text;
 pub mod url;
