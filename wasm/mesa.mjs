@@ -85,7 +85,7 @@ export const da = ms => ((BigInt(Math.floor(ms / 1000)) + 0x8000000cce9e0d80n) <
 // tree (rel is its absolute path); 'p' one of lattice's live pages. All
 // but 'n' are private: the publisher grants who may read them. Mount
 // 'forum' is a forum board, rel [board] or [board, post] with post a
-// number (forum.mjs reads it): since release 73 forum/<board>[/<post>]
+// number, or a BigInt past 2^53 - 1 (forum.mjs reads it): since release 73 forum/<board>[/<post>]
 // names a board, and any other shape under forum/ is still a page.
 export function deUrb(url) {
   if (!url.startsWith('urb://')) throw new UrbError('not an urb:// url');
@@ -100,7 +100,10 @@ export function deUrb(url) {
   if (!segs.every(s => KNOT.test(s))) throw new UrbError(`bad path in ${url}`);
   if (segs[0] === 'forum' && segs.length > 1) {
     if (segs.length === 2) return [who, [segs[1]], 'forum'];
-    if (segs.length === 3 && UD.test(segs[2])) return [who, [segs[1], Number(segs[2].replaceAll('.', ''))], 'forum'];
+    if (segs.length === 3 && UD.test(segs[2])) {
+      const id = BigInt(segs[2].replaceAll('.', ''));   // exact: a BigInt past 2^53 - 1
+      return [who, [segs[1], id <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(id) : id], 'forum'];
+    }
   }
   if (segs[0].length > 1) return [who, segs, 'n'];     // frozen legacy form
   if ('nkpt'.includes(segs[0])) return [who, segs.slice(1), segs[0]];
@@ -169,7 +172,9 @@ export function writeRows(rows) {
 //   MAX_DEPTH   64: a $json nested deeper is refused
 //   TANK_DEPTH  32: a tank nested deeper prints as nothing
 //   MAX_NUMBER  32 bytes: an atom read as a number (a hash, an id, a
-//               date, a count, a flag) is at most 256 bits; a ship 128
+//               date, a count, a flag) is at most 256 bits; a ship 128,
+//               and a %snap's snap-id 64, since grubbery makes it by
+//               (shaz eny), an @uvJ of 512 bits
 //   MAX_SEGS    64 segments in a path, each at most MAX_KNOT, 256 bytes,
 //               as libmesa caps them (PATH_MAX_SEGS, KNOT_MAX)
 //   text        an atom read as text is not capped here: libmesa takes
@@ -310,28 +315,41 @@ function fileOf(snap, silo, conv) {
 // The files of a directory's %snap, deep: [[path, noun]], each path
 // relative to it, name last; null if the silo lacks its tree. A tree
 // ject is [%tree nek gain bang fil=(map @ta jobe) dir=(map @ta [jobe
-// weir])]. A tree reached twice, which hashes can fake, is read once,
-// and one deeper than MAX_SEGS is refused. conv takes the list.
+// weir])]. Jects are named by their hashes, so two directories with the
+// same contents are one ject, read at each place it is, as lattice's
+// ball holds both. A tree that holds itself, which hashes can fake, is
+// refused, and so is one deeper than MAX_SEGS, or a walk past MAX_CELLS
+// trees and files (shared trees fake a vast one). A name that is not a
+// leaf where a file goes, or not a tree where a directory goes, is
+// skipped, as one missing from the silo is. conv takes the list.
 function ballOf(snap, silo, conv) {
   const pace = snap.tail.head;
   const top = ['firm', 'temp'].includes(pace.head.text()) ? unit(pace.tail) : null;
   if (!top) return null;
   const jects = new Map(entries(silo.tail).map(e => [e.head.int(), e.tail.tail]));
   const nouns = new Map(entries(silo.head).map(e => [e.head.int(), e.tail.tail]));
-  const out = [], seen = new Set();
+  const out = [], above = new Set();
+  let work = 0;
+  const count = () => {
+    if (++work > MAX_CELLS) throw hostile(`has a directory of over ${MAX_CELLS} trees and files`);
+  };
   const walk = (jobe, at) => {
     const ject = jects.get(jobe);
-    if (!ject || ject.head.text() !== 'tree' || seen.has(jobe)) return false;
+    if (!ject || ject.head.text() !== 'tree') return false;
+    if (above.has(jobe)) throw hostile('has a directory that holds itself');
     if (at.length > MAX_SEGS) throw hostile(`has a directory over ${MAX_SEGS} deep`);
-    seen.add(jobe);
+    count();
+    above.add(jobe);
     const fil = ject.tail.tail.tail.tail.head, dir = ject.tail.tail.tail.tail.tail;
     for (const e of entries(fil)) {
+      count();
       const leaf = jects.get(e.tail.int());
       if (!leaf || leaf.head.text() !== 'leaf') continue;
       const val = nouns.get(leaf.tail.head.int());
       if (val) out.push([[...at, knot(e.head)], val]);
     }
     for (const e of entries(dir)) walk(e.tail.head.int(), [...at, knot(e.head)]);
+    above.delete(jobe);
     return true;
   };
   if (!walk(top.int(), [])) return null;

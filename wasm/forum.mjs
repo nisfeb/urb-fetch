@@ -44,6 +44,23 @@ const ACTION = ['/lattice', 'forum-action'];
 const NOTE = ['/lattice', 'forum-note'];
 const ROLES = ['mod', 'poster', 'reader'];
 const TAS = /^[a-z][a-z0-9-]*$/;   // (sane %tas), which a board name must be
+const SAFE = BigInt(Number.MAX_SAFE_INTEGER);
+const MAX_MS = 8_640_000_000_000_000n;   // the furthest a Date reaches either way
+
+// An id or count, exactly: a number up to 2^53 - 1, a BigInt past it, so
+// each value has one form and === compares ids. ids sorts by them.
+export const exact = v => (v <= SAFE ? Number(v) : v);
+export const ids = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+// an id we are given: a non-negative integer as a number, BigInt or
+// digits, in its exact form
+export function idOf(x) {
+  let v = null;
+  if (typeof x === 'bigint') v = x;
+  else if (typeof x === 'number' && Number.isSafeInteger(x)) v = BigInt(x);
+  else if (typeof x === 'string' && /^(0|[1-9][0-9]*)$/.test(x) && x.length <= 77) v = BigInt(x);
+  if (v === null || v < 0n || v >= 2n ** 256n) throw new UrbError(`not an id: ${x}`);
+  return exact(v);
+}
 
 // The forum actions lattice's /forum-post-remote sends, as nouns for
 // mesa.mjs (action:ft in code/lib/lattice-forum-types.hoon). As its form
@@ -51,7 +68,7 @@ const TAS = /^[a-z][a-z0-9-]*$/;   // (sane %tas), which a board name must be
 // or a comment with no body is refused before it is sent. target is
 // {post} or {post, comment}.
 const some = v => (v === null || v === undefined || v === '' ? null : [null, v]);
-const targetOf = ({ post, comment = null }) => (comment === null ? ['post', post] : ['comment', post, comment]);
+const targetOf = ({ post, comment = null }) => (comment === null ? ['post', idOf(post)] : ['comment', idOf(post), idOf(comment)]);
 export const actions = {
   newPost(name, { title, url = null, body = null }) {
     if (!title) throw new UrbError('a post needs a title');
@@ -59,7 +76,7 @@ export const actions = {
   },
   newComment(name, post, body, parent = null) {
     if (!body) throw new UrbError('a comment needs a body');
-    return ['new-comment', name, post, some(parent), body];
+    return ['new-comment', name, idOf(post), parent === null ? null : [null, idOf(parent)], body];
   },
   upvote: (name, target) => ['upvote', name, targetOf(target)],
   downvote: (name, target) => ['downvote', name, targetOf(target)],
@@ -75,24 +92,27 @@ export function forum(urb, host) {
     if (n.isCell) throw new UrbError('a cell where an atom goes');
     return n;
   };
-  const num = n => Number(atom(n).int());
+  const big = n => atom(n).int();
+  const num = n => exact(big(n));
   const text = n => atom(n).text();
   const flag = n => {
-    const v = num(n);
-    if (v > 1) throw new UrbError('not a flag');
-    return v === 0;
+    const v = big(n);
+    if (v > 1n) throw new UrbError('not a flag');
+    return v === 0n;
   };
   const unit = (n, f) => {
     if (!n.isCell) {
-      if (num(n) !== 0) throw new UrbError('not a unit');
+      if (big(n) !== 0n) throw new UrbError('not a unit');
       return null;
     }
-    if (num(n.head) !== 0) throw new UrbError('not a unit');
+    if (big(n.head) !== 0n) throw new UrbError('not a unit');
     return f(n.tail);
   };
+  //  a @da as a Date, or null for one past where a Date reaches
   const date = n => {
-    const d = atom(n).int();
-    return new Date(Number((d >> 64n) - DA_UNIX_EPOCH) * 1000 + Number(((d & 0xffffffffffffffffn) * 1000n) >> 64n));
+    const d = big(n);
+    const ms = ((d >> 64n) - DA_UNIX_EPOCH) * 1000n + (((d & 0xffffffffffffffffn) * 1000n) >> 64n);
+    return ms > MAX_MS || ms < -MAX_MS ? null : new Date(Number(ms));
   };
   const role = n => {
     const r = text(n);
@@ -106,7 +126,7 @@ export function forum(urb, host) {
     return [...out, n];
   };
   const versioned = n => {    // [%1 x]
-    if (num(n.head) !== 1) throw new UrbError('not version 1');
+    if (big(n.head) !== 1n) throw new UrbError('not version 1');
     return n.tail;
   };
   const info = n => {
@@ -145,7 +165,7 @@ export function forum(urb, host) {
       else if (at === 'pub/conf') {
         const c = versioned(val);
         acc.conf = { nextPost: num(c.head), prune: unit(c.tail, p => ({ minScore: num(p.head),
-          after: Number((atom(p.tail).int() * 1000n) >> 64n) })) };   // ms
+          after: exact((big(p.tail) * 1000n) >> 64n) })) };   // ms
       } else if (at === 'content/pins') acc.pins = entries(versioned(val)).map(num);
       else if (at === 'content/sidebar') acc.side = text(versioned(val));
       else if (pax.length === 3 && pax[0] === 'content') {
@@ -170,16 +190,16 @@ export function forum(urb, host) {
     });
     const comments = {};
     for (const [pid, t] of acc.threads) {
-      comments[pid] = t.comments.map(([cid, c]) => ({ ...c, ...tally(`comment ${pid} ${cid}`) })).sort((a, b) => a.id - b.id);
+      comments[pid] = t.comments.map(([cid, c]) => ({ ...c, ...tally(`comment ${pid} ${cid}`) })).sort((a, b) => ids(a.id, b.id));
     }
     return {
       info: acc.card,
       roles: Object.fromEntries(acc.roles),
       nextPost: acc.conf.nextPost,
       prune: acc.conf.prune,
-      pinned: acc.pins.sort((a, b) => a - b),
+      pinned: [...acc.pins].sort(ids),
       sidebar: acc.side,
-      posts: posts.sort((a, b) => b.id - a.id),
+      posts: posts.sort((a, b) => ids(b.id, a.id)),
       comments,
     };
   }
@@ -223,11 +243,13 @@ export function forum(urb, host) {
   return {
     // the whole board: {info, roles, nextPost, prune, pinned, sidebar,
     // posts (newest first, each with up, down and its comment count),
-    // comments ({[post]: oldest first})}
+    // comments ({[post]: oldest first})}. Ids and counts are exact (see
+    // exact), and a date a Date can't hold is null.
     board,
 
     // one post and its comments, oldest first
     async thread(name, post) {
+      post = idOf(post);
       const b = await board(name);
       const p = b.posts.find(x => x.id === post);
       if (!p) throw new UrbError(`no post ${post} on ${host}'s board ${name}`);
@@ -242,10 +264,12 @@ export function forum(urb, host) {
     downvote: (name, target) => act(actions.downvote(boardName(name), target)),
     unvote: (name, target) => act(actions.unvote(boardName(name), target)),
 
-    // f({host, board, reason, at}) for each refusal note a host sends us.
-    // It takes the engine's one inbox, as furum's onNote does.
+    // f({host, board, reason, at}) for each refusal note this host sends
+    // us, to our /forum.sig: a note from any other ship is not its, and is
+    // ignored. It takes the engine's one inbox, as furum's onNote does.
     onNote(f) {
-      urb.grub.onInbox(({ from, mark, noun }) => {
+      urb.grub.onInbox(({ from, to, mark, noun }) => {
+        if (from !== host || to[1] !== 'forum.sig' || !FORUM_BASES.includes(to[0])) return;
         if (mark[0] !== NOTE[0] || mark[1] !== NOTE[1] || !noun.isCell || noun.head.isCell || noun.tail.isCell) return;
         f({ host: from, board: noun.head.text(), reason: noun.tail.text(), at: new Date(urb.now()) });
       });

@@ -25,7 +25,7 @@ const { values: opt, positionals: [url] } = parseArgs({
     comment: { type: 'string' }, upvote: { type: 'boolean' },
   },
 });
-const [host, [name, id] = [], mount] = url ? deUrb(url) : [];
+const [host, [name, id] = [], mount] = url ? deUrb(url) : [];   // id is exact, as forum.mjs's
 if (mount !== 'forum' || ((opt.comment || opt.upvote) && id === undefined)) {
   log('usage: node forum-cli.mjs [--fake ~SHIP | --relay URL] [--moon KEYFILE] [--trace] urb://~host/forum/board[/ID] [--post TITLE [--body TEXT] [--url URL] | --comment TEXT | --upvote]');
   process.exit(2);
@@ -43,7 +43,8 @@ async function until(f) {
   return null;
 }
 const votes = x => `${x.up.length} up, ${x.down.length} down`;
-const show = p => `#${p.id} ${p.title}  (${p.author}, ${p.created.toISOString().slice(0, 16)}, ${votes(p)}, ${p.comments} comments)${p.url ? `\n    ${p.url}` : ''}${p.body ? `\n    ${p.body}` : ''}`;
+const when = d => (d ? d.toISOString().slice(0, 16) : 'no date');
+const show = p => `#${p.id} ${p.title}  (${p.author}, ${when(p.created)}, ${votes(p)}, ${p.comments} comments)${p.url ? `\n    ${p.url}` : ''}${p.body ? `\n    ${p.body}` : ''}`;
 const showThread = t => {
   console.log(show(t.post));
   for (const c of t.comments) console.log(`  c${c.id}${c.parent !== null ? ` on c${c.parent}` : ''} ${c.author}: ${c.body} (${votes(c)})`);
@@ -52,9 +53,10 @@ let code = 0, urb = null;
 try {
   urb = await connect(opt);
   const f = forum(urb, host);
+  //  onNote hears only the host; a note about another board isn't ours
   f.onNote(n => {
     log(`note from ${n.host} on ${n.board}: ${n.reason}`);
-    refused = n.reason;
+    if (n.board === name) refused = n.reason;
   });
   let t = Date.now();
   const before = await f.board(name);

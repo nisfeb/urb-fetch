@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DESK_BASE, UrbError, da, decoders, deUrb } from '../mesa.mjs';
-import { FORUM_BASES, actions, forum } from '../forum.mjs';
+import { FORUM_BASES, actions, forum, idOf } from '../forum.mjs';
 import { fleet, late, victim } from './fleet.mjs';
 
 test('deUrb: forum/<board>[/<post>] names a board, as lattice 81', () => {
@@ -23,6 +23,9 @@ test('deUrb: forum/<board>[/<post>] names a board, as lattice 81', () => {
     ['urb://~zod/forum/test/x', ['forum', 'test', 'x']],
     ['urb://~zod/forum/test/1/more', ['forum', 'test', '1', 'more']],
   ]) assert.deepEqual(deUrb(url), ['~zod', rel, 'n'], url);
+  //  a post past 2^53 - 1 is exact, as a BigInt
+  assert.deepEqual(deUrb('urb://~zod/forum/test/9.007.199.254.740.993'), ['~zod', ['test', 9007199254740993n], 'forum']);
+  assert.deepEqual(deUrb('urb://~zod/forum/test/9.007.199.254.740.991'), ['~zod', ['test', 9007199254740991], 'forum']);
   //  and /n/ escapes a page named forum/..., as +en-urb writes it
   assert.deepEqual(deUrb('urb://~zod/n/forum/test'), ['~zod', ['forum', 'test'], 'n']);
 });
@@ -232,15 +235,50 @@ test('ballOf reads a directory, deep, and refuses a loop of trees', () => {
   assert.deepEqual(got, [['a/b/c/d', 'deep'], ['card', 'c'], ['posts/b0', 'p0'], ['posts/b1', 'p1']]);
   //  a file's pace is not a directory's
   assert.equal(decoders.ballOf(N([[1, 0], ['tomb', null], [null, null]]), N(silo), x => x), null);
-  //  a tree that holds itself is read once
+  //  a tree that holds itself is refused
   const loop = [[[1, 0], ['firm', null, 7], [null, null]],
     [null, kv([[7, [1, ['tree', null, 0, null, null, kv([['me', [7, null]]])]]]])]];
-  assert.deepEqual(decoders.ballOf(N(loop[0]), N(loop[1]), x => x), []);
+  assert.throws(() => decoders.ballOf(N(loop[0]), N(loop[1]), x => x), e => e instanceof UrbError && /holds itself/.test(e.message));
   //  and one past MAX_SEGS deep is refused
   const deep = {};
   deep[Array.from({ length: 70 }, (_, i) => `d${i}`).join('/')] = 'x';
   const [s2, l2] = dirSnap(deep);
   assert.throws(() => decoders.ballOf(N(s2), N(l2), x => x), /over 64 deep/);
+});
+
+// a silo by hand: jects {jobe: ject}, nouns {nobe: noun}, top jobe
+const silo = (top, jects, nouns = {}) => [[[1, 0], ['firm', null, top], [null, null]],
+  [kv(Object.entries(nouns).map(([k, v]) => [BigInt(k), [1, v]])), kv(Object.entries(jects).map(([k, v]) => [BigInt(k), [1, v]]))]];
+const tree = (fil, dir = []) => ['tree', null, 0, null, kv(fil), kv(dir.map(([n, j]) => [n, [j, null]]))];
+const files = s => decoders.ballOf(N(s[0]), N(s[1]), fs => fs.map(([p, n]) => [p.join('/'), n.text()]).sort());
+
+test('ballOf: two directories alike are both read, as lattice\'s ball holds both', () => {
+  //  a and b hold the same, so their trees are one ject, as hashes make it
+  const got = files(silo(1, { 1: tree([['top', 2]], [['a', 4], ['b', 4]]), 2: leaf(3), 4: tree([['x', 5]]), 5: leaf(6) },
+    { 3: 't', 6: 'same' }));
+  assert.deepEqual(got, [['a/x', 'same'], ['b/x', 'same'], ['top', 't']]);
+});
+
+test('ballOf: hostile silos', () => {
+  //  the top tree missing from the silo, or the top a leaf: nothing there
+  assert.equal(files(silo(9, { 1: tree([]) })), null);
+  assert.equal(files(silo(1, { 1: leaf(2) }, { 2: 'x' })), null);
+  //  a file naming a tree, a missing ject or a missing noun, and a
+  //  directory naming a leaf or nothing, are skipped
+  assert.deepEqual(files(silo(1, {
+    1: tree([['ok', 2], ['isdir', 4], ['gone', 77], ['nonoun', 5]], [['isleaf', 2], ['nodir', 88]]),
+    2: leaf(3), 4: tree([]), 5: leaf(99),
+  }, { 3: 'fine' })), [['ok', 'fine']]);
+  //  a name over MAX_KNOT
+  assert.throws(() => files(silo(1, { 1: tree([['x'.repeat(257), 2]]), 2: leaf(3) }, { 3: 'x' })), /over 256 bytes/);
+  assert.throws(() => files(silo(1, { 1: tree([], [['y'.repeat(257), 4]]), 4: tree([]) })), /over 256 bytes/);
+  //  a tree that is 2^20 trees by sharing, in 21 jects, is past the cap
+  const jects = { 1: tree([], [['a', 2], ['b', 2]]) };
+  for (let i = 2; i <= 20; i++) jects[i] = tree([], [['a', i + 1], ['b', i + 1]]);
+  jects[21] = tree([]);
+  assert.throws(() => files(silo(1, jects)), e => e instanceof UrbError && /over 200000 trees and files/.test(e.message));
+  //  a cycle two deep
+  assert.throws(() => files(silo(1, { 1: tree([], [['a', 2]]), 2: tree([], [['back', 1]]) })), /holds itself/);
 });
 
 test('a directory %snap off the wire, inline and by %want, through the engine', { timeout: 60_000 }, async () => {
@@ -272,6 +310,50 @@ test('a directory %snap off the wire, inline and by %want, through the engine', 
   await v.f.close();
 });
 
+test('a %veto of /pub, or of /content after /pub, fails the board cleanly', { timeout: 60_000 }, async () => {
+  for (const vetoed of [2, 3]) {
+    const v = await victim();
+    const read = forum(v.urb, '~nec').board('test').then(() => null, e => e);
+    const say = async (n, rest) => {
+      await new Promise(r => setTimeout(r, 50));
+      v.deliver('grubbery-transfer', [v.path(`/urb-fetch/${v.nonce}/${n}`), ...rest]);
+    };
+    const index = dirSnap({ index: 0 });
+    await say(1, ['snap', [0, v.path('/x'), 'x'], 1, [null, [[1, 0], ['firm', null, index[1][1][0][0]], [null, null]]], [null, index[1]]]);
+    const pub = Object.fromEntries(Object.entries(board()).filter(([k]) => k.startsWith('pub/')).map(([k, x]) => [k.slice(4), x]));
+    if (vetoed === 3) await say(2, ['snap', [1, v.path('/x')], 1, ...((s => [[null, s[0]], [null, s[1]]])(dirSnap(pub)))]);
+    await say(vetoed, ['veto', [1, v.path('/x')]]);
+    try {
+      const e = await late(read);
+      assert.ok(e instanceof UrbError && /shares no board test/.test(e.message), `${vetoed}: ${e}`);
+      assert.deepEqual(v.trapped(), []);
+    } finally {
+      await v.f.close();
+    }
+  }
+});
+
+test('dates past a Date are null, and ids past 2^53 are exact', async () => {
+  const far = (2n ** 255n);
+  const u = await fakeUrb(board({
+    'content/posts/b0': [1, kv([[2n ** 60n + 1n, [2n ** 60n + 1n, BUD, 'big', null, null, far]], [2n ** 60n, [2n ** 60n, BUD, 'big too', null, null, t0]]])],
+    'pub/conf': [1, 2n ** 60n + 2n, null],
+  }));
+  const b = await forum(u.urb, '~nec').board('test');
+  assert.deepEqual(b.posts.map(p => [p.id, p.created]), [[2n ** 60n + 1n, null], [2n ** 60n, new Date(Date.UTC(2026, 9, 31, 12))]]);
+  assert.equal(b.nextPost, 2n ** 60n + 2n);
+  assert.equal((await forum(u.urb, '~nec').thread('test', '1152921504606846976')).post.title, 'big too');
+  await u.close();
+  assert.equal(idOf(5), 5);
+  assert.equal(idOf(5n), 5);
+  assert.equal(idOf('9007199254740993'), 9007199254740993n);
+  for (const bad of [-1, 1.5, NaN, '01', '-1', 2 ** 53, -1n, 2n ** 256n, null, {}]) assert.throws(() => idOf(bad), UrbError, String(bad));
+  assert.throws(() => actions.upvote('test', { post: -1 }), /not an id/);
+  assert.throws(() => actions.newComment('test', 1.5, 'x'), /not an id/);
+  assert.throws(() => actions.newComment('test', 1, 'x', -2), /not an id/);
+  assert.deepEqual(actions.downvote('test', { post: 2n ** 60n, comment: '3' }), ['downvote', 'test', ['comment', 2n ** 60n, 3]]);
+});
+
 // ------------------------------------------------------------ two engines
 
 test('a post reaches the host\'s /forum.sig, and its refusal note comes back', { timeout: 60_000 }, async () => {
@@ -300,6 +382,12 @@ test('a post reaches the host\'s /forum.sig, and its refusal note comes back', {
   //  a note of the wrong shape, or another mark, is not one
   await late(nec.grub.poke('~zod', DESK_BASE, 'forum.sig', ['/lattice', 'forum-note'], [['a', 'b'], 'c']));
   await late(nec.grub.poke('~zod', DESK_BASE, 'forum.sig', ['/lattice', 'forum-action'], ['test', 'x']));
+  //  nor is one to another grub of ours
+  await late(nec.grub.poke('~zod', DESK_BASE, 'inbox.sig', ['/lattice', 'forum-note'], ['test', 'elsewhere']));
+  //  and a note from a ship that isn't the host is not its: anyone could
+  //  send one, and a refusal stops the poster's wait
+  const bud = await f.engine('~bud', 2);
+  await late(bud.grub.poke('~zod', DESK_BASE, 'forum.sig', ['/lattice', 'forum-note'], ['test', 'a fake refusal']));
   assert.equal(notes.length, 1);
   await f.close();
 });
