@@ -19,6 +19,10 @@ func TestDeUrb(t *testing.T) {
 		"urb://~zod/site/":            {"site"},
 		"urb://~zod/notes/2026/intro": {"notes", "2026", "intro"},
 		"urb://~zod/n/notes":          {"notes"},
+		"urb://~zod/forum":            {"forum"},
+		"urb://~zod/forum/b/1000":     {"forum", "b", "1000"},
+		"urb://~zod/forum/b/1/x":      {"forum", "b", "1", "x"},
+		"urb://~zod/n/forum/b":        {"forum", "b"},
 	}
 	for url, want := range ok {
 		ship, rel, err := deUrb(url)
@@ -28,7 +32,7 @@ func TestDeUrb(t *testing.T) {
 	}
 	for _, url := range []string{"https://example.com", "urb://notaship/x", "urb://~notaship/x",
 		"urb://~zod/x/foo", "urb://~zod/p/counter", "urb://~zod/t/apps/x", "urb://~zod/k/user/prefs",
-		"urb://~zod/Caps", "urb://~zod/a//b"} {
+		"urb://~zod/Caps", "urb://~zod/a//b", "urb://~zod/forum/b", "urb://~zod/forum/b/12", "urb://~zod/forum/b/1.000"} {
 		if _, _, err := deUrb(url); err == nil {
 			t.Errorf("accepted %s", url)
 		}

@@ -15,6 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { DESK_BASE, da, fakeKeyfile, open, renderAs, uv } from './mesa.mjs';
 import { markOf, publish } from './pub.mjs';
+import { actions } from './forum.mjs';
 
 const wasm = readFileSync(new URL('build/mesa.wasm', import.meta.url));
 
@@ -73,8 +74,38 @@ for (const n of [0n, 1n, 31n, 32n, 0xdeadbeefn, 2n ** 128n - 1n, 0x0123456789abc
   cases.push([`(scot %uv ${ux(n)})`, uv(n)]);
 }
 
+//  every forum action forum.mjs sends, clammed as the host clams it
+//  (+apply-forum-notice: ;;(action:ft q.q.sage)) against lattice's own
+//  mold, test/lattice-forum-types.hoon, copied verbatim from release 81
+//  (7584d6a). ;; fails a noun the clam would change, so a case agrees
+//  only if the action fits and hashes the same.
+const hoonOf = x => {   // a JS value as mesa.mjs makes its noun, as Hoon
+  if (x === null) return '0x0';
+  if (typeof x === 'string') x = [...new TextEncoder().encode(x)].reduceRight((v, b) => (v << 8n) | BigInt(b), 0n);
+  if (typeof x === 'number' || typeof x === 'bigint') return BigInt(x) ? ux(BigInt(x)) : '0x0';
+  return `[${x.map(hoonOf).join(' ')}]`;
+};
+const clam = x => `(sham ;;(action:ft \`*\`${hoonOf(x)}))`;
+for (const a of [
+  actions.newPost('test', { title: 'Hello' }),
+  actions.newPost('test', { title: 'Hello', url: 'https://example.com', body: 'A body\nof two lines' }),
+  actions.newPost('my-board-2', { title: 'ünïcode ✓', body: 'x'.repeat(2000) }),
+  actions.newComment('test', 1, 'a comment'),
+  actions.newComment('test', 1_000_000, 'a reply', 12),
+  actions.upvote('test', { post: 3 }),
+  actions.upvote('test', { post: 3, comment: 4 }),
+  actions.downvote('test', { post: 3 }),
+  actions.unvote('test', { post: 3, comment: 0 }),
+]) cases.push([clam(a), sham(a)]);
+//  and the clam bites: shapes no action has are refused
+for (const bad of [['new-post', 'test', ['a', 'b'], null, null], ['new-post', 'test', 'x', [1, 'u'], null],
+  ['upvote', 'test', ['reply', 1]], ['create', 'test'], ['remove-vote', 'test', ['comment', 1]]]) {
+  cases.push([`?~((mole |.(;;(action:ft \`*\`${hoonOf(bad)}))) 1 0)`, 1n]);
+}
+
 const urbit = process.env.URBIT || 'urbit';
-const expr = `~[${cases.map(([h, j]) => (typeof j === 'string' ? h : `\`@ux\`${h}`)).join(' ')}]`;
+const types = readFileSync(new URL('test/lattice-forum-types.hoon', import.meta.url), 'utf8');
+const expr = `=/  ft\n${types}\n~[${cases.map(([h, j]) => (typeof j === 'string' ? h : `\`@ux\`${h}`)).join(' ')}]`;
 // the answer alone is on stdout
 const out = execFileSync(urbit, ['eval'], { input: expr, encoding: 'utf8', maxBuffer: 1 << 26, stdio: ['pipe', 'pipe', 'ignore'] })
   .replace(/\x1b\[[0-9;]*m/g, '');
