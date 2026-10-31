@@ -322,6 +322,20 @@ What they and the vectors taught:
 
 A run is slow (tens to hundreds a second) because a hostile input makes a decoder walk to its 200,000 cap before it refuses. The slowest is the hostile ballOf vector of over 200,000 trees and files: 0.8 s in a release build, about 6 s under ASan, since each file's path is copied, as the JS's `[...at, name]` copies it. It is bounded, but on a loaded machine it passed libFuzzer's 10 s limit, so the targets run with a 30 s one. CI runs each for a minute.
 
+**What M2's review found.** Three nouns passed `measure` and still blew up a decoder, in the hardened JS as well as in the port:
+- ballOf's directory loop did no counted work for an entry that isn't a tree (259 s);
+- a tank's separator, printed between each two kids, multiplied text (a 150 KB jam printed 3.6 GB);
+- one big atom backref'd at many places was decoded at each of them (a 2 MB jam read as 4 GB).
+
+`measure` bounded cells, but not the work or the output that walking shared structure produces. The fix went into the JS and the Go on main first (PR #5), and then here:
+
+- `measure` counts atom bytes as a tree too, under `MAX_BYTES` (64 MiB, libmesa's largest message), from a `Budget` that the whole decode shares. The tank printer spends each separator it prints after the first. ballOf counts every directory entry, and spends each file's path and noun at each place the file appears.
+- `measure` returns a `Measured`. Only a `Measured` or an owned `Noun` can be jammed, hashed or compared: `NounRef` has no `==`, `jam` or `sham`, since libmesa's versions walk a noun as a tree. `tang_text` takes a `Measured`. A peer's noun used as a `Value::Map` key must come from one (`From<Measured> for Value`).
+- `Debug` prints at most 64 cells, and an atom's low 32 bytes. `Number()` of a `0x` literal folds its digits as it goes, instead of keeping a bit for each one.
+- The hostile vectors carry their whole message, and every runner matches it exactly. Eight new vectors cover the three blowups.
+- The fuzz targets assert that a decode's output stays under `OUT_MAX` (three times `MAX_BYTES`, plus a little per cell). The stack machine can now build the shapes: a 2 MiB atom, a 10,000-long tape, a map of many names for one ject, and a tree ject.
+- One case is bounded only by the product of the caps. ballOf's paths in Rust are a `Vec<String>` per file, so 200,000 files 65 empty segments deep cost about 300 MB of String headers; the JS's arrays cost about 100 MB.
+
 ## Testing beyond the traces
 
 - **The fake fleet, automated.** One script resets the furum set to `hus-lattice` and runs the stage 3, furum and lattice forum checks against the JS engine and then the Rust engine, with the same assertions. Run it for every milestone from M3 on.
