@@ -208,7 +208,7 @@ Each has exit criteria. A milestone isn't done until they all pass and the chang
 **M4. Serving** (2 days)
 - The grubbery server: snaps, keeps, drops, waves, `changed`; scry serving; the keeper cap.
 - Lattice's layout (`pub`).
-- Exit: trace 5 replays; every built message clams against grubbery's molds in vere; trace 7 replays.
+- Exit: trace 5 replays; every built message clams against grubbery's molds in vere; trace 7 replays; saved meta.pub round-trips byte for byte with the JS's.
 
 **M5. furum and lattice forums** (2 days)
 - furum's boards, and the lattice forum reader: board, thread, post, refusal notes.
@@ -361,6 +361,22 @@ M3's exit criteria passed: traces 1, 2, 3, 6 and 9 replay into the Rust core byt
 **The props flake** (vere gave 1,129 answers for 1,200 on CI) was the test's escape stripper: it skipped from an ESC to the next `m`, so a CSI ending in another letter ate the hex answers after it. It now strips a CSI to its final byte, and a short count writes vere's whole output to a file.
 
 **Fuzzing.** Two new targets: `de_urb`, any text through deUrb (only its errors, never a panic), and `hooks`, a core with a fake engine open and a peek, a poke and a keen waiting, handed another ship's `%grubbery-transfer` on each wire and on `/want` (after a `%snap` with no data), a `%grubbery-load`, a nack and a keen's answer, each a fuzzer's noun. The hooks must never panic, every noun must be let go, and what they give must stay under `OUT_MAX`; the core's timers then run past the 30 s timeouts. `seed.mjs` seeds both. A brief run found nothing: hooks ran 26,423 inputs in 15 minutes with AddressSanitizer and LeakSanitizer and 37,012 in 5 without (each opens an engine), and de_urb 11,450,705 in 5 minutes with them and 30,634,171 in 3 without. CI runs each for a minute, and the replay.
+
+## M4's findings (2026-10-31)
+
+M4's exit criteria passed. Trace 5 replays into the Rust core byte for byte, timers included (its two early wakes too), natively and under WASI, debug and release, and so do 1, 2, 3, 6, 7, 9 and 10, which the replay now requires. Every message the core sends clams against grubbery's molds in vere. Saved meta.pub round-trips byte for byte with the JS's.
+
+**The server** is mesa.mjs's, in `core.rs`. A `%peek` of a file we serve is answered with its `%snap` and silo inline, a `%keep` with its first wave and kept (up to 256 keeps, `MAX_KEEPERS`), a `%drop` forgets the keep, and `grub.changed` sends each keeper of a file its new wave, in one transaction. A `%keen` of our namespace is answered by `scry.serve`. `grub.serve`'s three functions are closures (`Files`, `Scries`, `OnKeepers`) the engine's state holds, so the shims of M6 can hand in the JS's own. `publish.rs` is pub.mjs: `pageKey`, the index, revs and vault files, the page scry, `put` and `remove`. The calls are trace.mjs's `pub`, `pub.put`, `pub.remove` and `pub.pages`, and each save is an event, `pub.save`.
+
+**meta.pub is kept as JS values, not as a struct.** `publish.rs` holds the saved `{pages, keepers}` as `js::Json`, in the order the JS keeps an object's keys, so whatever a host saved is saved again as it was: a page from before marks keeps having none, a removed page has none either, and a field the JS never wrote survives. `js::stringify` is JSON.stringify. `tests/publish.rs` publishes from 11 saved states (trace 5's saves, an empty one, and older and odder shapes) in pub.mjs on mesa.wasm (`tests/pub-oracle.mjs`) and in the core, runs 14 puts, removes and reads on each, and requires the same results and the same 88 saves, as JSON text, byte for byte.
+
+**Port the JS's accidents, again.** put's rev is `(rev ?? 0) + 1` and remove's is `rev + 1`, so a saved page with no rev comes back up at 1 and goes down at NaN. The index reads each page's hash as `BigInt('0x' + hash)`, which throws for a page saved with none: a peek of the index logs the error and is not answered, and every put fails after its save. A saved keeper whose ship is not one makes every put of its page fail with `not a ship: …`, after the save. Each is the JS's behaviour, ported, and none is fixed here; the last two are for main if a host can ever hold such a state.
+
+**The molds.** `capture_pokes` keeps the mark and jam of every poke the core makes on its thread. The replay test clams each distinct one, from every required trace and from a serving session of peeks, keeps, edits and a drop from another ship, against `load`, `transfer` and `intake` in check.mjs's copy of grubbery's molds, by `(sham ;;(mold (cue …)))` against the Rust sham. 50 distinct messages fit: 20 load `%peek`, 1 load `%poke`, 17 transfer `%snap`, 1 `%pack`, 1 `%want` and 10 intake waves. A load with a deep flag of 2 and a `%snap` whose pace is `%fir` must be refused, and the same `%snap` with `%firm` must fit.
+
+**The replay bites** for serving too. Each of these fails trace 5: no room for a keep, the page scry's id cut one short, the page hash in upper case, the list's version one higher, and a keep that does not save.
+
+**Fuzzing.** A new target, `serve`: a core publishing pages, one taken down and one kept by a saved keep, hears a `%grubbery-load` whose whole noun, wire, dest or folder is the fuzzer's, for each of `%peek`, `%keep` and `%drop`, or a scry of the fuzzer's bytes as a path; then an edit waves every keeper and the timers run. No hook may panic, every noun must be let go, the keeps must stay under the cap, and what it gives must stay under `OUT_MAX`. `seed.mjs` seeds it. A brief run found nothing: serve ran 41,877 inputs in 12 minutes with AddressSanitizer and LeakSanitizer and 60,931 in 5 without, and hooks 21,747 in 3 without. CI runs it for a minute with the rest.
 
 ## Testing beyond the traces
 
