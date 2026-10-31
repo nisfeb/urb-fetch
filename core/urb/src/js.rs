@@ -132,6 +132,44 @@ fn radix_number(digits: &str, radix: u32) -> f64 {
     mant as f64 * 2f64.powi(exp)
 }
 
+/// A number as JS's Number.prototype.toString writes it: the shortest
+/// digits that read back as it, in JS's choice of plain or exponent form.
+pub fn number_text(x: f64) -> String {
+    if x.is_nan() {
+        return "NaN".into();
+    }
+    if x == 0.0 {
+        return "0".into();
+    }
+    if x < 0.0 {
+        return format!("-{}", number_text(-x));
+    }
+    if x.is_infinite() {
+        return "Infinity".into();
+    }
+    // Rust's {:e} gives the shortest round-trip digits too
+    let e = format!("{x:e}");
+    let (mant, exp) = e.split_once('e').expect("{:e} has an e");
+    let digits: String = mant.chars().filter(|c| *c != '.').collect();
+    let k = digits.len() as i64;
+    let n = exp.parse::<i64>().expect("an exponent") + 1;
+    if k <= n && n <= 21 {
+        format!("{digits}{}", "0".repeat((n - k) as usize))
+    } else if 0 < n && n <= 21 {
+        format!("{}.{}", &digits[..n as usize], &digits[n as usize..])
+    } else if -6 < n && n <= 0 {
+        format!("0.{}{digits}", "0".repeat((-n) as usize))
+    } else {
+        let e = n - 1;
+        let sign = if e < 0 { '-' } else { '+' };
+        if k == 1 {
+            format!("{digits}e{sign}{}", e.abs())
+        } else {
+            format!("{}.{}e{sign}{}", &digits[..1], &digits[1..], e.abs())
+        }
+    }
+}
+
 /// A JS value as mesa.mjs's json() returns it.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Json {
@@ -213,6 +251,28 @@ fn array_index(k: &str) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn numbers_as_js_writes_them() {
+        for (x, t) in [
+            (1.0, "1"),
+            (-1.0, "-1"),
+            (1.5, "1.5"),
+            (0.1, "0.1"),
+            (1e21, "1e+21"),
+            (1e20, "100000000000000000000"),
+            (123456789012345680000.0, "123456789012345680000"),
+            (1e-7, "1e-7"),
+            (1.5e-7, "1.5e-7"),
+            (0.000001, "0.000001"),
+            (2f64.powi(53), "9007199254740992"),
+            (f64::NAN, "NaN"),
+            (-f64::INFINITY, "-Infinity"),
+            (-0.0, "0"),
+        ] {
+            assert_eq!(number_text(x), t, "{x}");
+        }
+    }
 
     #[test]
     fn numbers_as_js_reads_them() {

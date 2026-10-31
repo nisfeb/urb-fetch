@@ -8,8 +8,10 @@
 
 pub mod codec;
 pub mod js;
+pub mod msg;
 pub mod noun;
 pub mod text;
+pub mod url;
 
 pub use noun::{Int, Noun, NounRef, TypeError, Value, alive};
 

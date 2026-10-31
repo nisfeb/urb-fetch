@@ -216,3 +216,180 @@ fn every_codec_vector() {
     }
     assert_eq!(bad, 0, "{bad} codec vectors fail");
 }
+
+// ------------------------------------------------------------ M3
+
+/// a vector's id argument, as forum.mjs's idOf is given it
+fn id(j: &J) -> urb::msg::Id {
+    use urb::msg::Id;
+    match j {
+        J::Number(n) => Id::Num(n.as_f64().unwrap()),
+        J::String(s) => Id::Text(s.clone()),
+        J::Object(o) if o.contains_key("$big") => {
+            let d = o["$big"].as_str().unwrap();
+            match d.strip_prefix('-') {
+                Some(m) => Id::Big(true, common::big(m)),
+                None => Id::Big(false, common::big(d)),
+            }
+        }
+        _ => panic!("no id {j}"),
+    }
+}
+
+fn target(j: &J) -> urb::msg::Target {
+    urb::msg::Target {
+        post: id(&j["post"]),
+        comment: j.get("comment").filter(|c| !c.is_null()).map(id),
+    }
+}
+
+/// a file, as mesa.mjs's snapOf and waveOf take it
+fn file<'a>(j: &J, nouns: &'a [Noun], at: &mut usize) -> urb::msg::File<'a> {
+    let mark = j.get("mark").map_or((String::new(), String::new()), |m| {
+        (m[0].as_str().unwrap().into(), m[1].as_str().unwrap().into())
+    });
+    urb::msg::File {
+        mark,
+        value: j.get("value").map(|v| value(v, nouns, at)),
+        rev: j["rev"].as_u64().unwrap(),
+        at: j["at"].as_u64().unwrap(),
+    }
+}
+
+/// a message case's noun, as jam hex, or its error
+fn message(f: &str, a: &[J]) -> Result<String, String> {
+    use urb::msg;
+    let mut nouns = Vec::new();
+    for x in a {
+        cue_all(x, &mut nouns);
+    }
+    let mut at = 0;
+    let mut val = |j: &J| value(j, &nouns, &mut at);
+    let s = |j: &J| j.as_str().map(String::from);
+    let e = |r: urb::UrbError| r.message;
+    let v: Value<'_> = match f {
+        "peek" => msg::peek(&s(&a[0]).unwrap(), &s(&a[1]).unwrap(), s(&a[2]).as_deref()),
+        "poke" => {
+            let mark = (s(&a[3][0]).unwrap(), s(&a[3][1]).unwrap());
+            msg::poke(
+                &s(&a[0]).unwrap(),
+                &s(&a[1]).unwrap(),
+                &s(&a[2]).unwrap(),
+                (&mark.0, &mark.1),
+                val(&a[4]),
+            )
+        }
+        "pack" => msg::pack(val(&a[0])),
+        "want" => {
+            let (w, d, i) = (val(&a[0]), val(&a[1]), val(&a[2]));
+            msg::want(w, d, i)
+        }
+        "snap" => {
+            let (w, d, i) = (val(&a[0]), val(&a[1]), val(&a[2]));
+            let sn = (!a[3].is_null()).then(|| val(&a[3]));
+            let da = (!a[4].is_null()).then(|| val(&a[4]));
+            msg::snap(w, d, i, sn, da)
+        }
+        "snapFile" => {
+            let (w, d, i) = (val(&a[0]), val(&a[1]), val(&a[2]));
+            let mut at2 = 0;
+            let fl = file(&a[3], &nouns, &mut at2);
+            let (sn, si) = msg::snap_of(&fl).map_err(|t| t.0)?;
+            msg::snap(w, d, i, Some(sn), Some(si))
+        }
+        "intakeOf" => {
+            let (w, d) = (val(&a[0]), val(&a[1]));
+            let mut at2 = 0;
+            let fl = file(&a[2], &nouns, &mut at2);
+            msg::intake(w, d, msg::wave_of(Some(&fl), "gmi"))
+        }
+        "forum.newPost" => msg::forum::new_post(
+            &s(&a[0]).unwrap(),
+            a[1].get("title").and_then(J::as_str),
+            a[1].get("url").and_then(J::as_str),
+            a[1].get("body").and_then(J::as_str),
+        )
+        .map_err(e)?,
+        "forum.newComment" => msg::forum::new_comment(
+            &s(&a[0]).unwrap(),
+            &id(&a[1]),
+            a[2].as_str(),
+            a.get(3).filter(|p| !p.is_null()).map(id).as_ref(),
+        )
+        .map_err(e)?,
+        "forum.upvote" => msg::forum::upvote(&s(&a[0]).unwrap(), &target(&a[1])).map_err(e)?,
+        "forum.downvote" => msg::forum::downvote(&s(&a[0]).unwrap(), &target(&a[1])).map_err(e)?,
+        "forum.unvote" => msg::forum::unvote(&s(&a[0]).unwrap(), &target(&a[1])).map_err(e)?,
+        _ => panic!("no message {f}"),
+    };
+    let out = Noun::of(&v).map(|n| hex(&n.jam())).map_err(|t| t.0);
+    drop(v);
+    drop(nouns);
+    out
+}
+
+/// deUrb's [ship, rel, mount], as trace.mjs encodes it
+fn de_urb(url: &str) -> Result<J, String> {
+    use urb::url::Mount;
+    let u = urb::url::de_urb(url).map_err(|e| e.message)?;
+    let mut rel: Vec<J> = u.rel.iter().map(|s| J::String(s.clone())).collect();
+    let mount = match &u.mount {
+        Mount::N => "n",
+        Mount::K => "k",
+        Mount::P => "p",
+        Mount::T => "t",
+        Mount::Forum { post } => {
+            if let Some(p) = post {
+                rel.push(match p.to_u64().filter(|&n| n <= 9_007_199_254_740_991) {
+                    Some(n) => json!(n),
+                    None => json!({"$big": p.decimal()}),
+                });
+            }
+            "forum"
+        }
+    };
+    Ok(json!([u.ship, rel, mount]))
+}
+
+#[test]
+fn every_message_and_url_vector() {
+    let mut bad = 0;
+    for (name, src, want) in [
+        (
+            "messages",
+            include_str!("../../../conformance/messages.json"),
+            39,
+        ),
+        ("deurb", include_str!("../../../conformance/deurb.json"), 60),
+    ] {
+        let v: J = serde_json::from_str(src).unwrap();
+        let mut ran = 0;
+        for (i, c) in v["cases"].as_array().unwrap().iter().enumerate() {
+            let f = c["fn"].as_str().unwrap();
+            let a = c["in"].as_array().unwrap();
+            let got = if name == "deurb" {
+                de_urb(a[0].as_str().unwrap())
+            } else {
+                message(f, a).map(J::String)
+            };
+            ran += 1;
+            assert_eq!(alive(), 0, "{name} {i} {f} left nouns alive");
+            let ok = match (&got, c.get("error")) {
+                (Err(m), Some(J::String(w))) => m == w,
+                (Ok(o), None) => same(o, &c["out"]),
+                _ => false,
+            };
+            if !ok {
+                bad += 1;
+                eprintln!(
+                    "  {name} {i} {f}({})\n    want {}\n    got  {got:?}",
+                    c["in"],
+                    c.get("error").unwrap_or(&c["out"])
+                );
+            }
+        }
+        eprintln!("ok    {name}: {ran} cases");
+        assert_eq!(ran, want, "{name}: ran {ran}, not {want}");
+    }
+    assert_eq!(bad, 0, "{bad} vectors fail");
+}
