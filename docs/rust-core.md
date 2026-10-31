@@ -135,7 +135,7 @@ These come first, because they are what proves the port matches.
 
 **One set of rendering rules.** The Go gateway's `safeLink` and Markdown regexes do not yet have 800ff22's rules: no control-character check, schemes matched in lower case only, unbounded link text and target, and no 256 KB cap. A target like `\x01//evil.com` passes Go's `safeLink` today. By rule 2 the Go gets the same rules on main first, with tests. Any other difference between the Go and the JS renderers is listed, and each is settled on main by making one match the other, before M5b ports them.
 
-**Recorded sessions.** libmesa's engine is deterministic: it reads no clock and no OS randomness (its source has none outside its test helpers; confirmed in M0). So with the clock and entropy fixed, one session's inputs fully decide its outputs. A recorder wraps the JS host and writes every input and every output to a trace file:
+**Recorded sessions.** libmesa's engine is deterministic: it reads no clock and no OS randomness (confirmed in M0; see "M0's findings"). Time enters only as the `now` its calls take, and entropy only as bytes its caller passes in: the `eny` comet mining takes, and the key `mesa_shut_add` takes. One environment variable changes what it does: `MESA_TRACE` turns its tracing on, so the recorder and the replay run with it unset. So with the clock and entropy fixed, one session's inputs fully decide its outputs. A recorder wraps the JS host and writes every input and every output to a trace file:
 
 - inputs: datagrams heard, key lookups and their answers, app calls, entropy drawn, and every timer firing (the engine's wake, and each keen, peek and poke timeout) as a tick with its `now`
 - outputs: datagrams sent, rows saved, events, API results
@@ -175,7 +175,7 @@ Each has exit criteria. A milestone isn't done until they all pass and the chang
 
 **M0. Groundwork** (2 days)
 - The workspace, `mesa-sys` building libmesa natively and for wasm32-wasip1.
-- libmesa's own test suites run against our build, natively and under WASI (11 of 12 pass under WASI today; store_test needs flock).
+- libmesa's own test suites run against our build, natively and under WASI (11 of 12 pass under WASI; store_test does not compile there, as wasi-libc has no mkdtemp).
 - Confirm the engine reads no clock or randomness of its own.
 - CI runs `cargo test`, the conformance suite and `check.mjs`.
 - Exit: libmesa's suites pass with the same results as its zig build.
@@ -235,6 +235,30 @@ Each has exit criteria. A milestone isn't done until they all pass and the chang
 - The HTTP gateway in Rust: same routes, headers and errors, with `urb-render` for rendering.
 - It opens the Go gateway's existing state folder and keeps its comet and port.
 - Exit: a side-by-side run serves the same bytes as the Go gateway for every page in a fixed list, from the fake fleet and read-only from live ships; `urb_test.go`'s and `reader_test.go`'s cases pass as vectors.
+
+## M0's findings (2026-10-31)
+
+M0's exit criterion passed: libmesa's suites give the same results built by mesa-sys as built by its own build.zig with zig 0.15.2. `core/mesa-sys/suites.sh` runs both, and CI runs them on every change.
+
+| Build | Native | WASI |
+|---|---|---|
+| mesa-sys, debug | 12 of 12 | 11 of 12 |
+| mesa-sys, release | 12 of 12 | 11 of 12 |
+| mesa-sys, with zig Debug's UBSan | 12 of 12 | not run |
+| zig, Debug | 12 of 12 | 11 of 12 |
+| zig, ReleaseFast | 12 of 12 | 11 of 12 |
+
+Under WASI store_test does not compile in either build (no mkdtemp in wasi-libc). The WASI tests link wasi-libc's emulated getpid, since they seed `rand()` with it.
+
+**No clock and no randomness.** The evidence:
+
+- libmesa's built sources have no call to a clock, a timer or a random source. The only `rand`, `srand` and `getpid` calls are in `src/wire/pact.c` lines 1251 to 1517, inside `#ifdef PACT_TEST` (lines 1070 to 1532), which only pact_test builds. `vendor/` and the public headers have none. `src/host/host.c` has the libuv clock, but mesa-sys does not build it.
+- The libc symbols `libmesa.a` imports, native and wasm, are memory, string and formatting functions, `abort`, `getenv`, and `open`, `close` and `flock` for the SQLite store's lock file. There is no `time`, `clock_gettime`, `gettimeofday`, `rand`, `getrandom` or `getentropy`.
+- `getenv` is read only for `MESA_TRACE` (`eng_ames.c:279`, `eng_util.c:44`).
+- urcrypt's ed25519 includes `ed25519_create_seed`, which reads `/dev/urandom`. Nothing in libmesa or urcrypt's wrappers references it, so it is never linked.
+- SQLite imports `time`, `gettimeofday`, `localtime` and `getpid` for its own file handling. It runs only in the native SQLite store, and it does not change the rows the engine saves.
+
+**A bindgen trap.** bindgen read `MESA_NONE`, which is `((mesa_noun)UINT64_MAX)`, as `i32 = -1`. That compiles and is wrong. build.rs now names the C type of every integer macro and stops the build on one it does not know. The same care goes into every later binding.
 
 ## Testing beyond the traces
 
