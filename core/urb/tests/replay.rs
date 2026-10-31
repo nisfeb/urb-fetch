@@ -3,7 +3,9 @@
 //! step's outputs compared with the trace's, byte for byte, as JSON in
 //! trace.mjs's encoding. The trace's `timer` and `untimer` outputs are
 //! the JS's own scheduling: the core keeps its own timers, which each
-//! tick fires by its name and due, and the rest is compared. Each step
+//! tick fires by its name and due. After each step the timers the core
+//! has set must be the ones the JS had live (by kind and due), and its
+//! deadline their earliest; the rest is compared output by output. Each step
 //! must also draw the entropy the trace says it drew, and all of it.
 //!
 //! M3's traces must replay: 1, 2, 3, 6 and 9. The others (furum, serving,
@@ -204,8 +206,18 @@ fn replay(lines: &str) -> Replayed {
             }
         }
     });
+    // the JS's live timers, as the trace sets and clears them: id ->
+    // (kind, due); and which steps are close calls
+    let mut live: std::collections::BTreeMap<u64, (String, u64)> = Default::default();
+    let mut closes = std::collections::HashSet::new();
     for (k, step) in steps.iter().enumerate() {
         let i = &step["in"];
+        if i["k"] == "call" && i["op"] == "close" {
+            closes.insert(k as u64);
+        }
+        if i["k"] == "tick" {
+            live.remove(&i["timer"].as_u64().unwrap());
+        }
         let now = i["now"].as_u64().unwrap();
         {
             let mut e = eny.borrow_mut();
@@ -246,6 +258,27 @@ fn replay(lines: &str) -> Replayed {
             Err(e) => return Replayed::Fail(k, e),
         };
         let got: Vec<J> = got.iter().map(out).collect();
+        for o in step["out"].as_array().unwrap() {
+            if let Some(id) = o.get("timer").and_then(J::as_u64) {
+                live.insert(id, (text(&o["kind"]), o["due"].as_u64().unwrap()));
+            } else if let Some(id) = o.get("untimer").and_then(J::as_u64) {
+                live.remove(&id);
+            } else if o.get("result").and_then(J::as_u64).is_some_and(|c| closes.contains(&c)) {
+                // trace.mjs's close clears every timer before its result
+                live.clear();
+            }
+        }
+        // the core's timers are the JS's, and its deadline their earliest
+        let mut js: Vec<(String, u64)> = live.values().cloned().collect();
+        let mut ours = core.timers();
+        js.sort();
+        ours.sort();
+        if js != ours {
+            return Replayed::Fail(k, format!("timers: the JS has {js:?}, the core {ours:?}"));
+        }
+        if core.deadline() != js.iter().map(|t| t.1).min() {
+            return Replayed::Fail(k, format!("deadline {:?}, timers {js:?}", core.deadline()));
+        }
         let want: Vec<J> = step["out"]
             .as_array()
             .unwrap()
