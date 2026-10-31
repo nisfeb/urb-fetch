@@ -810,7 +810,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       const snap = unit(r.tail.tail.head), data = unit(r.tail.tail.tail);
       if (snap && !data) {
         //  too big to inline: ask for the content, pinned for 5 minutes
-        const id = r.tail.head.int();
+        const id = r.tail.head.int(64);   // an @uvJ, (shaz eny): 512 bits
         st.snap = new Noun(X.ref(snap.n));
         poke(her, st.bone, 'grubbery', 'grubbery-transfer', [wireN, 'want', r.head, id]);
         return;

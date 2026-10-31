@@ -143,7 +143,7 @@ test('hostile answers to a peek fail it, and nothing traps', { timeout: 60_000 }
   for (let i = 0; i < 200; i++) deep = ['a', [deep, null]];
   await refusedBy(w => file(w, deep), /nested over 64/);
   await refusedBy(w => file(w, ['q', 'x']), /no kind/);
-  await refusedBy(w => snapOf(w, null, { id: 2n ** 400n }).map((x, i) => (i === 5 ? null : x)), /number over 32/);
+  await refusedBy(w => snapOf(w, null, { id: 2n ** 520n }).map((x, i) => (i === 5 ? null : x)), /number over 64/);   // over an @uvJ
   await refusedBy(w => snapOf(w, null, { pace: [['firm', 'x'], null, 7] }), /cell where an atom/);
   await refusedBy(w => [w, 'snap', 5], /atom where a cell/);
   await refusedBy(w => [w, 'snap', null, 5, [null, [null, 'firm']], [null, 1]], /atom where a cell/);
@@ -211,7 +211,8 @@ test('a hostile publisher and a hostile furum host, over the loop', { timeout: 6
 test('%want: only the ship asked answers it, and its own miss or data settles it', { timeout: 30_000 }, async () => {
   const v = await victim();
   const big = 'z'.repeat(50_000);
-  const snap = k => [v.path(`/urb-fetch/${v.nonce}/${k}`), 'snap', null, 5, [null, [null, ['firm', null, 7], null]], null];
+  //  a snap id as grubbery makes it, (shaz eny): 512 bits
+  const snap = k => [v.path(`/urb-fetch/${v.nonce}/${k}`), 'snap', null, 2n ** 511n + 5n, [null, [null, ['firm', null, 7], null]], null];
   const data = [v.path('/want'), 'data', [[9, null, big], null, null], [[7, null, 'leaf', 9, null], null, null]];
   const p = v.urb.grub.peek('~nec', '/x', 'y', v.urb.nouns.cord);
   v.deliver('grubbery-transfer', snap(1));   // too big to inline: we %want it
