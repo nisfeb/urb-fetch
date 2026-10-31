@@ -95,6 +95,17 @@ func TestHostileAnswers(t *testing.T) {
 	if v, ok, _ := read(func(w mesa.Noun) mesa.Value { return snapOf(w, deep(63)) }); !ok || v == nil {
 		t.Fatalf("a $json 64 deep: %v %v", v, ok)
 	}
+	big := strings.Repeat("x", 2<<20)
+	//  30 copies, 60 MiB as a tree, is under maxBytes
+	if v, ok, _ := read(func(w mesa.Noun) mesa.Value {
+		items := make([]mesa.Value, 30)
+		for i := range items {
+			items[i] = mesa.Tuple("s", big)
+		}
+		return snapOf(w, mesa.Tuple("a", mesa.List(items...)))
+	}); !ok || len(v.([]any)) != 30 {
+		t.Fatalf("30 copies of a big atom: %v", ok)
+	}
 	for name, answer := range map[string]func(mesa.Noun) mesa.Value{
 		"shared structure": func(w mesa.Noun) mesa.Value { return snapOf(w, shared(num, 18)) },
 		"a shared snap":    func(w mesa.Noun) mesa.Value { return mesa.Tuple(w, "snap", nil, shared(uint64(1), 18), nil, nil) },
@@ -111,10 +122,19 @@ func TestHostileAnswers(t *testing.T) {
 			return mesa.Tuple(w, "snap", nil, uint64(5), mesa.Some(mesa.Tuple(nil, mesa.Tuple("firm", nil, 7), nil)), mesa.Some(mesa.Tuple(1, 2)))
 		},
 		"a veto": func(w mesa.Noun) mesa.Value { return mesa.Tuple(w, "veto", nil) },
+		//  [%a 40 × [%s <2 MiB>]], which jam sends as one atom: 2 MB
+		//  on the wire, 80 MiB of text as a tree
+		"a big atom at many places": func(w mesa.Noun) mesa.Value {
+			items := make([]mesa.Value, 40)
+			for i := range items {
+				items[i] = mesa.Tuple("s", big)
+			}
+			return snapOf(w, mesa.Tuple("a", mesa.List(items...)))
+		},
 	} {
 		v, ok, took := read(answer)
 		if v != nil || !ok || took > 5*time.Second {
-			t.Errorf("%s: read %v, answered %v, in %s", name, v, ok, took)
+			t.Errorf("%s: read %.80v, answered %v, in %s", name, v, ok, took)
 		}
 	}
 	//  and it still reads a good answer
