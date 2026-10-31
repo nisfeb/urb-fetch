@@ -15,6 +15,9 @@
 //! CI sets it, a missing one fails. Under WASI only the Rust ones run.
 //! Every test ends with no noun alive.
 
+// under WASI only the round trips run, so the oracles' helpers go unused
+#![cfg_attr(target_os = "wasi", allow(unused_imports, dead_code))]
+
 mod common;
 
 use proptest::prelude::*;
