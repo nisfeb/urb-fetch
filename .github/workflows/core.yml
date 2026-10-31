@@ -1,7 +1,8 @@
 # The Rust core (docs/rust-core.md): cargo test natively and under
-# WASI, the conformance vectors in Rust, the property tests against
-# vere and the JS, a short fuzz run of every decoder, libmesa's own
-# suites against mesa-sys's build and against its zig build; check.mjs
+# WASI, the conformance vectors and the traces in Rust, the property
+# tests against vere and the JS, a short fuzz run of every decoder and
+# of the core's hooks, libmesa's own suites against mesa-sys's build
+# and against its zig build; check.mjs
 # against vere, the JS tests, every trace replayed into the JS, and the
 # conformance vectors in the JS, the extension's renderers and the Go.
 # rerecord.yml records the traces again.
@@ -51,6 +52,9 @@ jobs:
       - name: the conformance vectors, in Rust
         working-directory: core
         run: cargo test -p urb --test vectors -- --nocapture
+      - name: the traces, replayed into the Rust core
+        working-directory: core
+        run: cargo test -p urb --test replay -- --nocapture
       - name: cargo test
         working-directory: core
         run: |
@@ -71,7 +75,8 @@ jobs:
             for m in debug release; do core/mesa-sys/suites.sh zig $w $m; done
           done
 
-  # a minute of every fuzz target, from the vectors' nouns; a long run
+  # a minute of every fuzz target (the decoders, deUrb and the core's
+  # hooks), from the vectors' nouns and urls; a long run
   # is by hand (core/urb/fuzz/Cargo.toml says how)
   fuzz:
     runs-on: ubuntu-24.04

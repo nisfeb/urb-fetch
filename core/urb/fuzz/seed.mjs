@@ -1,6 +1,8 @@
 // Seeds each fuzz target's corpus from the conformance vectors: every
 // noun in them, as jam (an input of mode 0, as src/lib.rs reads it),
 // and for file_of and ball_of each fileOf and ballOf case's two nouns.
+// hooks gets each noun twice, with each of its picks (the last byte);
+// de_urb the urls deurb.json is made from.
 //
 //   node core/urb/fuzz/seed.mjs   (writes core/urb/fuzz/corpus/<target>/)
 
@@ -39,4 +41,10 @@ const put = (target, i, bytes) => {
   put('file_of', `${fn}-${i}`, input);
   put('ball_of', `${fn}-${i}`, input);
 });
+[...nouns].forEach((h, i) => {
+  const x = Buffer.from(h, 'hex');
+  const len = Buffer.from([x.length & 0xff, x.length >> 8]);
+  for (let pick = 0; pick < 7; pick++) put('hooks', `${i}-${pick}`, Buffer.concat([Buffer.from([0]), len, x, x, Buffer.from([pick])]));
+});
+JSON.parse(readFileSync(`${here}../../../conformance/inputs/urls.json`, 'utf8')).forEach((u, i) => put('de_urb', i, Buffer.from(u)));
 console.log(`seeded ${nouns.size} nouns and ${pairs.size} pairs`);

@@ -97,3 +97,17 @@ path = "fuzz_targets/ship.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "de_urb"
+path = "fuzz_targets/de_urb.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "hooks"
+path = "fuzz_targets/hooks.rs"
+test = false
+doc = false
+bench = false
