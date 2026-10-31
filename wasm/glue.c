@@ -212,15 +212,16 @@ u_store_load(const uint8_t* buf_y, size_t len_z)
     uint32_t key_w;
     uint32_t val_w;
 
-    if ( at_z + 4 > len_z ) return -1;
+    //  each bound as what is left, so no sum wraps a 32-bit size_t
+    if ( len_z - at_z < 4 ) return -1;
     memcpy(&key_w, buf_y + at_z, 4);
-    if ( at_z + 8 + (size_t)key_w > len_z ) return -1;
+    if ( len_z - at_z - 4 < 4 || len_z - at_z - 8 < (size_t)key_w ) return -1;
     memcpy(&val_w, buf_y + at_z + 4 + key_w, 4);
     if ( UINT32_MAX == val_w ) {
       at_z += 8 + key_w;
       continue;
     }
-    if ( at_z + 8 + (size_t)key_w + val_w > len_z ) return -1;
+    if ( len_z - at_z - 8 - key_w < (size_t)val_w ) return -1;
     inn->put(inn->ctx, buf_y + at_z + 4, key_w, buf_y + at_z + 8 + key_w, val_w);
     at_z += 8 + key_w + val_w;
   }
@@ -444,18 +445,24 @@ u_close(void)
   eng = NULL;
 }
 
-EXPORT("our_lo") uint64_t u_our_lo(void) { return mesa_engine_ship(eng).lo; }
-EXPORT("our_hi") uint64_t u_our_hi(void) { return mesa_engine_ship(eng).hi; }
+//  Every export below that takes the engine checks there is one: after a
+//  refused open (or a close) it is NULL, and libmesa would read through
+//  it (low memory under wasm, a crash natively). With none, each answers
+//  as for nothing: no deadline, no bone, MESA_E_STATE, and a noun passed
+//  in is still consumed.
+
+EXPORT("our_lo") uint64_t u_our_lo(void) { return eng ? mesa_engine_ship(eng).lo : 0; }
+EXPORT("our_hi") uint64_t u_our_hi(void) { return eng ? mesa_engine_ship(eng).hi : 0; }
 
 EXPORT("hear") void
 u_hear(uint32_t ip, int port, const uint8_t* buf, size_t len, uint64_t now)
 {
   mesa_lane lan = { .kind = MESA_LANE_IP, .ip = ip, .port = port };
-  mesa_engine_hear(eng, lan, buf, len, now);
+  if ( eng ) mesa_engine_hear(eng, lan, buf, len, now);
 }
 
-EXPORT("wake") void u_wake(uint64_t now) { mesa_engine_wake(eng, now); }
-EXPORT("deadline") uint64_t u_deadline(void) { return mesa_engine_deadline(eng); }
+EXPORT("wake") void u_wake(uint64_t now) { if ( eng ) mesa_engine_wake(eng, now); }
+EXPORT("deadline") uint64_t u_deadline(void) { return eng ? mesa_engine_deadline(eng) : UINT64_MAX; }
 
 EXPORT("point_request") char*
 u_point_request(uint64_t lo, uint64_t hi)
@@ -470,6 +477,9 @@ u_point(uint64_t lo, uint64_t hi, const char* json, size_t len)
 {
   mesa_point pot;
 
+  if ( !eng ) {
+    return 0;
+  }
   if ( json
     && MESA_AZIMUTH_OK == mesa_azimuth_point_parse(ship(lo, hi), len, json, &pot) )
   {
@@ -488,47 +498,54 @@ u_point_fake(uint64_t lo, uint64_t hi)
   mesa_ident ide;
   mesa_point pot = { .who = ship(lo, hi), .rift = 0, .life = 1, .has_sponsor = false };
 
+  if ( !eng ) {
+    return;
+  }
   mesa_ident_fake(ship(lo, hi), &ide);
   mesa_ident_pass(&ide, pot.pass);
   mesa_engine_point(eng, &pot);
 }
 
-EXPORT("txn_begin") int u_txn_begin(void) { return mesa_txn_begin(eng); }
-EXPORT("txn_commit") int u_txn_commit(void) { return mesa_txn_commit(eng); }
-EXPORT("txn_abort") void u_txn_abort(void) { mesa_txn_abort(eng); }
+EXPORT("txn_begin") int u_txn_begin(void) { return eng ? mesa_txn_begin(eng) : MESA_E_STATE; }
+EXPORT("txn_commit") int u_txn_commit(void) { return eng ? mesa_txn_commit(eng) : MESA_E_STATE; }
+EXPORT("txn_abort") void u_txn_abort(void) { if ( eng ) mesa_txn_abort(eng); }
 
 //  a new forward flow to [lo hi]; its bone, or UINT64_MAX
 EXPORT("flow_open") uint64_t
 u_flow_open(uint64_t lo, uint64_t hi)
 {
   uint64_t bone;
-  return MESA_OK == mesa_flow_open(eng, ship(lo, hi), &bone) ? bone : UINT64_MAX;
+  return eng && MESA_OK == mesa_flow_open(eng, ship(lo, hi), &bone) ? bone : UINT64_MAX;
 }
 
 //  close our forward flow [bone] once its pleas are done
 EXPORT("flow_cork") int
 u_flow_cork(uint64_t lo, uint64_t hi, uint64_t bone)
 {
-  return mesa_flow_cork(eng, ship(lo, hi), bone);
+  return eng ? mesa_flow_cork(eng, ship(lo, hi), bone) : MESA_E_STATE;
 }
 
 EXPORT("poke") int
 u_poke(uint64_t lo, uint64_t hi, uint64_t bone, const char* agent,
        const char* mark, mesa_noun noun)
 {
+  if ( !eng ) {
+    mesa_unref(noun);
+    return MESA_E_STATE;
+  }
   return mesa_gall_poke(eng, ship(lo, hi), bone, agent, mark, noun);
 }
 
 EXPORT("keen") int
 u_keen(uint64_t lo, uint64_t hi, const char* path)
 {
-  return mesa_keen(eng, ship(lo, hi), path);
+  return eng ? mesa_keen(eng, ship(lo, hi), path) : MESA_E_STATE;
 }
 
 EXPORT("yawn") int
 u_yawn(uint64_t lo, uint64_t hi, const char* path)
 {
-  return mesa_yawn(eng, ship(lo, hi), path);
+  return eng ? mesa_yawn(eng, ship(lo, hi), path) : MESA_E_STATE;
 }
 
 //  nouns
