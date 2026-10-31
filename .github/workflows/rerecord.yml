@@ -1,0 +1,59 @@
+# Records traces 1 to 9 again against the fleet and fails on a drift
+# from the committed ones (docs/rust-core.md, "Re-recording in CI";
+# traces/rerecord.sh does the work, and runs the same by hand).
+#
+# The fleet is on one machine, so the job runs on a self-hosted runner
+# there, labelled fleet, with the furum set's m1c-traces snapshot. Set
+# the repository variable FLEET_RUNNER to yes once one is registered.
+# Until then the job is skipped, with a warning that says so: it never
+# passes. On a runner without the fleet, rerecord.sh exits 2 and the
+# job fails, saying it was skipped.
+name: rerecord
+
+on:
+  push:
+  schedule:
+    - cron: '23 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  runner:
+    runs-on: ubuntu-24.04
+    outputs:
+      fleet: ${{ steps.which.outputs.fleet }}
+    steps:
+      - id: which
+        run: |
+          if [ "${{ vars.FLEET_RUNNER }}" = yes ]; then
+            echo fleet=yes >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning title=rerecord skipped, not passed::no self-hosted runner with the fleet is registered (FLEET_RUNNER is not yes), so the traces were not recorded again"
+            echo fleet=no >> "$GITHUB_OUTPUT"
+          fi
+
+  rerecord:
+    needs: runner
+    if: needs.runner.outputs.fleet == 'yes'
+    runs-on: [self-hosted, fleet]
+    # one recording at a time: they share the furum set
+    concurrency: fleet-furum
+    env:
+      FLEET_WHO: ci-rerecord
+      FLEET: ${{ vars.FLEET_CMD || '/home/sneagan/software/personal/hoon-development/fleet/fleet' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: tools
+        run: core/ci/tools.sh "$RUNNER_TEMP/tools"
+      - name: mesa.wasm
+        run: wasm/build.sh
+      - name: claim the furum set
+        run: |
+          [ -x "$FLEET" ] || { echo "rerecord: SKIPPED, not passed: no fleet at $FLEET"; exit 2; }
+          "$FLEET" claim furum "$FLEET_WHO"
+      - name: record the traces again, and compare
+        run: traces/rerecord.sh
+      - name: release the furum set
+        if: always()
+        run: '[ -x "$FLEET" ] && "$FLEET" release furum || true'
