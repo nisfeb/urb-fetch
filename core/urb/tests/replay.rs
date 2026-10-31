@@ -497,3 +497,264 @@ fn a_tick_must_name_a_timer() {
     assert!(got.is_err());
     let _ = Lane::Galaxy(0);
 }
+
+// ------------------------------------------------------------ the molds
+
+/// a load another ship's grubbery sends ours: [[wire dest] tag ~], dest
+/// the file [folder name]
+fn load(wire: &str, folder: &str, name: &str, tag: &str) -> Value<'static> {
+    use urb::codec::path;
+    Value::Array(vec![
+        Value::Array(vec![
+            path(wire),
+            Value::Array(vec![0u64.into(), path(folder), name.into()]),
+        ]),
+        tag.into(),
+        Value::Null,
+    ])
+}
+
+/// What only another ship's grubbery brings about, by the hooks: a core
+/// publishing pages, peeked and kept from ~zod, edited, and dropped, as
+/// check.mjs's loop does. What it gives is not checked here, only that
+/// every message it sends fits its mold.
+fn serving() {
+    use urb::core::Hook;
+    use urb::publish::{pub_dir, vault};
+    let mut c = Core::new(|n| vec![7; n]);
+    let us = urb::engine::ship_parse("~nec").unwrap();
+    let call = |c: &mut Core, id: u64, req: Request| {
+        let o = c.step(id, Input::Call { id, req }).unwrap();
+        assert!(
+            !o.iter()
+                .any(|o| matches!(o, Output::Done { result: Err(_), .. })),
+            "{o:?}"
+        );
+    };
+    call(
+        &mut c,
+        1,
+        Request::Open {
+            keyfile: Some(urb::engine::fake_keyfile(us)),
+            rows: None,
+            fresh: true,
+            fake: true,
+        },
+    );
+    call(
+        &mut c,
+        2,
+        Request::Pub {
+            pages: None,
+            keepers: None,
+        },
+    );
+    let put = |name: &str, body: &str, mark: Option<&str>| Request::PubPut {
+        name: name.into(),
+        body: body.into(),
+        mark: mark.map(String::from),
+    };
+    call(&mut c, 3, put("index", "# home", None));
+    call(&mut c, 4, put("notes/intro", "# Intro", Some("md")));
+    call(&mut c, 5, put("gone", "soon gone", Some("text")));
+    call(&mut c, 6, Request::PubRemove("gone".into()));
+    let (dir, vault) = (pub_dir(), vault());
+    let hear = |c: &mut Core, v: Value<'static>| {
+        let n = urb::Noun::of(&v).unwrap();
+        let o = c.hook(10, Hook::Poke("~zod", "grubbery-load", n.borrow()));
+        assert!(!o.iter().any(|o| matches!(o, Output::Log(_))), "{o:?}");
+    };
+    for page in ["notes/intro", "gone", "never"] {
+        hear(
+            &mut c,
+            load("/keep/page", &format!("{vault}/{page}"), "gmi", "keep"),
+        );
+    }
+    for (folder, name) in [
+        (dir.clone(), "index"),
+        (dir.clone(), "revs"),
+        (format!("{vault}/notes/intro"), "gmi"),
+        (format!("{vault}/gone"), "gmi"),
+        (format!("{vault}/never"), "gmi"),
+        ("/not/ours".into(), "x"),
+    ] {
+        hear(&mut c, load("/peek/1", &folder, name, "peek"));
+    }
+    // a deep peek, of a directory
+    hear(&mut c, msg_peek("/peek/2", &dir));
+    call(&mut c, 7, put("notes/intro", "# Intro, again", Some("md")));
+    call(&mut c, 8, put("gone", "back", None));
+    hear(
+        &mut c,
+        load("/keep/page", &format!("{vault}/notes/intro"), "gmi", "drop"),
+    );
+    // a grub there writing to ours: taken in with a %pack
+    hear(
+        &mut c,
+        urb::msg::poke(
+            "/grub-poke/1/1",
+            &dir,
+            "x",
+            ("/lattice", "msg"),
+            "hi".into(),
+        ),
+    );
+    drop(c);
+}
+
+fn msg_peek(wire: &str, folder: &str) -> Value<'static> {
+    let mut v = urb::msg::peek(wire, folder, None);
+    // another ship's peek: its act is [%peek ~ deep]
+    if let Value::Array(a) = &mut v {
+        a[1] = Value::Array(vec!["peek".into(), Value::Null, true.into()]);
+    }
+    v
+}
+
+#[cfg(not(target_os = "wasi"))]
+#[test]
+fn every_message_sent_clams_against_grubberys_molds() {
+    use common::{answers, run_tool, tool, ux};
+    use urb::Int;
+    let Some(urbit) = tool("URBIT", "urbit", "the mold checks") else {
+        return;
+    };
+    urb::core::capture_pokes(true);
+    for &(n, name, lines) in TRACES {
+        if MUST.contains(&n) {
+            assert!(matches!(replay(lines), Replayed::Ok(_)), "{name}");
+        }
+    }
+    serving();
+    let sent = urb::core::capture_pokes(false);
+    assert_eq!(alive(), 0);
+    let mold = |m: &str| match m {
+        "grubbery-load" => Some("load:remo:nexus"),
+        "grubbery-transfer" => Some("transfer:remo:nexus"),
+        "grubbery-intake" => Some("intake:remo:nexus"),
+        _ => None,
+    };
+    // each message once: [hoon, rust's sham, what it is]
+    let mut seen = std::collections::HashSet::new();
+    let mut cases: Vec<(String, String, String)> = Vec::new();
+    let mut kinds: std::collections::BTreeMap<String, usize> = Default::default();
+    for (mark, jam) in &sent {
+        let m = mold(mark).unwrap_or_else(|| panic!("we sent a {mark}, which has no mold here"));
+        if !seen.insert((mark.clone(), jam.clone())) {
+            continue;
+        }
+        let n = urb::Noun::cue(jam).expect("our own jam");
+        let tag = if mark == "grubbery-intake" {
+            "wave".into()
+        } else {
+            n.borrow().tail().unwrap().head().unwrap().text().unwrap()
+        };
+        let what = format!("{} %{tag}", &mark[9..]);
+        *kinds.entry(what.clone()).or_default() += 1;
+        cases.push((
+            format!(
+                "`@ux`(fall (mole |.((sham ;;({m} (cue {}))))) 0)",
+                ux(&Int::from_le(jam))
+            ),
+            format!("{:x}", n.sham()),
+            what,
+        ));
+    }
+    for want in [
+        "load %peek",
+        "load %poke",
+        "transfer %pack",
+        "transfer %snap",
+        "transfer %want",
+        "intake %wave",
+    ] {
+        assert!(kinds.contains_key(want), "no {want} was sent: {kinds:?}");
+    }
+    // and the clam bites: a load whose deep flag is 2, and a %snap whose
+    // pace is %fir, are refused; the same %snap with %firm fits
+    let snap = |pace: &str| {
+        let s = Value::Array(vec![
+            Value::Array(vec![1u64.into(), urb::text::da(0).into()]),
+            Value::Array(vec![pace.into(), Value::Null, 0x1234u64.into()]),
+            Value::Array(vec![Value::Set(vec![0x1234u64.into()]), Value::Set(vec![])]),
+        ]);
+        let v = urb::msg::snap(
+            urb::codec::path("/w"),
+            Value::Array(vec![0u64.into(), urb::codec::path("/a"), "b".into()]),
+            7u64.into(),
+            Some(s),
+            None,
+        );
+        urb::Noun::of(&v).unwrap()
+    };
+    let mut deep = urb::msg::peek("/w", "/a", None);
+    if let Value::Array(a) = &mut deep
+        && let Value::Array(wd) = &mut a[0]
+        && let Value::Array(d) = &mut wd[1]
+    {
+        d[0] = 2u64.into();
+    }
+    let deep = urb::Noun::of(&deep).unwrap();
+    let (firm, fir) = (snap("firm"), snap("fir"));
+    for (m, n, want) in [
+        ("load:remo:nexus", &deep, "0".to_string()),
+        ("transfer:remo:nexus", &fir, "0".to_string()),
+        ("transfer:remo:nexus", &firm, format!("{:x}", firm.sham())),
+    ] {
+        cases.push((
+            format!(
+                "`@ux`(fall (mole |.((sham ;;({m} (cue {}))))) 0)",
+                ux(&Int::from_le(&n.jam()))
+            ),
+            want,
+            format!("refused or not: {m}"),
+        ));
+    }
+    drop((deep, firm, fir));
+    let molds = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../wasm/test/grubbery-molds.hoon"
+    ))
+    .unwrap();
+    let expr = format!(
+        "{molds}\n~[{}]",
+        cases
+            .iter()
+            .map(|c| c.0.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    let out = run_tool(&urbit, &["eval"], &expr, None);
+    let got = answers(&out);
+    assert_eq!(
+        got.len(),
+        cases.len(),
+        "vere gave {} answers for {}: ...{}",
+        got.len(),
+        cases.len(),
+        &out[out.floor_char_boundary(out.len().saturating_sub(600))..]
+    );
+    let mut bad = 0;
+    for ((h, want, what), have) in cases.iter().zip(&got) {
+        if have != want {
+            bad += 1;
+            eprintln!(
+                "MISMATCH {what}: {}\n  vere {have}\n  rust {want}",
+                &h[..h.len().min(200)]
+            );
+        }
+    }
+    eprintln!(
+        "{} of {} messages fit grubbery's molds ({kinds:?}), and the clam bites",
+        cases.len() - 3 - bad.min(cases.len() - 3),
+        cases.len() - 3
+    );
+    assert_eq!(bad, 0, "{bad} of {} disagree with vere", cases.len());
+    assert_eq!(alive(), 0);
+}
+
+#[test]
+fn serving_logs_nothing_and_lets_every_noun_go() {
+    serving();
+    assert_eq!(alive(), 0);
+}

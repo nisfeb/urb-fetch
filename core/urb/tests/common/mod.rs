@@ -119,3 +119,119 @@ pub fn value<'a>(j: &J, nouns: &'a [Noun], at: &mut usize) -> Value<'a> {
         J::Object(o) => panic!("no such value in M2's vectors: {o:?}"),
     }
 }
+
+// ------------------------------------------------------------ vere
+
+/// a tool the batch needs, or None (and a note) if it is missing, which
+/// fails with REQUIRE_ALL set
+#[cfg(not(target_os = "wasi"))]
+pub fn tool(var: &str, name: &str, why: &str) -> Option<String> {
+    let p = std::env::var(var).unwrap_or_else(|_| name.into());
+    let found = std::process::Command::new(&p)
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok();
+    if found {
+        return Some(p);
+    }
+    assert!(
+        std::env::var_os("REQUIRE_ALL").is_none(),
+        "no {name} ({var}), which {why} needs"
+    );
+    eprintln!("skip: no {name} ({var}), which {why} needs");
+    None
+}
+
+#[cfg(not(target_os = "wasi"))]
+pub fn run_tool(cmd: &str, args: &[&str], input: &str, dir: Option<&str>) -> String {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let mut c = Command::new(cmd);
+    c.args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit());
+    if let Some(d) = dir {
+        c.current_dir(d);
+    }
+    let mut child = c.spawn().expect("spawn");
+    let mut stdin = child.stdin.take().unwrap();
+    let input = input.to_owned();
+    let w = std::thread::spawn(move || stdin.write_all(input.as_bytes()));
+    let out = child.wait_with_output().expect("wait");
+    w.join().unwrap().expect("write stdin");
+    assert!(out.status.success(), "{cmd} failed");
+    String::from_utf8(out.stdout).expect("utf-8")
+}
+
+/// an atom as a hoon @ux literal, in dotted groups of four
+pub fn ux(i: &Int) -> String {
+    let mut h: String = i.le().iter().rev().map(|b| format!("{b:02x}")).collect();
+    let h = h.split_off(h.find(|c| c != '0').unwrap_or(h.len()));
+    if h.is_empty() {
+        return "0x0".into();
+    }
+    let lead = match h.len() % 4 {
+        0 => 4,
+        n => n,
+    };
+    let mut out = format!("0x{}", &h[..lead]);
+    for g in h.as_bytes()[lead..].chunks(4) {
+        out.push('.');
+        out.push_str(std::str::from_utf8(g).unwrap());
+    }
+    out
+}
+
+/// vere's output without its terminal escapes: a CSI (ESC [, its
+/// parameters and intermediates, then one final byte in 0x40-0x7E), an
+/// OSC (ESC ], to BEL or ESC backslash), a charset choice (ESC ( or ESC ) and
+/// one more), or any other ESC and the one character after it
+pub fn unescaped(out: &str) -> String {
+    let mut clean = String::new();
+    let mut it = out.chars().peekable();
+    while let Some(c) = it.next() {
+        if c != '\x1b' {
+            clean.push(c);
+            continue;
+        }
+        match it.next() {
+            Some('[') => {
+                for c in it.by_ref() {
+                    if ('\x40'..='\x7e').contains(&c) {
+                        break;
+                    }
+                }
+            }
+            Some(']') => {
+                while let Some(c) = it.next() {
+                    if c == '\x07' || (c == '\x1b' && it.next_if_eq(&'\\').is_some()) {
+                        break;
+                    }
+                }
+            }
+            Some('(' | ')') => {
+                it.next();
+            }
+            _ => {}
+        }
+    }
+    clean
+}
+
+/// vere's answers, as hex digits or @uv text
+pub fn answers(out: &str) -> Vec<String> {
+    let clean = unescaped(out);
+    clean
+        .split(|c: char| c.is_whitespace() || c == '[' || c == ']')
+        .filter_map(|w| {
+            if let Some(h) = w.strip_prefix("0x") {
+                Some(h.replace('.', ""))
+            } else {
+                w.strip_prefix("~.").map(str::to_owned)
+            }
+        })
+        .collect()
+}

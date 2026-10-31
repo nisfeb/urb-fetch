@@ -1554,6 +1554,11 @@ impl Inst {
         value: Value<'_>,
     ) -> Result<(), Failure> {
         let n = Noun::of(&value)?;
+        SENT.with(|s| {
+            if let Some(v) = s.borrow_mut().as_mut() {
+                v.push((mark.to_string(), n.jam()));
+            }
+        });
         check(self.eng.poke(her, bone, agent, mark, n)?, "poke")
     }
 
@@ -1798,6 +1803,21 @@ impl Drop for Inst {
     fn drop(&mut self) {
         self.eng.close();
     }
+}
+
+/// a poke's mark and its noun's jam
+type Sent = (String, Vec<u8>);
+
+thread_local! {
+    static SENT: RefCell<Option<Vec<Sent>>> = const { RefCell::new(None) };
+}
+
+/// For the tests that clam what we send against the molds it must fit:
+/// keep the mark and the jam of every poke made on this thread from now
+/// on (on), or stop keeping them; what was kept.
+#[doc(hidden)]
+pub fn capture_pokes(on: bool) -> Vec<Sent> {
+    SENT.with(|s| s.replace(on.then(Vec::new)).unwrap_or_default())
 }
 
 // ------------------------------------------------------------ opening
