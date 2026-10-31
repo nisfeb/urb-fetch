@@ -346,15 +346,19 @@ M3's exit criteria passed: traces 1, 2, 3, 6 and 9 replay into the Rust core byt
 
 **libmesa built natively gives mesa.wasm's bytes.** The traces were recorded with mesa.wasm (wasm32, zig's clang 20). Replayed into libmesa built by mesa-sys for x86-64 and for wasm32-wasip1, every datagram and every commit is the same, byte for byte. The engine is deterministic across both, as M0 expected.
 
-**The replay bites.** Each of these makes a required trace fail: the keen, peek or close timeout a millisecond longer, the revision cache's 60 s cut to 1 s, or the wake's `>=` made `>`.
+**The replay bites.** After each step the core's timers must be the ones the JS had live (rebuilt from the trace's `timer`, `untimer` and ticks, all cleared when close gives its result), by kind and due, and `deadline()` their earliest. Each of these makes a required trace fail: a settled peek's timer left set, a stray 0 ms timer, the keen, peek or close timeout a millisecond longer, the revision cache's 60 s cut to 1 s, or the wake's `>=` made `>`.
 
 **What it taught:**
 
-- mesa.mjs calls `X.deadline()` after a refused open, when glue.c's engine is NULL. Under wasm that reads low memory and goes on; natively it would crash. The core asks no deadline of a closed engine. Timers are not compared, so no trace can see it, but by rule 2 glue.c's `u_deadline` should check for NULL on main.
+- mesa.mjs calls `X.deadline()` after a refused open, when glue.c's engine is NULL. Under wasm that read low memory: zeroed, it gave no deadline, and with 0xff there it traps. By rule 2 it was fixed on main first (PR #7): every glue.c export that takes the engine checks for one, and `store_load` bounds each row by what is left of its buffer, since a length near 2^32 wrapped a 32-bit `size_t` past its checks. `Journal::load` had the same wrap and checks every sum too. The core never asks a closed engine anything.
 - The roller's 30 s limit aborts the real fetch through its signal, and trace.mjs's fetch ignores the signal: a lookup that never answers would hang in a replay. In the core the `roller <ship>` timer does nothing, as in a replay, so the native host (M7) must bound its own fetch.
 - A request's state holds the reaction that waits on it, and that reaction holds the engine: the core breaks the cycles when it closes the engine.
 - We serve no files yet, so a `%peek` from another ship is answered with an empty `%snap` (with 16 bytes of entropy for its id, as the JS draws), a `%keep` with an empty wave, and a scry with nothing. M4 serves.
 - On wasm32-wasip1 Rust aborts on a panic, so `catch_unwind` guards the native build only; under WASI a panic stops the module, as the plan's risks say.
+
+**Why not a simpler order.** Comparing each kind of output as its own sequence, with commits before the datagrams they release as an invariant, would let the core emit at once and drop rt.rs. It can't replay the traces byte for byte (trace 3's commit, result, datagram), so M3 keeps the JS's queue. Whether to relax the contract is for before M4 and M7.
+
+**The props flake** (vere gave 1,129 answers for 1,200 on CI) was the test's escape stripper: it skipped from an ESC to the next `m`, so a CSI ending in another letter ate the hex answers after it. It now strips a CSI to its final byte, and a short count writes vere's whole output to a file.
 
 **Fuzzing.** Two new targets: `de_urb`, any text through deUrb (only its errors, never a panic), and `hooks`, a core with a fake engine open and a peek, a poke and a keen waiting, handed another ship's `%grubbery-transfer` on each wire and on `/want` (after a `%snap` with no data), a `%grubbery-load`, a nack and a keen's answer, each a fuzzer's noun. The hooks must never panic, every noun must be let go, and what they give must stay under `OUT_MAX`; the core's timers then run past the 30 s timeouts. `seed.mjs` seeds both. A brief run found nothing: hooks ran 26,423 inputs in 15 minutes with AddressSanitizer and LeakSanitizer and 37,012 in 5 without (each opens an engine), and de_urb 11,450,705 in 5 minutes with them and 30,634,171 in 3 without. CI runs each for a minute, and the replay.
 
