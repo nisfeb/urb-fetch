@@ -1,0 +1,3 @@
+# cargo test --target wasm32-wasip1 runs the tests under wasmtime
+[target.wasm32-wasip1]
+runner = "wasmtime"

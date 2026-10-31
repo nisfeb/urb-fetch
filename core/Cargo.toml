@@ -1,0 +1,9 @@
+# The Rust core: see docs/rust-core.md. M0 holds mesa-sys only.
+[workspace]
+resolver = "3"
+members = ["mesa-sys"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+publish = false
