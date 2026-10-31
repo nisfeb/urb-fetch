@@ -240,6 +240,12 @@ fn distinct(r: &mut Rng, n: usize, depth: u32) -> Vec<Value<'static>> {
 
 #[cfg(not(target_os = "wasi"))]
 #[test]
+fn escapes_are_stripped_as_a_terminal_reads_them() {
+    let out = "\x1b[K0xab\x1b[?25l ~.0vmm \x1b]0;title\x07[0x1.2 \x1b(B~.0v1\x1b[0m]";
+    assert_eq!(answers(out), ["ab", "0vmm", "12", "0v1"]);
+}
+
+#[test]
 fn maps_and_sets_hash_as_vere_builds_them() {
     let Some(urbit) = tool("URBIT", "urbit", "the vere checks") else {
         return;
@@ -289,14 +295,18 @@ fn maps_and_sets_hash_as_vere_builds_them() {
     );
     let out = run_tool(&urbit, &["eval"], &expr, None);
     let got = answers(&out);
-    assert_eq!(
-        got.len(),
-        cases.len(),
-        "vere gave {} answers for {}: {}",
-        got.len(),
-        cases.len(),
-        &out[out.len().saturating_sub(600)..]
-    );
+    if got.len() != cases.len() {
+        // all of it, for the next one to read
+        let keep = std::env::temp_dir().join("urb-props-vere.txt");
+        let _ = std::fs::write(&keep, &out);
+        panic!(
+            "vere gave {} answers for {}; its whole output is in {}: ...{}",
+            got.len(),
+            cases.len(),
+            keep.display(),
+            &out[out.floor_char_boundary(out.len().saturating_sub(600))..]
+        );
+    }
     let mut bad = 0;
     for ((h, want), have) in cases.iter().zip(&got) {
         if have != want {
@@ -313,18 +323,45 @@ fn maps_and_sets_hash_as_vere_builds_them() {
     assert_eq!(alive(), 0);
 }
 
-/// vere's answers, as hex digits or @uv text
-fn answers(out: &str) -> Vec<String> {
+/// vere's output without its terminal escapes: a CSI (ESC [, its
+/// parameters and intermediates, then one final byte in 0x40-0x7E), an
+/// OSC (ESC ], to BEL or ESC backslash), a charset choice (ESC ( or ESC ) and
+/// one more), or any other ESC and the one character after it
+fn unescaped(out: &str) -> String {
     let mut clean = String::new();
-    let mut esc = false;
-    for c in out.chars() {
-        match c {
-            '\x1b' => esc = true,
-            'm' if esc => esc = false,
-            _ if esc => {}
-            _ => clean.push(c),
+    let mut it = out.chars().peekable();
+    while let Some(c) = it.next() {
+        if c != '\x1b' {
+            clean.push(c);
+            continue;
+        }
+        match it.next() {
+            Some('[') => {
+                for c in it.by_ref() {
+                    if ('\x40'..='\x7e').contains(&c) {
+                        break;
+                    }
+                }
+            }
+            Some(']') => {
+                while let Some(c) = it.next() {
+                    if c == '\x07' || (c == '\x1b' && it.next_if_eq(&'\\').is_some()) {
+                        break;
+                    }
+                }
+            }
+            Some('(' | ')') => {
+                it.next();
+            }
+            _ => {}
         }
     }
+    clean
+}
+
+/// vere's answers, as hex digits or @uv text
+fn answers(out: &str) -> Vec<String> {
+    let clean = unescaped(out);
     clean
         .split(|c: char| c.is_whitespace() || c == '[' || c == ']')
         .filter_map(|w| {
