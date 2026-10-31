@@ -34,8 +34,10 @@ const FLAGS: &[&str] = &[
     "-DU3_OS_PROF=1",
 ];
 
-/// zig 0.15.2's Debug sanitizer flags for C, from its --verbose-cc.
-/// Fatal, as zig's own UBSan runtime is.
+/// UBSan as zig 0.15.2's Debug has it. The first three flags are the
+/// ones its --verbose-cc shows. The fourth is ours: zig's own UBSan
+/// runtime stops at the first fault, and -fno-sanitize-recover makes
+/// clang's do the same.
 const UBSAN: [&str; 4] = [
     "-fsanitize=undefined",
     "-fno-sanitize=vptr",
@@ -124,6 +126,22 @@ fn main() {
     if !upstream.join("src/noun.c").exists() {
         panic!("third_party/libmesa is empty: run git submodule update --init");
     }
+    // suites.sh's zig run and wasm/build.sh build the submodule's HEAD
+    // (git archive); this build reads its files. A local change would
+    // make them build different sources, so it stops the build.
+    let dirty = Command::new("git")
+        .arg("-C")
+        .arg(&upstream)
+        .args(["status", "--porcelain", "--untracked-files=no"])
+        .output();
+    match dirty {
+        Ok(o) if o.status.success() => assert!(
+            o.stdout.is_empty(),
+            "third_party/libmesa has local changes: build it clean, at its pinned commit"
+        ),
+        // a source tree with no git, such as a crate package, is as shipped
+        _ => println!("cargo:warning=could not check third_party/libmesa is clean"),
+    }
     let urcrypt = deps.join("urcrypt");
     let sqlite = deps.join("sqlite");
     if !urcrypt.join("urcrypt/urcrypt.h").exists() || !sqlite.join("sqlite3.c").exists() {
@@ -203,7 +221,6 @@ fn main() {
         for f in &UBSAN {
             core.flag(f);
         }
-        flags.extend(UBSAN.iter().map(|s| s.to_string()));
     }
     core.file(root.join("vendor/c3/defs.c"));
     for f in CORE {
@@ -328,7 +345,7 @@ fn main() {
     }
 
     bindings(&t, &root, &out);
-    suite_env(&t, &core, &includes, &flags, &root, &out);
+    suite_env(&t, &core, &root, &out);
 
     // for crates that link against libmesa's headers
     println!("cargo:include={}", root.join("include").display());
@@ -378,9 +395,16 @@ fn base(t: &Target, own: bool) -> cc::Build {
             "--sysroot={}",
             t.sysroot.as_ref().unwrap().display()
         ));
-        // zig's wasm32 CPU: no bulk memory, reference types or SIMD
+        // zig's wasm32 CPU, lime1: bulk-memory-opt (memcpy and memset)
+        // but not the rest of bulk memory, and no reference types or SIMD
         b.flag("-mcpu=lime1");
-    } else if env::var_os("CC").is_none()
+    } else if t.arch == "x86_64" {
+        // baseline x86-64, whatever the build machine: what ships runs
+        // on any x86-64. suites.sh compares with zig at the same CPU.
+        b.flag("-march=x86-64");
+    }
+    if !t.wasm
+        && env::var_os("CC").is_none()
         && env::var_os(format!(
             "CC_{}",
             env::var("TARGET").unwrap().replace('-', "_")
@@ -453,27 +477,15 @@ fn bindings(t: &Target, root: &Path, out: &Path) {
 }
 
 /// suite.env: how this build compiled libmesa, for suites.sh.
-fn suite_env(
-    t: &Target,
-    core: &cc::Build,
-    includes: &[PathBuf],
-    flags: &[String],
-    root: &Path,
-    out: &Path,
-) {
+fn suite_env(t: &Target, core: &cc::Build, root: &Path, out: &Path) {
+    // the compiler's arguments are already every flag, define and
+    // include libmesa was compiled with
     let cc = core.get_compiler();
-    let mut cflags: Vec<String> = cc
+    let cflags: Vec<String> = cc
         .args()
         .iter()
         .map(|a| a.to_string_lossy().into_owned())
         .collect();
-    cflags.extend(flags.iter().cloned());
-    if t.release {
-        cflags.push("-DNDEBUG".into());
-    }
-    for i in includes {
-        cflags.push(format!("-I{}", i.display()));
-    }
     let q = |s: &str| format!("'{}'", s.replace('\'', "'\\''"));
     let env = format!(
         "MESA_CC={}\nMESA_CFLAGS={}\nMESA_LIBDIR={}\nMESA_ROOT={}\nMESA_WASM={}\nMESA_RELEASE={}\n",
