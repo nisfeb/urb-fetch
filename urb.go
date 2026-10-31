@@ -26,6 +26,9 @@ func fail(status int, format string, args ...any) error {
 
 var knot = regexp.MustCompile(`^[a-z0-9~._-]+$`)
 
+// an @ud as +slaw reads it: 1.000, never 1000
+var ud = regexp.MustCompile(`^(0|[1-9][0-9]{0,2}(\.[0-9]{3})*)$`)
+
 // deUrb resolves a published page's url the way lattice's +de-urb does
 // (code/lib/lattice-urls.hoon): the ship and the page's path in the pub
 // vault. /p/, /k/ and /t/ name the publisher's grubbery tree, which a
@@ -49,6 +52,11 @@ func deUrb(url string) (mesa.Ship, []string, error) {
 		if !knot.MatchString(s) {
 			return mesa.Ship{}, nil, fail(400, "bad path in %s", url)
 		}
+	}
+	// forum/<board>[/<post>] names a lattice forum board (release 73 and
+	// later); any other shape under forum/ is still a page
+	if segs[0] == "forum" && (len(segs) == 2 || len(segs) == 3 && ud.MatchString(segs[2])) {
+		return mesa.Ship{}, nil, fail(501, "%s is a lattice forum board, which this gateway does not read", url)
 	}
 	switch {
 	case len(segs[0]) > 1: // the frozen legacy form
