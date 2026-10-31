@@ -1,0 +1,4268 @@
+{
+ "about": "nisfeb-extension's lib/gemtext.js and lib/markdown.js: gemtext and markdown's blocks, mdNodes' nodes (lib.mjs's document, links by linkHref on urb://~zod/a/b), spans, safeLink, linkTarget and linkHref on urb://~zod/a/b, readerPath",
+ "extension": "78c30bb",
+ "cases": [
+  {
+   "fn": "gemtext",
+   "in": [
+    "# Title\n\nA paragraph\nthat wraps.\n\n=> /notes/more More notes\n=> https://example.com The web\n=>urb://~nec/x\n* one\n* two\n> a quote\n```alt\npre  text\n```"
+   ],
+   "out": [
+    {
+     "kind": "h1",
+     "text": "Title"
+    },
+    {
+     "kind": "p",
+     "text": "A paragraph"
+    },
+    {
+     "kind": "p",
+     "text": "that wraps."
+    },
+    {
+     "kind": "link",
+     "href": "/notes/more",
+     "label": "More notes"
+    },
+    {
+     "kind": "link",
+     "href": "https://example.com",
+     "label": "The web"
+    },
+    {
+     "kind": "link",
+     "href": "urb://~nec/x",
+     "label": "urb://~nec/x"
+    },
+    {
+     "kind": "list",
+     "items": [
+      "one",
+      "two"
+     ]
+    },
+    {
+     "kind": "quote",
+     "text": "a quote"
+    },
+    {
+     "kind": "pre",
+     "text": "pre  text"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "# Title\n\nA paragraph\nthat wraps.\n\n=> /notes/more More notes\n=> https://example.com The web\n=>urb://~nec/x\n* one\n* two\n> a quote\n```alt\npre  text\n```"
+   ],
+   "out": [
+    {
+     "kind": "h1",
+     "spans": [
+      {
+       "text": "Title"
+      }
+     ]
+    },
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "A paragraph that wraps."
+      }
+     ]
+    },
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "=> /notes/more More notes => https://example.com The web =>urb://~nec/x"
+      }
+     ]
+    },
+    {
+     "kind": "ul",
+     "items": [
+      [
+       {
+        "text": "one"
+       }
+      ],
+      [
+       {
+        "text": "two"
+       }
+      ]
+     ]
+    },
+    {
+     "kind": "quote",
+     "spans": [
+      {
+       "text": "a quote"
+      }
+     ]
+    },
+    {
+     "kind": "pre",
+     "text": "pre  text"
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "# Title\n\nA paragraph\nthat wraps.\n\n=> /notes/more More notes\n=> https://example.com The web\n=>urb://~nec/x\n* one\n* two\n> a quote\n```alt\npre  text\n```"
+   ],
+   "out": [
+    {
+     "tag": "h1",
+     "kids": [
+      {
+       "text": "Title"
+      }
+     ]
+    },
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "A paragraph that wraps."
+      }
+     ]
+    },
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "=> /notes/more More notes => https://example.com The web =>urb://~nec/x"
+      }
+     ]
+    },
+    {
+     "tag": "ul",
+     "kids": [
+      {
+       "tag": "li",
+       "kids": [
+        {
+         "text": "one"
+        }
+       ]
+      },
+      {
+       "tag": "li",
+       "kids": [
+        {
+         "text": "two"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "tag": "blockquote",
+     "kids": [
+      {
+       "text": "a quote"
+      }
+     ]
+    },
+    {
+     "tag": "pre",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "## Heading ##"
+   ],
+   "out": [
+    {
+     "kind": "h2",
+     "text": "Heading ##"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "## Heading ##"
+   ],
+   "out": [
+    {
+     "kind": "h2",
+     "spans": [
+      {
+       "text": "Heading"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "## Heading ##"
+   ],
+   "out": [
+    {
+     "tag": "h2",
+     "kids": [
+      {
+       "text": "Heading"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "###### six"
+   ],
+   "out": [
+    {
+     "kind": "h3",
+     "text": "six"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "###### six"
+   ],
+   "out": [
+    {
+     "kind": "h6",
+     "spans": [
+      {
+       "text": "six"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "###### six"
+   ],
+   "out": [
+    {
+     "tag": "h6",
+     "kids": [
+      {
+       "text": "six"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "####### seven"
+   ],
+   "out": [
+    {
+     "kind": "h3",
+     "text": "seven"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "####### seven"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "####### seven"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "####### seven"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "####### seven"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "#nospace"
+   ],
+   "out": [
+    {
+     "kind": "h1",
+     "text": "nospace"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "#nospace"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "#nospace"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "#nospace"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "#nospace"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "  # indented"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "  # indented"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "  # indented"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "# indented"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "  # indented"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "# indented"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "#\tTab"
+   ],
+   "out": [
+    {
+     "kind": "h1",
+     "text": "Tab"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "#\tTab"
+   ],
+   "out": [
+    {
+     "kind": "h1",
+     "spans": [
+      {
+       "text": "Tab"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "#\tTab"
+   ],
+   "out": [
+    {
+     "tag": "h1",
+     "kids": [
+      {
+       "text": "Tab"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "# "
+   ],
+   "out": [
+    {
+     "kind": "h1",
+     "text": ""
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "# "
+   ],
+   "out": [
+    {
+     "kind": "h1",
+     "spans": []
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "# "
+   ],
+   "out": [
+    {
+     "tag": "h1",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "Plain **bold** and *em* and `code` and [a link](/x) and [bad](javascript:x)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "Plain **bold** and *em* and `code` and [a link](/x) and [bad](javascript:x)"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "Plain **bold** and *em* and `code` and [a link](/x) and [bad](javascript:x)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "Plain "
+      },
+      {
+       "strong": "bold"
+      },
+      {
+       "text": " and "
+      },
+      {
+       "em": "em"
+      },
+      {
+       "text": " and "
+      },
+      {
+       "code": "code"
+      },
+      {
+       "text": " and "
+      },
+      {
+       "link": "/x",
+       "text": "a link"
+      },
+      {
+       "text": " and "
+      },
+      {
+       "text": "bad"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "Plain **bold** and *em* and `code` and [a link](/x) and [bad](javascript:x)"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "Plain "
+      },
+      {
+       "tag": "strong",
+       "kids": []
+      },
+      {
+       "text": " and "
+      },
+      {
+       "tag": "em",
+       "kids": []
+      },
+      {
+       "text": " and "
+      },
+      {
+       "tag": "code",
+       "kids": []
+      },
+      {
+       "text": " and "
+      },
+      {
+       "tag": "a",
+       "kids": []
+      },
+      {
+       "text": " and "
+      },
+      {
+       "text": "bad"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "- a\n- b\n\n1. one\n2) two\n10. ten"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "- a"
+    },
+    {
+     "kind": "p",
+     "text": "- b"
+    },
+    {
+     "kind": "p",
+     "text": "1. one"
+    },
+    {
+     "kind": "p",
+     "text": "2) two"
+    },
+    {
+     "kind": "p",
+     "text": "10. ten"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "- a\n- b\n\n1. one\n2) two\n10. ten"
+   ],
+   "out": [
+    {
+     "kind": "ul",
+     "items": [
+      [
+       {
+        "text": "a"
+       }
+      ],
+      [
+       {
+        "text": "b"
+       }
+      ]
+     ]
+    },
+    {
+     "kind": "ol",
+     "items": [
+      [
+       {
+        "text": "one"
+       }
+      ],
+      [
+       {
+        "text": "two"
+       }
+      ],
+      [
+       {
+        "text": "ten"
+       }
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "- a\n- b\n\n1. one\n2) two\n10. ten"
+   ],
+   "out": [
+    {
+     "tag": "ul",
+     "kids": [
+      {
+       "tag": "li",
+       "kids": [
+        {
+         "text": "a"
+        }
+       ]
+      },
+      {
+       "tag": "li",
+       "kids": [
+        {
+         "text": "b"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "tag": "ol",
+     "kids": [
+      {
+       "tag": "li",
+       "kids": [
+        {
+         "text": "one"
+        }
+       ]
+      },
+      {
+       "tag": "li",
+       "kids": [
+        {
+         "text": "two"
+        }
+       ]
+      },
+      {
+       "tag": "li",
+       "kids": [
+        {
+         "text": "ten"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "* [x](y)\n+ plus"
+   ],
+   "out": [
+    {
+     "kind": "list",
+     "items": [
+      "[x](y)"
+     ]
+    },
+    {
+     "kind": "p",
+     "text": "+ plus"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "* [x](y)\n+ plus"
+   ],
+   "out": [
+    {
+     "kind": "ul",
+     "items": [
+      [
+       {
+        "link": "y",
+        "text": "x"
+       }
+      ],
+      [
+       {
+        "text": "plus"
+       }
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "* [x](y)\n+ plus"
+   ],
+   "out": [
+    {
+     "tag": "ul",
+     "kids": [
+      {
+       "tag": "li",
+       "kids": [
+        {
+         "tag": "a",
+         "kids": []
+        }
+       ]
+      },
+      {
+       "tag": "li",
+       "kids": [
+        {
+         "text": "plus"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "---"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "---"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "---"
+   ],
+   "out": [
+    {
+     "kind": "hr"
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "---"
+   ],
+   "out": [
+    {
+     "tag": "hr",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "***"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "***"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "***"
+   ],
+   "out": [
+    {
+     "kind": "hr"
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "***"
+   ],
+   "out": [
+    {
+     "tag": "hr",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "_ _ _"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "_ _ _"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "_ _ _"
+   ],
+   "out": [
+    {
+     "kind": "hr"
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "_ _ _"
+   ],
+   "out": [
+    {
+     "tag": "hr",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "- - -"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "- - -"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "- - -"
+   ],
+   "out": [
+    {
+     "kind": "hr"
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "- - -"
+   ],
+   "out": [
+    {
+     "tag": "hr",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "--"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "--"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "--"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "--"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "--"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "--"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "> q\n>> qq"
+   ],
+   "out": [
+    {
+     "kind": "quote",
+     "text": "q"
+    },
+    {
+     "kind": "quote",
+     "text": "> qq"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "> q\n>> qq"
+   ],
+   "out": [
+    {
+     "kind": "quote",
+     "spans": [
+      {
+       "text": "q"
+      }
+     ]
+    },
+    {
+     "kind": "quote",
+     "spans": [
+      {
+       "text": "> qq"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "> q\n>> qq"
+   ],
+   "out": [
+    {
+     "tag": "blockquote",
+     "kids": [
+      {
+       "text": "q"
+      }
+     ]
+    },
+    {
+     "tag": "blockquote",
+     "kids": [
+      {
+       "text": "> qq"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "```\n\nfirst blank\n```"
+   ],
+   "out": [
+    {
+     "kind": "pre",
+     "text": "\nfirst blank"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "```\n\nfirst blank\n```"
+   ],
+   "out": [
+    {
+     "kind": "pre",
+     "text": "\nfirst blank"
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "```\n\nfirst blank\n```"
+   ],
+   "out": [
+    {
+     "tag": "pre",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "```unclosed\nx"
+   ],
+   "out": [
+    {
+     "kind": "pre",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "```unclosed\nx"
+   ],
+   "out": [
+    {
+     "kind": "pre",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "```unclosed\nx"
+   ],
+   "out": [
+    {
+     "tag": "pre",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "a\r\nb\r\n\r\nc"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "a"
+    },
+    {
+     "kind": "p",
+     "text": "b"
+    },
+    {
+     "kind": "p",
+     "text": "c"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "a\r\nb\r\n\r\nc"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "a b"
+      }
+     ]
+    },
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "c"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "a\r\nb\r\n\r\nc"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "a b"
+      }
+     ]
+    },
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "c"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "a\rb"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "a\rb"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "a\rb"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "a\rb"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "a\rb"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "a\rb"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "- a\rb"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "- a\rb"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "- a\rb"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "- a\rb"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "- a\rb"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "- a\rb"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "x y"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "x y"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "x y"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "x y"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "x y"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "x y"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    " # nbsp"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": " # nbsp"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    " # nbsp"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "# nbsp"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    " # nbsp"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "# nbsp"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "=> "
+   ],
+   "out": []
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "=> "
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "=>"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "=> "
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "=>"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "=>"
+   ],
+   "out": []
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "=>"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "=>"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "=>"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "=>"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "=> /x"
+   ],
+   "out": [
+    {
+     "kind": "link",
+     "href": "/x",
+     "label": "/x"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "=> /x"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "=> /x"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "=> /x"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "=> /x"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "=>\t/x\tlabel"
+   ],
+   "out": [
+    {
+     "kind": "link",
+     "href": "/x",
+     "label": "label"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "=>\t/x\tlabel"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "=>\t/x\tlabel"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "=>\t/x\tlabel"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "=>\t/x\tlabel"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "=> \u0001x:-nec/page"
+   ],
+   "out": [
+    {
+     "kind": "link",
+     "href": "\u0001x:-nec/page",
+     "label": "\u0001x:-nec/page"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "=> \u0001x:-nec/page"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "=> \u0001x:-nec/page"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "=> \u0001x:-nec/page"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "=> \u0001x:-nec/page"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "=> //evil.example"
+   ],
+   "out": [
+    {
+     "kind": "link",
+     "href": "//evil.example",
+     "label": "//evil.example"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "=> //evil.example"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "=> //evil.example"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "=> //evil.example"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "=> //evil.example"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "=> \\\\evil.example/x"
+   ],
+   "out": [
+    {
+     "kind": "link",
+     "href": "\\\\evil.example/x",
+     "label": "\\\\evil.example/x"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "=> \\\\evil.example/x"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "=> \\\\evil.example/x"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "=> \\\\evil.example/x"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "=> \\\\evil.example/x"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "=> URB://~zod/y Up"
+   ],
+   "out": [
+    {
+     "kind": "link",
+     "href": "URB://~zod/y",
+     "label": "Up"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "=> URB://~zod/y Up"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "=> URB://~zod/y Up"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "=> URB://~zod/y Up"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "=> URB://~zod/y Up"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "=> mailto:a@b.example mail"
+   ],
+   "out": [
+    {
+     "kind": "link",
+     "href": "mailto:a@b.example",
+     "label": "mail"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "=> mailto:a@b.example mail"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "=> mailto:a@b.example mail"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "=> mailto:a@b.example mail"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "=> mailto:a@b.example mail"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "=> gemini://g.example gem"
+   ],
+   "out": [
+    {
+     "kind": "link",
+     "href": "gemini://g.example",
+     "label": "gem"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "=> gemini://g.example gem"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "=> gemini://g.example gem"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "=> gemini://g.example gem"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "=> gemini://g.example gem"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "* "
+   ],
+   "out": [
+    {
+     "kind": "list",
+     "items": [
+      ""
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "* "
+   ],
+   "out": [
+    {
+     "kind": "ul",
+     "items": [
+      []
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "* "
+   ],
+   "out": [
+    {
+     "tag": "ul",
+     "kids": [
+      {
+       "tag": "li",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "*"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "*"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "*"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "*"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "*"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "*"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    ">"
+   ],
+   "out": [
+    {
+     "kind": "quote",
+     "text": ""
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    ">"
+   ],
+   "out": [
+    {
+     "kind": "quote",
+     "spans": []
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    ">"
+   ],
+   "out": [
+    {
+     "tag": "blockquote",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "> "
+   ],
+   "out": [
+    {
+     "kind": "quote",
+     "text": ""
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "> "
+   ],
+   "out": [
+    {
+     "kind": "quote",
+     "spans": []
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "> "
+   ],
+   "out": [
+    {
+     "tag": "blockquote",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "```"
+   ],
+   "out": [
+    {
+     "kind": "pre",
+     "text": ""
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "```"
+   ],
+   "out": [
+    {
+     "kind": "pre",
+     "text": ""
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "```"
+   ],
+   "out": [
+    {
+     "tag": "pre",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "[a](b) [c](d)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "[a](b) [c](d)"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "[a](b) [c](d)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "link": "b",
+       "text": "a"
+      },
+      {
+       "text": " "
+      },
+      {
+       "link": "d",
+       "text": "c"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "[a](b) [c](d)"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "tag": "a",
+       "kids": []
+      },
+      {
+       "text": " "
+      },
+      {
+       "tag": "a",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "[[a]](b)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "[[a]](b)"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "[[a]](b)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "[[a]](b)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "[[a]](b)"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "[[a]](b)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "[a](b(c))"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "[a](b(c))"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "[a](b(c))"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "link": "b(c",
+       "text": "a"
+      },
+      {
+       "text": ")"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "[a](b(c))"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "tag": "a",
+       "kids": []
+      },
+      {
+       "text": ")"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "[a] (b)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "[a] (b)"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "[a] (b)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "[a] (b)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "[a] (b)"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "[a] (b)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "**unclosed"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "**unclosed"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "**unclosed"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "**unclosed"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "**unclosed"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "**unclosed"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "*a**b*"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "*a**b*"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "*a**b*"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "em": "a"
+      },
+      {
+       "em": "b"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "*a**b*"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "tag": "em",
+       "kids": []
+      },
+      {
+       "tag": "em",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "`a``b`"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "`a``b`"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "`a``b`"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "code": "a"
+      },
+      {
+       "code": "b"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "`a``b`"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "tag": "code",
+       "kids": []
+      },
+      {
+       "tag": "code",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "<b>raw</b> & \"quotes\""
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "<b>raw</b> & \"quotes\""
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "<b>raw</b> & \"quotes\""
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "<b>raw</b> & \"quotes\""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "<b>raw</b> & \"quotes\""
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "<b>raw</b> & \"quotes\""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    ""
+   ],
+   "out": []
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    ""
+   ],
+   "out": []
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    ""
+   ],
+   "out": []
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "\n\n\n"
+   ],
+   "out": []
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "\n\n\n"
+   ],
+   "out": []
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "\n\n\n"
+   ],
+   "out": []
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "link": "x",
+       "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "tag": "a",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "link": "/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+       "text": "t"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "tag": "a",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "😀 emoji [😀](/😀)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "😀 emoji [😀](/😀)"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "😀 emoji [😀](/😀)"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "😀 emoji "
+      },
+      {
+       "link": "/😀",
+       "text": "😀"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "😀 emoji [😀](/😀)"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "😀 emoji "
+      },
+      {
+       "tag": "a",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "1.5 not a list"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "1.5 not a list"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "1.5 not a list"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "1.5 not a list"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "1.5 not a list"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "1.5 not a list"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "1. "
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "1. "
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "1. "
+   ],
+   "out": [
+    {
+     "kind": "ol",
+     "items": [
+      []
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "1. "
+   ],
+   "out": [
+    {
+     "tag": "ol",
+     "kids": [
+      {
+       "tag": "li",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "-not a list"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "-not a list"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "-not a list"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "-not a list"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "-not a list"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "-not a list"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "- "
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "- "
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "- "
+   ],
+   "out": [
+    {
+     "kind": "ul",
+     "items": [
+      []
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "- "
+   ],
+   "out": [
+    {
+     "tag": "ul",
+     "kids": [
+      {
+       "tag": "li",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "a\n- b\nc"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "text": "a"
+    },
+    {
+     "kind": "p",
+     "text": "- b"
+    },
+    {
+     "kind": "p",
+     "text": "c"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "a\n- b\nc"
+   ],
+   "out": [
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "a"
+      }
+     ]
+    },
+    {
+     "kind": "ul",
+     "items": [
+      [
+       {
+        "text": "b"
+       }
+      ]
+     ]
+    },
+    {
+     "kind": "p",
+     "spans": [
+      {
+       "text": "c"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "a\n- b\nc"
+   ],
+   "out": [
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "a"
+      }
+     ]
+    },
+    {
+     "tag": "ul",
+     "kids": [
+      {
+       "tag": "li",
+       "kids": [
+        {
+         "text": "b"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "tag": "p",
+     "kids": [
+      {
+       "text": "c"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "gemtext",
+   "in": [
+    "> [q](/x) **b**"
+   ],
+   "out": [
+    {
+     "kind": "quote",
+     "text": "[q](/x) **b**"
+    }
+   ]
+  },
+  {
+   "fn": "markdown",
+   "in": [
+    "> [q](/x) **b**"
+   ],
+   "out": [
+    {
+     "kind": "quote",
+     "spans": [
+      {
+       "link": "/x",
+       "text": "q"
+      },
+      {
+       "text": " "
+      },
+      {
+       "strong": "b"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "mdNodes",
+   "in": [
+    "> [q](/x) **b**"
+   ],
+   "out": [
+    {
+     "tag": "blockquote",
+     "kids": [
+      {
+       "tag": "a",
+       "kids": []
+      },
+      {
+       "text": " "
+      },
+      {
+       "tag": "strong",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    ""
+   ],
+   "out": []
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "plain"
+   ],
+   "out": [
+    {
+     "text": "plain"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "**b**"
+   ],
+   "out": [
+    {
+     "strong": "b"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "*e*"
+   ],
+   "out": [
+    {
+     "em": "e"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "* e *"
+   ],
+   "out": [
+    {
+     "text": "* e *"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "`c`"
+   ],
+   "out": [
+    {
+     "code": "c"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "[t](u)"
+   ],
+   "out": [
+    {
+     "link": "u",
+     "text": "t"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "[t](u v)"
+   ],
+   "out": [
+    {
+     "text": "[t](u v)"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "[](u)"
+   ],
+   "out": [
+    {
+     "text": "[](u)"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "[t]()"
+   ],
+   "out": [
+    {
+     "text": "[t]()"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "**a** *b* `c` [d](e)"
+   ],
+   "out": [
+    {
+     "strong": "a"
+    },
+    {
+     "text": " "
+    },
+    {
+     "em": "b"
+    },
+    {
+     "text": " "
+    },
+    {
+     "code": "c"
+    },
+    {
+     "text": " "
+    },
+    {
+     "link": "e",
+     "text": "d"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "[a](b)[c](d)"
+   ],
+   "out": [
+    {
+     "link": "b",
+     "text": "a"
+    },
+    {
+     "link": "d",
+     "text": "c"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "[a](javascript:b)"
+   ],
+   "out": [
+    {
+     "text": "a"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "[a](//b)"
+   ],
+   "out": [
+    {
+     "text": "a"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "*"
+   ],
+   "out": [
+    {
+     "text": "*"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "**"
+   ],
+   "out": [
+    {
+     "text": "**"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "***a***"
+   ],
+   "out": [
+    {
+     "text": "*"
+    },
+    {
+     "strong": "a"
+    },
+    {
+     "text": "*"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "``"
+   ],
+   "out": [
+    {
+     "text": "``"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "[[a](b)"
+   ],
+   "out": [
+    {
+     "link": "b",
+     "text": "[a"
+    }
+   ]
+  },
+  {
+   "fn": "spans",
+   "in": [
+    "[a]](b)"
+   ],
+   "out": [
+    {
+     "text": "[a]](b)"
+    }
+   ]
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~zod"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "urb://~zod"
+   ],
+   "out": "urb://~zod"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "urb://~zod"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~nec/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "urb://~nec/x"
+   ],
+   "out": "urb://~nec/x"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "urb://~nec/x"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~nec%2Fx"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "URB://~zod/y"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "URB://~zod/y"
+   ],
+   "out": "urb://~zod/y"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "URB://~zod/y"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fy"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~notaship/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "urb://~notaship/x"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "urb://~notaship/x"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~zod/a/../b"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "urb://~zod/a/../b"
+   ],
+   "out": "urb://~zod/a/../b"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "urb://~zod/a/../b"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2F..%2Fb"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "HTTPS://a.b/c?d#e"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "HTTPS://a.b/c?d#e"
+   ],
+   "out": "https://a.b/c?d#e"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "HTTPS://a.b/c?d#e"
+   ],
+   "out": "https://a.b/c?d#e"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "http:/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "http:/x"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "http:/x"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "http://"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "http://"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "http://"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "https://a"
+   ],
+   "out": "https://a"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "https://a"
+   ],
+   "out": "https://a"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "mailto:a@b"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "mailto:a@b"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "mailto:a@b"
+   ],
+   "out": "mailto:a@b"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "Mailto:A@B"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "Mailto:A@B"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "Mailto:A@B"
+   ],
+   "out": "mailto:A@B"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "gemini://g"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "gemini://g"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "gemini://g"
+   ],
+   "out": "gemini://g"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "Gemini://g"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "Gemini://g"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "Gemini://g"
+   ],
+   "out": "gemini://g"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "javascript:x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "javascript:x"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "javascript:x"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "data:x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "data:x"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "data:x"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "/"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "/"
+   ],
+   "out": "urb://~zod"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "/"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "//"
+   ],
+   "out": false
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "//"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "//"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\\"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "\\"
+   ],
+   "out": "urb://~zod"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "\\"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    ".."
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    ".."
+   ],
+   "out": "urb://~zod"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    ".."
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "."
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "."
+   ],
+   "out": "urb://~zod/a/"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "."
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2F"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "x"
+   ],
+   "out": "urb://~zod/a/x"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "x"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2Fx"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "y/z"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "y/z"
+   ],
+   "out": "urb://~zod/a/y/z"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "y/z"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2Fy%2Fz"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "../../c?q=1#f"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "../../c?q=1#f"
+   ],
+   "out": "urb://~zod/c"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "../../c?q=1#f"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fc"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "?q"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "?q"
+   ],
+   "out": "urb://~zod/a/b"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "?q"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2Fb"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "#f"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "#f"
+   ],
+   "out": "urb://~zod/a/b"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "#f"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2Fb"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "%41"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "%41"
+   ],
+   "out": "urb://~zod/a/%41"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "%41"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2F%2541"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "%2e%2e/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "%2e%2e/x"
+   ],
+   "out": "urb://~zod/x"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "%2e%2e/x"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fx"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "é"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "é"
+   ],
+   "out": "urb://~zod/a/%C3%A9"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "é"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2F%25C3%25A9"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "😀"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "😀"
+   ],
+   "out": "urb://~zod/a/%F0%9F%98%80"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "😀"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2F%25F0%259F%2598%2580"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    ":"
+   ],
+   "out": false
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    ":"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    ":"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "a:b"
+   ],
+   "out": false
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "a:b"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "a:b"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "~"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "~"
+   ],
+   "out": "urb://~zod/a/~"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "~"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2F~"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "("
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "("
+   ],
+   "out": "urb://~zod/a/("
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "("
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2F("
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    " x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    " x"
+   ],
+   "out": "urb://~zod/a/x"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    " x"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "x "
+   ],
+   "out": false
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "x "
+   ],
+   "out": "urb://~zod/a/x"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "x "
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\tx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "\tx"
+   ],
+   "out": "urb://~zod/a/x"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "\tx"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "a\\b"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "a\\b"
+   ],
+   "out": "urb://~zod/a/a/b"
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "a\\b"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2Fa%2Fb"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "/\\x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "/\\x"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "/\\x"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0001//evil"
+   ],
+   "out": false
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "\u0001//evil"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "\u0001//evil"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "ftp://x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "ftp://x"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "ftp://x"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb:"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "urb:"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "urb:"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb:/~zod"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "urb:/~zod"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "urb:/~zod"
+   ],
+   "out": null
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~zod?x#y"
+   ],
+   "out": true
+  },
+  {
+   "fn": "linkTarget",
+   "in": [
+    "urb://~zod/a/b",
+    "urb://~zod?x#y"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "linkHref",
+   "in": [
+    "urb://~zod/a/b",
+    "urb://~zod?x#y"
+   ],
+   "out": null
+  },
+  {
+   "fn": "readerPath",
+   "in": [
+    "urb://~zod"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod"
+  },
+  {
+   "fn": "readerPath",
+   "in": [
+    "urb://~zod/a b?c#d"
+   ],
+   "out": "reader.html?u=urb%3A%2F%2F~zod%2Fa%20b%3Fc%23d"
+  }
+ ]
+}

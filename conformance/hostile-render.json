@@ -1,0 +1,1852 @@
+{
+ "about": "hand-written hostile page bodies and links (hostile.mjs): what the extension (lib.mjs) and the gateway (conformance_test.go) must each give, within 2000 ms. safeLink(target); mdLink(text, target), whether [text](target) is a link; mdFirst(body), the first block's tag (pre when the body is over the 256 KB cap); escapes(mark, body), that no raw tag gets through; renders(mark, body), that it renders at all",
+ "extension": "78c30bb",
+ "quick": 2000,
+ "cases": [
+  {
+   "fn": "safeLink",
+   "in": [
+    "javascript:alert(1)"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "JAVASCRIPT:alert(1)"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "JaVaScRiPt:x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    " javascript:x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "data:text/html,<b>x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "DATA:x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "vbscript:x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "VBScript:x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "file:///etc/passwd"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "chrome://settings"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "//evil.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\\\\evil.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "/\\evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\\/evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    " //evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb:x\u0000"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0000https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0000x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0000"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0000//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0001https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0001x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0001"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0001//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0002https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0002x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0002"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0002//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0003https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0003x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0003"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0003//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0004https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0004x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0004"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0004//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0005https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0005x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0005"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0005//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0006https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0006x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0006"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0006//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0007https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0007x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0007"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0007//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\bhttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\bx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\b"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\b//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\thttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\tx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\t"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\t//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\nhttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\nx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\n"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\n//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u000bhttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u000bx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u000b"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u000b//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\fhttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\fx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\f"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\f//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\rhttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\rx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\r"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\r//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u000ehttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u000ex"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u000e"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u000e//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u000fhttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u000fx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u000f"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u000f//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0010https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0010x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0010"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0010//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0011https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0011x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0011"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0011//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0012https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0012x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0012"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0012//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0013https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0013x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0013"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0013//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0014https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0014x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0014"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0014//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0015https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0015x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0015"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0015//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0016https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0016x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0016"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0016//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0017https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0017x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0017"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0017//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0018https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0018x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0018"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0018//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0019https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u0019x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u0019"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0019//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001ahttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u001ax"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u001a"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001a//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001bhttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u001bx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u001b"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001b//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001chttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u001cx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u001c"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001c//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001dhttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u001dx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u001d"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001d//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001ehttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u001ex"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u001e"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001e//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001fhttps://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/\u001fx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x\u001f"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001f//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    " https://a.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/ x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x "
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    " //evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "http://a.example"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "HTTPS://A.EXAMPLE/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~zod"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "URB://~zod/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "gemini://g.example"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "mailto:a@b.example"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "x/y"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "?q"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "#f"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    ".."
+   ],
+   "out": true
+  },
+  {
+   "fn": "mdLink",
+   "in": [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "mdLink",
+   "in": [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "mdLink",
+   "in": [
+    "t",
+    "/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   ],
+   "out": true
+  },
+  {
+   "fn": "mdLink",
+   "in": [
+    "t",
+    "/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   ],
+   "out": false
+  },
+  {
+   "fn": "mdLink",
+   "in": [
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+    "/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "mdLink",
+   "in": [
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀a",
+    "/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "mdLink",
+   "in": [
+    "t",
+    "javascript:x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "mdFirst",
+   "in": [
+    {
+     "$repeat": [
+      "a",
+      262144
+     ]
+    }
+   ],
+   "out": "p"
+  },
+  {
+   "fn": "mdFirst",
+   "in": [
+    {
+     "$repeat": [
+      "a",
+      262145
+     ]
+    }
+   ],
+   "out": "pre"
+  },
+  {
+   "fn": "mdFirst",
+   "in": [
+    {
+     "$cat": [
+      {
+       "$repeat": [
+        "😀",
+        131072
+       ]
+      },
+      "a"
+     ]
+    }
+   ],
+   "out": "pre"
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "md",
+    "<script>alert(1)</script>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "md",
+    "# <img src=x onerror=alert(1)>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "md",
+    "[<b>x</b>](/y)"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "md",
+    "=> /x <script>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "md",
+    "* <iframe src=//e>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "gmi",
+    "<script>alert(1)</script>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "gmi",
+    "# <img src=x onerror=alert(1)>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "gmi",
+    "[<b>x</b>](/y)"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "gmi",
+    "=> /x <script>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "gmi",
+    "* <iframe src=//e>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "text",
+    "<script>alert(1)</script>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "text",
+    "# <img src=x onerror=alert(1)>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "text",
+    "[<b>x</b>](/y)"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "text",
+    "=> /x <script>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "escapes",
+   "in": [
+    "text",
+    "* <iframe src=//e>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$repeat": [
+      "[",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$repeat": [
+      "[",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$repeat": [
+      "](",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$repeat": [
+      "](",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$repeat": [
+      "[a](",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$repeat": [
+      "[a](",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$repeat": [
+      "*",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$repeat": [
+      "*",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$repeat": [
+      "**",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$repeat": [
+      "**",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$repeat": [
+      "`",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$repeat": [
+      "`",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$repeat": [
+      "_",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$repeat": [
+      "_",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$cat": [
+      "#",
+      {
+       "$repeat": [
+        " ",
+        100000
+       ]
+      },
+      "x"
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$cat": [
+      "#",
+      {
+       "$repeat": [
+        " ",
+        100000
+       ]
+      },
+      "x"
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$cat": [
+      {
+       "$repeat": [
+        " ",
+        100000
+       ]
+      },
+      "#"
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$cat": [
+      {
+       "$repeat": [
+        " ",
+        100000
+       ]
+      },
+      "#"
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$cat": [
+      "# ",
+      {
+       "$repeat": [
+        "#",
+        100000
+       ]
+      },
+      " x"
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$cat": [
+      "# ",
+      {
+       "$repeat": [
+        "#",
+        100000
+       ]
+      },
+      " x"
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$repeat": [
+      "- ",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$repeat": [
+      "- ",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$repeat": [
+      "> ",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$repeat": [
+      "> ",
+      100000
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$cat": [
+      "=> ",
+      {
+       "$repeat": [
+        " ",
+        100000
+       ]
+      },
+      "x"
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$cat": [
+      "=> ",
+      {
+       "$repeat": [
+        " ",
+        100000
+       ]
+      },
+      "x"
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$cat": [
+      "[",
+      {
+       "$repeat": [
+        "a",
+        100000
+       ]
+      },
+      "]("
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$cat": [
+      "[",
+      {
+       "$repeat": [
+        "a",
+        100000
+       ]
+      },
+      "]("
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$cat": [
+      "[a](",
+      {
+       "$repeat": [
+        "b",
+        100000
+       ]
+      }
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$cat": [
+      "[a](",
+      {
+       "$repeat": [
+        "b",
+        100000
+       ]
+      }
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "md",
+    {
+     "$cat": [
+      {
+       "$repeat": [
+        "\t",
+        100000
+       ]
+      },
+      "<"
+     ]
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "renders",
+   "in": [
+    "gmi",
+    {
+     "$cat": [
+      {
+       "$repeat": [
+        "\t",
+        100000
+       ]
+      },
+      "<"
+     ]
+    }
+   ],
+   "out": true
+  }
+ ]
+}

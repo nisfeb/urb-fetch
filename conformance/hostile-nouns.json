@@ -1,0 +1,352 @@
+{
+ "about": "hand-written hostile nouns (hostile.mjs): each must be refused, with an error that contains its text, within 2000 ms, and never crash or hang",
+ "quick": 2000,
+ "cases": [
+  {
+   "fn": "measure",
+   "in": [
+    {
+     "$noun": "55555555c53c2a8e82637e8c8fe9313c66c7e8981c83233ec2233a82b3674e02"
+    }
+   ],
+   "error": "over 200000 cells"
+  },
+  {
+   "fn": "measure",
+   "in": [
+    {
+     "$noun": "5555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555ccc3381e86f1308a87413c8ce161080f237818c0c3f81d86ef307a87c13b8cdd61e80e237718b8c3b81d86ed306a87413b8cd961c80e237618b0c3781d86eb305a87c13a8cd561a80e237518a8c3381d86e9304a87413a8cd161880e237418a0c3f81c86e7303a87c1398ccd61680e23731898c3b81c86e5302a8741398cc961480e23721890c3781c86e3301a87c1388cc561280e23711888c3381c86e1300a8741388cc161080e2370188043f80fc13f84fe10f843d80f413f84fc10f043b80fc13e84fa10e843980f413e84f810e043780fc13d84f610d843580f413d84f410d043380fc13c84f210c843180f413c84f010c043f80ec13b84ee10b843d80e413b84ec10b043b80ec13a84ea10a843980e413a84e810a043780ec13984e6109843580e413984e4109043380ec13884e2108843180e413884e01080e3fe71feb87e1c3f6e1fa78fcbc7e1e3ee71f6b87a1c3d6e1e278f8bc7c1e3de71eeb8761c3b6e1da78e4bc7a1e3ce71e6b8721c396e1c278e0bc781a3fe283faa8fe2a3f6283d2a8fc2a3ee283baa8ea2a3e628392a8e82637e8c8fe9313c66c7e8981c83233ec2233a82b3674e02"
+    }
+   ],
+   "error": "over 200000 cells"
+  },
+  {
+   "fn": "json",
+   "in": [
+    {
+     "$noun": "c1c3355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993355993057743635555555555555555555555555555555501"
+    }
+   ],
+   "error": "nested over 64 deep"
+  },
+  {
+   "fn": "json",
+   "in": [
+    {
+     "$noun": "c1c335599335599335599335599335599335599335599335599335599335599335599335599335599335599335599335599335599335599335599335597037346e18f3368c761bc6b90d23dc86b16dc3a8b6613cdb30926d18c3368c5e1bc6ad0d23d686b16ac328b5617cda30326d1893368c461bc6a10d23d086b0b721d46d086f1b42da8630b621746d08571b42d486b0b421146ddc6fe3721b37dbb8d6c69d362eb451db46551bf3362605"
+    }
+   ],
+   "error": "over 200000 cells"
+  },
+  {
+   "fn": "json",
+   "in": [
+    {
+     "$noun": "c1f10c"
+    }
+   ],
+   "error": "of no kind we know"
+  },
+  {
+   "fn": "json",
+   "in": [
+    {
+     "$noun": "c1c500180000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020"
+    }
+   ],
+   "error": "a number over 32 bytes"
+  },
+  {
+   "fn": "json",
+   "in": [
+    {
+     "$noun": "c54806"
+    }
+   ],
+   "error": "a cell where an atom goes"
+  },
+  {
+   "fn": "json",
+   "in": [
+    {
+     "$noun": "c1df055f077743e31a9335266b4cd698ac315963b2c6648dc91a9335266b4cd698ac315963b2c6648dc91a9335266b4cd698ac315963b2c6648dc91a9335266b4cd698ac31990ed5e1500c0eb37f18f5c3641f06f930b787313d4ce561080f337718b1c3441d06e8302f87f1384cc321f887581f427b88e4217087381dc27288c271faf8785c3a1e04"
+    }
+   ],
+   "error": "over 200000"
+  },
+  {
+   "fn": "entries",
+   "in": [
+    {
+     "$noun": "055f077743e39aacc99aacc99aacc99aacc99aacc99aacc99aacc99aacc99aacc99aacc99aacc99aacc99aacc99aacc99a4c87093c4cdd61d20ed37598a8c3141d26e7302d8709394cc561120ed13f44fc10e543640fd13c44f010b543a40ed13944e41085e3f9f1f67878bc3a9e1ced4763"
+    }
+   ],
+   "error": "a map over 200000 entries"
+  },
+  {
+   "fn": "pathOf",
+   "in": [
+    {
+     "$noun": "c1c34d36d964934d36d964934d36d964934d36d964934d36d964934d36d964934d36d964934d36d964934d36d964934d36d964934d36d964934d36d964934d36d964934d36d964934d36d964934d36d9649302"
+    }
+   ],
+   "error": "a path over 64 segments"
+  },
+  {
+   "fn": "pathOf",
+   "in": [
+    {
+     "$noun": "018007c0c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c30b"
+    }
+   ],
+   "error": "a path segment over 256 bytes"
+  },
+  {
+   "fn": "pathOf",
+   "in": [
+    {
+     "$noun": "c54801"
+    }
+   ],
+   "error": "a cell where an atom goes"
+  },
+  {
+   "fn": "tang",
+   "in": [
+    {
+     "$noun": "01af4c4e5ec0977b9b2b5750d0b446d1c6a9358a364ead51b4716a8da28d536b146d9c5aa368e3d41a451ba7d628da38b546d1c6a9358a364ead51b4716a8da28d536b146d9c5aa368e3d41a451ba7d628da38b546d1c6a9358a364ead51b4716a8da28d536b146d9c5aa368e3d41a451ba7d628da38b546d1c6a9358a364ead51b4716a8da28d536b146d9c5aa368e3d41a451ba7d628da38b546d1c6a9358a364ead51b4716a8da28d536b146d9c5aa368e3d41a451ba716f0d9cac2ccc1d1c1d3361c716db8d0da707eb5e1b66ac3e1d486aba80d274f1bee99361c2b6db844da7066b4e18668c381d086eadf86d2de86badd86a2dc868adb8672da865ad98642d8862ad78612d686fad486e2d386cad286b2d1869ad086816fc334b76154db30876d18b2364c501bc6a30db16f4360db10b53684a48dbf15"
+    }
+   ],
+   "out": "another ship's noun has over 200000 cells"
+  },
+  {
+   "fn": "fileOf",
+   "in": [
+    {
+     "$noun": "59c0374b936b27be"
+    },
+    {
+     "$noun": "59006c0100000000000000000000000000000000000000000000000000000000000000000000000080a6"
+    }
+   ],
+   "error": "a number over 32 bytes"
+  },
+  {
+   "fn": "fileOf",
+   "in": [
+    {
+     "$noun": "59315201"
+    },
+    {
+     "$noun": "02"
+    }
+   ],
+   "error": "a cell where an atom goes"
+  },
+  {
+   "fn": "fileOf",
+   "in": [
+    {
+     "$noun": "59c0374b936b27be"
+    },
+    {
+     "$noun": "59104c6b76cdaed935bb66d7ec9a5db36b76cdaed935bb66d7ec9a5db36b76cdaed96373988243e00fb13e84f710d143100f713b84ea109d43400e31386e1f4f8f73c79fe3c2d17a141ddb"
+    }
+   ],
+   "error": "a map over 200000 entries"
+  },
+  {
+   "fn": "ballOf",
+   "in": [
+    {
+     "$noun": "59c0374b936b27ae"
+    },
+    {
+     "$noun": "59b819f0e9e4caca9999057cb6b73778b8a6432802"
+    }
+   ],
+   "error": "a directory that holds itself"
+  },
+  {
+   "fn": "ballOf",
+   "in": [
+    {
+     "$noun": "59c0374b936b270b"
+    },
+    {
+     "$noun": "599c019f4eaeac9c9959707248d30a998dc9cccc8293433b9eaed0d998cccc2c38394cc7d31566362633330b4e0ed7f174859b8dc9cccc8293c3763c5d6167633233b3e0e4f01d4f57f8d998cccc2c3839083a9eae20988dc9cccc829383a4e3e90a92d998cccc2c3839883a9eae209a8dc9cccc829383ace3e90ab2d998cccc2c3839083b9eae209c8dc9cccc829383b4e3e90ad2d998cccc2c3839883b9eae209e8dc9cccc829383bce3e90af2d998cccc2c383918743c5dc160362633330b4e0e161d4f57b0988dc9cccc82938349c7d3154c66633233b3e0e460d3f174059bd998cccc2c383918753c5dc168362633330b4e0e561d4f57b09a8dc9cccc82938359c7d315cc66633233b3e0e460d7f17405bbd998cccc2c383918763c5dc170362633330b4e0e961d4f57b09c8dc9cccc82938369c7d3154c67633233b3e0e460dbf17405dbd998cccc2c383918773c5dc178362633330b4e0ed61d4f57b09e8dc9cccc82938379c7d315cc67633233b3e0e460dff17405fbd998cccc2c383928e878ba8282d998cccc2c383968e878ba8286d998cccc2c3839a8e878ba828ad998cccc2c3839e8e878ba828ed998cccc2c383928e978ba8292d998cccc2c383968e978ba8296d998cccc2c3839a8e978ba829ad998cccc2c3839e8e978ba829ed998cccc2c383928ea78ba82a2d998cccc2c383968ea78ba82a6d998cccc2c3839a8ea78ba82aad998cccc2c3839e8ea78ba82aed998cccc2c383928eb78ba82b2d998cccc2c383968eb78ba82b6d998cccc2c3839a8eb78ba82bad998cccc2c3839e8eb78ba82bed998cccc2c383928ec78ba82c2d998cccc2c383968ec78ba82c6d998cccc2c3839a8ec78ba82cad998cccc2c3839e8ec78ba82ced998cccc2c383928ed78ba82d2d998cccc2c383968ed78ba82d6d998cccc2c3839a8ed78ba82dad998cccc2c3839e8ed78ba82ded998cccc2c383928ee78ba82e2d998cccc2c383968ee78ba82e6d998cccc2c3839a8ee78ba82ead998cccc2c3839e8ee78ba82eed998cccc2c383928ef78ba82f2d998cccc2c383968ef78ba82f6d998cccc2c3839a8ef78ba82fad998cccc2c3839e8ef78ba82fed998cccc2c383938d0f174050766633233b3e0e4e041c7d3153c988dc9cccc8293830b1d4f577061362633733c3d9e5655555555555555555555555555555515"
+    }
+   ],
+   "error": "a directory over 64 deep"
+  },
+  {
+   "fn": "ballOf",
+   "in": [
+    {
+     "$noun": "59c0374b936b270b"
+    },
+    {
+     "$noun": "599c019f4eaeac9c9959707c48b3e0f9716f5a21b331999959707c68b3e0f921ac8770acd0d998cccc2c383e4cb3e0f961ba0ee1586166633233b3e0f870cd82e787393f8463859b8dc9cccc82e3c3360b9e1f2ace211c2bec6c4c6666161c1fbe59f0fc50fc0ee158e167633233b3e0f82068163c3fd4e143385610ccc6646666c1f141d22c787e380c0ee15841321b93999905c70751b3e0f9e15439846305d16c4c6666161c1f64cd82e787e3e9108e1564b331999959707c10360b9e1fceb943385610cec6646666c1f141da2c787e38300fe158413a1b93999905c70771b3e0f9e1e43d846305f16c4c6666161c1fe4cd82e78723fc108e15e4b331999959707c3068163c3fa4050ee158c160362633330b8e0f16cd82e7875cc5211c2b58ccc6646666c1f1c1a459f0fc90403984630593d998cccc2c383ed8340b9e1fb23a8770ac60331b93999905c707a366c1f343aae9108e158c6663323387701cc2515555555505"
+    }
+   ],
+   "error": "a directory of over 200000 trees and files"
+  },
+  {
+   "fn": "ship",
+   "in": [
+    {
+     "$noun": "00260100000000000000000000000000000000000000000000000002"
+    }
+   ],
+   "error": "a ship over 128 bits"
+  },
+  {
+   "fn": "forum.board",
+   "in": [
+    {
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/b/pub": [
+      [
+       [
+        "card"
+       ],
+       {
+        "$noun": "2105"
+       }
+      ]
+     ],
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/b/content": []
+    },
+    "b"
+   ],
+   "error": "unreadable: /pub/card (not version 1)"
+  },
+  {
+   "fn": "forum.board",
+   "in": [
+    {
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/b/pub": [
+      [
+       [
+        "card"
+       ],
+       {
+        "$noun": "717071707a707266800fee6d8eae4c2e"
+       }
+      ],
+      [
+       [
+        "conf"
+       ],
+       {
+        "$noun": "712c"
+       }
+      ]
+     ],
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/b/content": [
+      [
+       [
+        "posts",
+        "b0"
+       ],
+       {
+        "$noun": "7101b005000000000000000000000000000000000000000000000000000000000000000000000000009a02"
+       }
+      ]
+     ]
+    },
+    "b"
+   ],
+   "error": "unreadable: /content/posts/b0"
+  },
+  {
+   "fn": "forum.board",
+   "in": [
+    {
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/b/pub": [
+      [
+       [
+        "card"
+       ],
+       {
+        "$noun": "717071707a707266800fee6d8eae4c2e"
+       }
+      ],
+      [
+       [
+        "conf"
+       ],
+       {
+        "$noun": "712c"
+       }
+      ]
+     ],
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/b/content": [
+      [
+       [
+        "votes",
+        "b0"
+       ],
+       {
+        "$noun": "710578e4cae0d8f29c8e1301"
+       }
+      ]
+     ]
+    },
+    "b"
+   ],
+   "error": "no vote target %reply"
+  },
+  {
+   "fn": "forum.board",
+   "in": [
+    {
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/b/pub": [
+      [
+       [
+        "roles"
+       ],
+       {
+        "$noun": "7131f0d7d2dcce29"
+       }
+      ]
+     ],
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/b/content": []
+    },
+    "b"
+   ],
+   "error": "no role king"
+  },
+  {
+   "fn": "forum.board",
+   "in": [
+    {
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/b/pub": [
+      [
+       [
+        "conf"
+       ],
+       {
+        "$noun": "712c"
+       }
+      ]
+     ],
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/b/content": []
+    },
+    "b"
+   ],
+   "error": "has no card"
+  },
+  {
+   "fn": "furum.posts",
+   "in": [
+    {
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/b/pub conf": {
+      "$noun": "71800900000000a0"
+     }
+    },
+    "b"
+   ],
+   "error": "claims 1099511627776 posts, over 100000"
+  }
+ ]
+}

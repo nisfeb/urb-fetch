@@ -1,0 +1,2034 @@
+{
+ "about": "noun(value) as mesa.mjs builds it, as jam hex: maps and sets as +put builds them (the value in trace.mjs's encoding: an array of two or more is cells, null is ~, true and false loobeans)",
+ "cases": [
+  {
+   "fn": "noun",
+   "in": [
+    null
+   ],
+   "out": "02"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    true
+   ],
+   "out": "02"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    false
+   ],
+   "out": "0c"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    0
+   ],
+   "out": "02"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    1
+   ],
+   "out": "0c"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    255
+   ],
+   "out": "20fe01"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    256
+   ],
+   "out": "600002"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    65535
+   ],
+   "out": "40f8ff07"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    9007199254740991
+   ],
+   "out": "80f5ffffffffffff03"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$big": "18446744073709551616"
+    }
+   ],
+   "out": "00030000000000000080"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$big": "340282366920938463463374607431768211457"
+    }
+   ],
+   "out": "00060200000000000000000000000000000002"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$big": "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"
+    }
+   ],
+   "out": "0008e0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    ""
+   ],
+   "out": "02"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    "a"
+   ],
+   "out": "f030"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    "cord"
+   ],
+   "out": "c01f7b932303"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    "ünïcode ✓"
+   ],
+   "out": "00d1615eb7e1d7b137b2321071ce49"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "out": "00c09fc7c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c303"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    [
+     1,
+     2
+    ]
+   ],
+   "out": "3112"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    [
+     1,
+     2,
+     3
+    ]
+   ],
+   "out": "714834"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    [
+     "a",
+     null
+    ]
+   ],
+   "out": "c1c302"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    [
+     [
+      1,
+      2
+     ],
+     [
+      3,
+      4
+     ]
+    ]
+   ],
+   "out": "c5c8d098"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    [
+     null,
+     null,
+     null
+    ]
+   ],
+   "out": "9902"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    [
+     "a",
+     "b",
+     "c",
+     null
+    ]
+   ],
+   "out": "c1c3c1c5c1c702"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    null
+   ],
+   "out": "02"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    [
+     "g",
+     "x",
+     "1",
+     "grubbery",
+     "",
+     "1",
+     "pub",
+     "page",
+     "notes",
+     "intro",
+     "0v1",
+     null
+    ]
+   ],
+   "out": "c1cfc1f141e300ff995c9d9858995c3e83c6010fae4e1cf0e1c2ceca011eb737bab2798027cd8d4eee1dd060ec6201"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    [
+     "apps",
+     "shell.shell",
+     "desks",
+     "lattice.desk",
+     "desk",
+     "data",
+     "lattice.lattice_app",
+     null
+    ]
+   ],
+   "out": "013f0c0e6e1ec06b0ead8c8dcd650ead8c8d1de0212b9b5b9b07f0630ba3a34b1b2b73212b9b5b077cb2b2b975c0270ba30b07e0852d8c8e2e6daccc852d8c8e2e6dacec2b0c0e2e"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": []
+    }
+   ],
+   "out": "02"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": []
+    }
+   ],
+   "out": "02"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": []
+    }
+   ],
+   "out": "02"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": []
+    }
+   ],
+   "out": "02"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ]
+     ]
+    }
+   ],
+   "out": "0568d6caf25a6053"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "15f0e0eac481868303de595bda046d07a7"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      1000
+     ]
+    }
+   ],
+   "out": "81423f05"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      "s0"
+     ]
+    }
+   ],
+   "out": "819e8353"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ]
+     ]
+    }
+   ],
+   "out": "0568d6caf25a60b300cd5a595e4bcc29"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "15f0e0eac481868303de595bda046d0767353bd070f17830066d17a7"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919
+     ]
+    }
+   ],
+   "out": "81be163350e8a7"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1"
+     ]
+    }
+   ],
+   "out": "819e8333d073710a"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ]
+     ]
+    }
+   ],
+   "out": "0568d6caf25a602b40b35696d72223d302346b65792d318fe701"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "15f0e0eac481868303de595bda046d0757cd0e349c3c1e0c09da4e4eabd981868bc7833168bb78886d"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838
+     ]
+    }
+   ],
+   "out": "81be160bbc71300d14faa335"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2"
+     ]
+    }
+   ],
+   "out": "819e8333d07371067a4e4e01"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ]
+     ]
+    }
+   ],
+   "out": "0568d6caf25a602b40b35696d732a3b300cd5a595e8b8c4c0bd0ac95e5b5d098598066ad2caf25e6217601"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "15f0e0eac481868303de595bda046d0757cd0e341c3d1e0c13b41d5d353bd070f2783024683b39ad66071a6e1e0f86066d370f53b39a1d68b8783c1883b68b87a909"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676
+     ]
+    }
+   ],
+   "out": "8127fd1778e36006be169c06fa5acc40a13f4e05"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4"
+     ]
+    }
+   ],
+   "out": "819e830bf41c9d067a6e2ed073f1281de839799406"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ],
+      [
+       "key-5",
+       5
+      ],
+      [
+       "key-6",
+       6
+      ],
+      [
+       "key-7",
+       7
+      ]
+     ]
+    }
+   ],
+   "out": "0568d6caf25a602b40b35696d772e3578066ad2caf654667019ab5b2bc1619995a8066ad2cafc5c6ce02346b65792d34660568d6caf25a6adc21f80bd0ac95e5b5c43c043f"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p5",
+        "gmi",
+        null
+       ],
+       [
+        5,
+        "v5"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p6",
+        "gmi",
+        null
+       ],
+       [
+        6,
+        "v6"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p7",
+        "gmi",
+        null
+       ],
+       [
+        7,
+        "v7"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "15f0e0eac481868303de595bda046d0757cd0e341c3d1e0c13b41d5d353bd070f678306cd07676d5ec40c3c9e3c190a0ede4d46a76a0e1e6f16068d076f3308fabd981868bc7833168bbb86a76a0e1eaf160b8a0edeaac66071aee1e0f860fdaee1ee6b1"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676,
+      40595,
+      48514,
+      56433
+     ]
+    }
+   ],
+   "out": "8127fd1778e3600141b0370d0871dc05be163c5e35d0d7620161d273bc1a28f4c7ab"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s5",
+      "s6",
+      "s7"
+     ]
+    }
+   ],
+   "out": "819e830bf41c9d067a6e2ed07375819e8b33d073f6286da0e7e4023d778fd202"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ],
+      [
+       "key-5",
+       5
+      ],
+      [
+       "key-6",
+       6
+      ],
+      [
+       "key-7",
+       7
+      ],
+      [
+       "key-8",
+       8
+      ],
+      [
+       "key-9",
+       9
+      ],
+      [
+       "key-10",
+       10
+      ],
+      [
+       "key-11",
+       11
+      ],
+      [
+       "key-12",
+       12
+      ]
+     ]
+    }
+   ],
+   "out": "0568d6caf25a602b40b35696d772e3578066ad2caf0587600568d6caf25a667416a0592bcb6b91916901bab5b2bc961818a215a05b2bcb6b8991213c0c500bd0ac95e5b5e4901c0668019ab5b2bc161b3b0bd0ac95e5b5d09815a0592bcb6ba971b300dd5a595e4b4c0cd9618016a0592bcb6b897918a0"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p5",
+        "gmi",
+        null
+       ],
+       [
+        5,
+        "v5"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p6",
+        "gmi",
+        null
+       ],
+       [
+        6,
+        "v6"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p7",
+        "gmi",
+        null
+       ],
+       [
+        7,
+        "v7"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p8",
+        "gmi",
+        null
+       ],
+       [
+        8,
+        "v8"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p9",
+        "gmi",
+        null
+       ],
+       [
+        9,
+        "v9"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p10",
+        "gmi",
+        null
+       ],
+       [
+        10,
+        "v10"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p11",
+        "gmi",
+        null
+       ],
+       [
+        11,
+        "v11"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p12",
+        "gmi",
+        null
+       ],
+       [
+        12,
+        "v12"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "15f0e0eac481868303de595bda046d0757cd0e341c3d1e0c13b41d5d353bd070f678306cd07676d5ec800617138f07832cd0ec62e2ac66071a4e1e0f86046d27a756b3030d878f078320683bbc6a76a0e1e6f16068d0767356b3030d978f07832468bb7c2801abd9010d2e461e0f0661a0d9c5c8430958cd0e345c3c1e8c41dbc555b3030d578f07c3056d5767353bd070f778307cd07677d5ec800617038f078328d0ec62e0a10454"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676,
+      40595,
+      48514,
+      56433,
+      64352,
+      72271,
+      80190,
+      88109,
+      96028
+     ]
+    }
+   ],
+   "out": "8127fd17305ab016307c72a681370e16309e341610c0f6c7b50141b0775c1b10e2b80b7c2d785c1b3038ee8e6b037d2d1610263dc7b581427f5c0b"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s5",
+      "s6",
+      "s7",
+      "s8",
+      "s9",
+      "s10",
+      "s11",
+      "s12"
+     ]
+    }
+   ],
+   "out": "819e830b68733172067a8ece80361713a7819ec30bf45c3c8460a0e7e6023d5717e8397b08c140cfe5430806b4b91838033d2717e8b97b084101"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ],
+      [
+       "key-5",
+       5
+      ],
+      [
+       "key-6",
+       6
+      ],
+      [
+       "key-7",
+       7
+      ],
+      [
+       "key-8",
+       8
+      ],
+      [
+       "key-9",
+       9
+      ],
+      [
+       "key-10",
+       10
+      ],
+      [
+       "key-11",
+       11
+      ],
+      [
+       "key-12",
+       12
+      ],
+      [
+       "key-13",
+       13
+      ],
+      [
+       "key-14",
+       14
+      ],
+      [
+       "key-15",
+       15
+      ],
+      [
+       "key-16",
+       16
+      ],
+      [
+       "key-17",
+       17
+      ],
+      [
+       "key-18",
+       18
+      ],
+      [
+       "key-19",
+       19
+      ],
+      [
+       "key-20",
+       20
+      ],
+      [
+       "key-21",
+       21
+      ],
+      [
+       "key-22",
+       22
+      ],
+      [
+       "key-23",
+       23
+      ],
+      [
+       "key-24",
+       24
+      ],
+      [
+       "key-25",
+       25
+      ],
+      [
+       "key-26",
+       26
+      ],
+      [
+       "key-27",
+       27
+      ],
+      [
+       "key-28",
+       28
+      ],
+      [
+       "key-29",
+       29
+      ],
+      [
+       "key-30",
+       30
+      ],
+      [
+       "key-31",
+       31
+      ],
+      [
+       "key-32",
+       32
+      ],
+      [
+       "key-33",
+       33
+      ],
+      [
+       "key-34",
+       34
+      ],
+      [
+       "key-35",
+       35
+      ],
+      [
+       "key-36",
+       36
+      ],
+      [
+       "key-37",
+       37
+      ],
+      [
+       "key-38",
+       38
+      ],
+      [
+       "key-39",
+       39
+      ]
+     ]
+    }
+   ],
+   "out": "05e8d6caf25a646018ad00dd5a595e8bcc0cbb15a0592bcb6b99d115a05b2bcb6b8999215d01bab5b2bc16191966b300dd5a595ecbcc0d2dd302746b65792d32364c57806ead2caf65468682c304b700dd5a595e8b4c0cab598066ad2caf45460e13bc00dd5a595ecb0c0d15b300cd5a595e0b6c05e8d6caf25a6670a85901bab5b2bc16991cd62b40b35696d78243300bd0ad95e5b5cce4d07398e005e8d6caf25a627098cc02746b65792d31328487095e806ead2caf450687f10ad0ac95e5b5dcf815a05b2bcb6b8981213a4cf002746b65792d32340c0f13bc00cd5a595e4b0ec9618217a0592bcb6bb1b12b40b75696d7125343be02746b65792d333694ac00dd5a595ecb4c0cfbc304570bd0ad95e5b5c8dcb09d05e8d6caf25a6666685801bab5b2bc96991a3a568066ad2cafa5c61d26b805e8d6caf25a646a58ae00cd5a595e0b8d5901bab5b2bc969818b2c3042f40b75696d71243437c98e005e8d6caf25a626e58ac00dd5a595e4b8c0d8359806ead2caf252687cd618217a0592bcb6b89b902746b65792d3330cc0f135c"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p5",
+        "gmi",
+        null
+       ],
+       [
+        5,
+        "v5"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p6",
+        "gmi",
+        null
+       ],
+       [
+        6,
+        "v6"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p7",
+        "gmi",
+        null
+       ],
+       [
+        7,
+        "v7"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p8",
+        "gmi",
+        null
+       ],
+       [
+        8,
+        "v8"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p9",
+        "gmi",
+        null
+       ],
+       [
+        9,
+        "v9"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p10",
+        "gmi",
+        null
+       ],
+       [
+        10,
+        "v10"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p11",
+        "gmi",
+        null
+       ],
+       [
+        11,
+        "v11"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p12",
+        "gmi",
+        null
+       ],
+       [
+        12,
+        "v12"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p13",
+        "gmi",
+        null
+       ],
+       [
+        13,
+        "v13"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p14",
+        "gmi",
+        null
+       ],
+       [
+        14,
+        "v14"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p15",
+        "gmi",
+        null
+       ],
+       [
+        15,
+        "v15"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p16",
+        "gmi",
+        null
+       ],
+       [
+        16,
+        "v16"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p17",
+        "gmi",
+        null
+       ],
+       [
+        17,
+        "v17"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p18",
+        "gmi",
+        null
+       ],
+       [
+        18,
+        "v18"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p19",
+        "gmi",
+        null
+       ],
+       [
+        19,
+        "v19"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p20",
+        "gmi",
+        null
+       ],
+       [
+        20,
+        "v20"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p21",
+        "gmi",
+        null
+       ],
+       [
+        21,
+        "v21"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p22",
+        "gmi",
+        null
+       ],
+       [
+        22,
+        "v22"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p23",
+        "gmi",
+        null
+       ],
+       [
+        23,
+        "v23"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p24",
+        "gmi",
+        null
+       ],
+       [
+        24,
+        "v24"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p25",
+        "gmi",
+        null
+       ],
+       [
+        25,
+        "v25"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p26",
+        "gmi",
+        null
+       ],
+       [
+        26,
+        "v26"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p27",
+        "gmi",
+        null
+       ],
+       [
+        27,
+        "v27"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p28",
+        "gmi",
+        null
+       ],
+       [
+        28,
+        "v28"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p29",
+        "gmi",
+        null
+       ],
+       [
+        29,
+        "v29"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p30",
+        "gmi",
+        null
+       ],
+       [
+        30,
+        "v30"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p31",
+        "gmi",
+        null
+       ],
+       [
+        31,
+        "v31"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p32",
+        "gmi",
+        null
+       ],
+       [
+        32,
+        "v32"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p33",
+        "gmi",
+        null
+       ],
+       [
+        33,
+        "v33"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p34",
+        "gmi",
+        null
+       ],
+       [
+        34,
+        "v34"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p35",
+        "gmi",
+        null
+       ],
+       [
+        35,
+        "v35"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p36",
+        "gmi",
+        null
+       ],
+       [
+        36,
+        "v36"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p37",
+        "gmi",
+        null
+       ],
+       [
+        37,
+        "v37"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p38",
+        "gmi",
+        null
+       ],
+       [
+        38,
+        "v38"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p39",
+        "gmi",
+        null
+       ],
+       [
+        39,
+        "v39"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "15f0e0eac4010d2e060f78676d698349a0d9c5e055b3030d078f2f13b41d5c353ba0c1c5cce3cb200d34bb98b96a7640839bc1c797414da0d9cde055b3031a9c0c3cbe0c468166270357cd0e687033f7f832680934bb99bb6a76408393c1c797c138d0ec64f0b49a1dd0e062e2f16590059a5d4c3cd4cbd5ec40c3d9e3cbb041dbd955b3031a5c4c3dbe0cf240b38ba9b39a1d6838797c1912b49d3cd4cbd5ec800637438f2f838a40b39ba1ab660734b8987b7c192c02cd2ee61eea65abd98186a3c7976182b6a3b39a1dd0e062f2f165b00934bb983cabd9010d4e661e5f06bb40b39399b39a1dd0e064e4f165300b343b1979a897abd98186c3c7974110b41d5e353ba0c1c9c4e3cb601568763271d5ec40c3cde3cbd0a0ede6aad9010d6e461e5f06058166372367353ba0c1c9d0e3cb6018687632f4502f57b3031a5c8c3dbe0c068166176367353bd070f9f8324882b6cb877ad96a7640839b99c7974143a0d9cdcc59cd0e687031f2f8320803cd2e461eeae56a7640839b81c797c13cd0ec66e0aad9010d6ea61e5f061d8166375357cd0e345c3dbe0c17b45d9dd5ec800617038f2f8328d0ec62e0a15eb69a1dd0e064eef165b00d343b993babd9010d6e261e5f06fb40b39b89877ab99a1dd0e064f2f165b00e343b993cabd981868bc7973168bbb86a76408393b1c797c134d0ec64ecac660734b8197b7c1994049add8c9dd5ec40c3dde3cbf041dbdd55b3031a5c0c3dbe0ce240b38ba1877ab99a1dd0e064eaf165b00c343b997aa897abd9010d6e261f5f063d816637930ff532"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676,
+      40595,
+      48514,
+      56433,
+      64352,
+      72271,
+      80190,
+      88109,
+      96028,
+      103947,
+      111866,
+      119785,
+      127704,
+      135623,
+      143542,
+      151461,
+      159380,
+      167299,
+      175218,
+      183137,
+      191056,
+      198975,
+      206894,
+      214813,
+      222732,
+      230651,
+      238570,
+      246489,
+      254408,
+      262327,
+      270246,
+      278165,
+      286084,
+      294003,
+      301922,
+      309841
+     ]
+    }
+   ],
+   "out": "8127fd17305ab016507e12ce80e19333034ad8b219505c50ce8052fa641a702a7d5840398e7008f3c01b070b184f1a0b38629b2c2080ed674091637508f38063fac121cc03863eed0c0882bd4398078438ee024ab6f005947dc287300f3851bacc8043d8c5028a2d8c19f85a700694c14687300f38737c1cc23c6070dc2da0741c3d8479c0c0963f8479a0afc5020a94ba051406b387300f28c8e11710263d3360a44f1fc2dc80a23e7a01e71680058c05cb439807144a373350e80f612e"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s5",
+      "s6",
+      "s7",
+      "s8",
+      "s9",
+      "s10",
+      "s11",
+      "s12",
+      "s13",
+      "s14",
+      "s15",
+      "s16",
+      "s17",
+      "s18",
+      "s19",
+      "s20",
+      "s21",
+      "s22",
+      "s23",
+      "s24",
+      "s25",
+      "s26",
+      "s27",
+      "s28",
+      "s29",
+      "s30",
+      "s31",
+      "s32",
+      "s33",
+      "s34",
+      "s35",
+      "s36",
+      "s37",
+      "s38",
+      "s39"
+     ]
+    }
+   ],
+   "out": "016d2e662ed07370016d2e462ea0cdc9e469a0e7e802da9c8c3d0462409b8b8987400c68733275819ec30bf45c3c0462409b8bc933a0cdcdcc05b4b9997c0844033d5717d0e662ea023d670f8168409b9b8933a0cdc5d8432006b4b918ba8036376317d0e666ea023d3717d0e664e4023d970f8118d0e664ee211003da9c0c3e0462409b8bb987400c68733374016d4e061e0231a0cdc5c0432006b4b919b98036370317d0e662f0023d7717d0e666ee211003da9c0c3d0462409b938987400c687333f81088016d4e66ce40cfc9432002"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       {
+        "$big": "1"
+       },
+       [
+        0,
+        "noun 0"
+       ]
+      ],
+      [
+       {
+        "$big": "4660"
+       },
+       [
+        0,
+        "noun 1"
+       ]
+      ],
+      [
+       {
+        "$big": "18446744073709551616"
+       },
+       [
+        0,
+        "noun 2"
+       ]
+      ],
+      [
+       {
+        "$big": "18446744073709551617"
+       },
+       [
+        0,
+        "noun 3"
+       ]
+      ],
+      [
+       {
+        "$big": "170141183460469231731687303715884105733"
+       },
+       [
+        0,
+        "noun 4"
+       ]
+      ],
+      [
+       {
+        "$big": "67743901318781152046652688020001116771"
+       },
+       [
+        0,
+        "noun 5"
+       ]
+      ],
+      [
+       {
+        "$big": "154311324640108980043252166549901340601"
+       },
+       [
+        0,
+        "noun 6"
+       ]
+      ],
+      [
+       {
+        "$big": "170777908403253027204831903224999358451"
+       },
+       [
+        0,
+        "noun 7"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "052060fed5243145b4294220f658d41e540f30019ddb5b9d1bc85d81a59109e8dcdeeadc40e20a404001000000000000000000000000000060023ab7b73a37103a2d80fe9874526bd52066dc2b5028450dc0bd9c80ceedadce0da4ce021800000000000000004c40e7f656e706220f556001fc73dfcdca187756fef8eaf4b9678f2ee809e8dcdeeadc40ec8a13d0b9bdd5b981c04315580083000000000000008009e8dcdeeadc40e6a10a04"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$set": [
+      {
+       "$big": "1"
+      },
+      {
+       "$big": "4660"
+      },
+      {
+       "$big": "18446744073709551616"
+      },
+      {
+       "$big": "18446744073709551617"
+      },
+      {
+       "$big": "170141183460469231731687303715884105733"
+      },
+      {
+       "$big": "67743901318781152046652688020001116771"
+      },
+      {
+       "$big": "154311324640108980043252166549901340601"
+      },
+      {
+       "$big": "170777908403253027204831903224999358451"
+      }
+     ]
+    }
+   ],
+   "out": "0108987f35494c116d8a10883d16b507d5032cb034b2000414000000000000000000000000000000a601f4c7a4935aab0631e35e8142296a00eee50c6000000000000000007018a101fc73dfcdca187756fef8eaf4b9678f2ee8c5c3080d6010000000000000007018a1"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    {
+     "$map": [
+      [
+       "a",
+       {
+        "$map": [
+         [
+          "b",
+          {
+           "$set": [
+            1,
+            2
+           ]
+          }
+         ]
+        ]
+       }
+      ]
+     ]
+    }
+   ],
+   "out": "050f175c1cb23875b41ead01"
+  },
+  {
+   "fn": "noun",
+   "in": [
+    [
+     "o",
+     {
+      "$map": [
+       [
+        "/a",
+        [
+         "o",
+         {
+          "$map": [
+           [
+            "rev",
+            [
+             "n",
+             "3"
+            ]
+           ],
+           [
+            "id",
+            [
+             "s",
+             "0v1"
+            ]
+           ]
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   ],
+   "out": "c1df05fe25dc64014faecc1edc0d9db3c0a79183cf81066317a7432803"
+  }
+ ]
+}

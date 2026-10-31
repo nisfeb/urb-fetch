@@ -1,0 +1,543 @@
+{
+ "about": "urb.go's deUrb(url): {ship, rel} for a page the gateway reads, or \"\u003cstatus\u003e \u003cmessage\u003e\"",
+ "cases": [
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod"
+   ],
+   "out": {
+    "rel": [
+     "index"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/"
+   ],
+   "out": {
+    "rel": [
+     "index"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/site/"
+   ],
+   "out": {
+    "rel": [
+     "site"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~sampel-palnet/site/"
+   ],
+   "out": {
+    "rel": [
+     "site"
+    ],
+    "ship": "~sampel-palnet"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/notes/2026/intro"
+   ],
+   "out": {
+    "rel": [
+     "notes",
+     "2026",
+     "intro"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/n/notes"
+   ],
+   "out": {
+    "rel": [
+     "notes"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~sampel-palnet/n/notes"
+   ],
+   "out": {
+    "rel": [
+     "notes"
+    ],
+    "ship": "~sampel-palnet"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "https://example.com"
+   ],
+   "error": "400 not an urb:// url: https://example.com"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://notaship/x"
+   ],
+   "error": "400 no ship in urb://notaship/x"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~notaship/x"
+   ],
+   "error": "400 no ship in urb://~notaship/x"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/x/foo"
+   ],
+   "error": "404 /x/ is not an urb:// mount"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/p/counter"
+   ],
+   "error": "501 /p/ addresses read the publisher's tree, which this gateway does not do"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/p"
+   ],
+   "error": "501 /p/ addresses read the publisher's tree, which this gateway does not do"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/t/apps/x"
+   ],
+   "error": "501 /t/ addresses read the publisher's tree, which this gateway does not do"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/t"
+   ],
+   "error": "501 /t/ addresses read the publisher's tree, which this gateway does not do"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/k/user/prefs"
+   ],
+   "error": "501 /k/ addresses read the publisher's tree, which this gateway does not do"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/k"
+   ],
+   "error": "501 /k/ addresses read the publisher's tree, which this gateway does not do"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/x"
+   ],
+   "error": "404 /x/ is not an urb:// mount"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/Caps"
+   ],
+   "error": "400 bad path in urb://~zod/Caps"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/a//b"
+   ],
+   "error": "400 bad path in urb://~zod/a//b"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/x\u0001"
+   ],
+   "error": "400 bad path in urb://~zod/x\u0001"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/a b"
+   ],
+   "error": "400 bad path in urb://~zod/a b"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/%41"
+   ],
+   "error": "400 bad path in urb://~zod/%41"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/é"
+   ],
+   "error": "400 bad path in urb://~zod/é"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum"
+   ],
+   "out": {
+    "rel": [
+     "forum"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/"
+   ],
+   "out": {
+    "rel": [
+     "forum"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/b"
+   ],
+   "error": "501 urb://~zod/forum/b is a lattice forum board, which this gateway does not read"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/b/"
+   ],
+   "error": "501 urb://~zod/forum/b/ is a lattice forum board, which this gateway does not read"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/test/0"
+   ],
+   "error": "501 urb://~zod/forum/test/0 is a lattice forum board, which this gateway does not read"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/test/012"
+   ],
+   "out": {
+    "rel": [
+     "forum",
+     "test",
+     "012"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/test/12"
+   ],
+   "error": "501 urb://~zod/forum/test/12 is a lattice forum board, which this gateway does not read"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/test/1.000"
+   ],
+   "error": "501 urb://~zod/forum/test/1.000 is a lattice forum board, which this gateway does not read"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/test/1000"
+   ],
+   "out": {
+    "rel": [
+     "forum",
+     "test",
+     "1000"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/test/1/more"
+   ],
+   "out": {
+    "rel": [
+     "forum",
+     "test",
+     "1",
+     "more"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/test/9.007.199.254.740.991"
+   ],
+   "error": "501 urb://~zod/forum/test/9.007.199.254.740.991 is a lattice forum board, which this gateway does not read"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/test/9.007.199.254.740.993"
+   ],
+   "error": "501 urb://~zod/forum/test/9.007.199.254.740.993 is a lattice forum board, which this gateway does not read"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/test/x"
+   ],
+   "out": {
+    "rel": [
+     "forum",
+     "test",
+     "x"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/n/forum/b"
+   ],
+   "out": {
+    "rel": [
+     "forum",
+     "b"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/Bad"
+   ],
+   "error": "400 bad path in urb://~zod/forum/Bad"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/q/x"
+   ],
+   "error": "404 /q/ is not an urb:// mount"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/.."
+   ],
+   "out": {
+    "rel": [
+     ".."
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/."
+   ],
+   "error": "404 /./ is not an urb:// mount"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/~nec"
+   ],
+   "out": {
+    "rel": [
+     "~nec"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/a.b-c_d~e"
+   ],
+   "out": {
+    "rel": [
+     "a.b-c_d~e"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~ZOD/x"
+   ],
+   "error": "400 no ship in urb://~ZOD/x"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod-nec/x"
+   ],
+   "error": "400 no ship in urb://~zod-nec/x"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~doznec-dozzod/x"
+   ],
+   "error": "404 /x/ is not an urb:// mount"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~sampel-palnet-sampel-palnet/x"
+   ],
+   "error": "404 /x/ is not an urb:// mount"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~"
+   ],
+   "error": "400 no ship in urb://~"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://"
+   ],
+   "error": "400 no ship in urb://"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "URB://~zod"
+   ],
+   "error": "400 not an urb:// url: URB://~zod"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb:/~zod"
+   ],
+   "error": "400 not an urb:// url: urb:/~zod"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod?x"
+   ],
+   "error": "400 no ship in urb://~zod?x"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/x?y"
+   ],
+   "error": "400 bad path in urb://~zod/x?y"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/x#y"
+   ],
+   "error": "400 bad path in urb://~zod/x#y"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod//"
+   ],
+   "out": {
+    "rel": [
+     "index"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/index"
+   ],
+   "out": {
+    "rel": [
+     "index"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/n"
+   ],
+   "out": {
+    "rel": [],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/n/"
+   ],
+   "out": {
+    "rel": [],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/n/index"
+   ],
+   "out": {
+    "rel": [
+     "index"
+    ],
+    "ship": "~zod"
+   }
+  }
+ ]
+}

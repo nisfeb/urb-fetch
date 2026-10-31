@@ -1,0 +1,1557 @@
+{
+ "about": "wasm/mesa.mjs's renderAs(mark, body) and looksHtml(body); urb.go's renderAs and looksHTML give the same (no mark is \"\" there)",
+ "cases": [
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "# x"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "<p>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "  <!doctype html>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "\n <p>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    " <b>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "﻿<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "<x>"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "\u000b<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "\f<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "　<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    ""
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "x"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    {
+     "$u": 1
+    },
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "# x"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "<p>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "  <!doctype html>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "\n <p>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    " <b>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "﻿<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "<x>"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "\u000b<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "\f<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "　<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    ""
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "x"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    null,
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "# x"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "<p>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "  <!doctype html>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "\n <p>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    " <b>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "﻿<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "<x>"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "\u000b<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "\f<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "　<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    ""
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "x"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "# x"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "<p>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "  <!doctype html>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "\n <p>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    " <b>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "﻿<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "\u000b<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "\f<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "　<x>"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    ""
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "x"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "# x"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "<p>"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "  <!doctype html>"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "\n <p>"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    " <b>"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "﻿<x>"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "<x>"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "\u000b<x>"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "\f<x>"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "　<x>"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    ""
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "x"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "# x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "<p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "  <!doctype html>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "\n <p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    " <b>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "﻿<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "\u000b<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "\f<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "　<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    ""
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "# x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "<p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "  <!doctype html>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "\n <p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    " <b>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "﻿<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "\u000b<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "\f<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "　<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    ""
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "# x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "<p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "  <!doctype html>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "\n <p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    " <b>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "﻿<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "\u000b<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "\f<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "　<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    ""
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "# x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "<p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "  <!doctype html>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "\n <p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    " <b>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "﻿<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "\u000b<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "\f<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "　<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    ""
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "# x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "<p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "  <!doctype html>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "\n <p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    " <b>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "﻿<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "\u000b<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "\f<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "　<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    ""
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "del",
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "# x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "<p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "  <!doctype html>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "\n <p>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    " <b>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "﻿<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "\u000b<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "\f<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "　<x>"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    ""
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "GMI",
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "# x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "<p>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "  <!doctype html>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "\n <p>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    " <b>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "﻿<x>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "<x>"
+   ],
+   "out": false
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "\u000b<x>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "\f<x>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "　<x>"
+   ],
+   "out": true
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    ""
+   ],
+   "out": false
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "                                                                                                                                                                                                                                                               <"
+   ],
+   "out": true
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "                                                                                                                                                                                                                                                                <"
+   ],
+   "out": false
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<"
+   ],
+   "out": true
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀<"
+   ],
+   "out": false
+  }
+ ]
+}

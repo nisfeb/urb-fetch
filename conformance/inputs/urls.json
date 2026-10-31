@@ -1,0 +1,11 @@
+["urb://~zod", "urb://~zod/", "urb://~zod/site/", "urb://~sampel-palnet/site/", "urb://~zod/notes/2026/intro", "urb://~zod/n/notes",
+ "urb://~sampel-palnet/n/notes", "https://example.com", "urb://notaship/x", "urb://~notaship/x", "urb://~zod/x/foo",
+ "urb://~zod/p/counter", "urb://~zod/p", "urb://~zod/t/apps/x", "urb://~zod/t", "urb://~zod/k/user/prefs", "urb://~zod/k",
+ "urb://~zod/x", "urb://~zod/Caps", "urb://~zod/a//b", "urb://~zod/x\u0001", "urb://~zod/a b", "urb://~zod/%41", "urb://~zod/é",
+ "urb://~zod/forum", "urb://~zod/forum/", "urb://~zod/forum/b", "urb://~zod/forum/b/", "urb://~zod/forum/test/0", "urb://~zod/forum/test/012",
+ "urb://~zod/forum/test/12", "urb://~zod/forum/test/1.000", "urb://~zod/forum/test/1000", "urb://~zod/forum/test/1/more",
+ "urb://~zod/forum/test/9.007.199.254.740.991", "urb://~zod/forum/test/9.007.199.254.740.993", "urb://~zod/forum/test/x",
+ "urb://~zod/n/forum/b", "urb://~zod/forum/Bad", "urb://~zod/q/x", "urb://~zod/..", "urb://~zod/.", "urb://~zod/~nec",
+ "urb://~zod/a.b-c_d~e", "urb://~ZOD/x", "urb://~zod-nec/x", "urb://~doznec-dozzod/x", "urb://~sampel-palnet-sampel-palnet/x",
+ "urb://~", "urb://", "URB://~zod", "urb:/~zod", "urb://~zod?x", "urb://~zod/x?y", "urb://~zod/x#y", "urb://~zod//",
+ "urb://~zod/index", "urb://~zod/n", "urb://~zod/n/", "urb://~zod/n/index"]
