@@ -1076,9 +1076,17 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       poke(her, flowTo(her), 'grubbery', 'grubbery-transfer', messages.snap(wire, dest, id, snap, data));
       return;
     }
-    if (f && (keepers.has(k) || keepers.size < MAX_KEEPERS)) {
-      keepers.set(k, { ship, wire: segments(wire), folder: at[0], name: at[1] });
-      keepersChanged([...keepers.values()]);
+    //  Only a file with something in it is kept, so one ship can't fill
+    //  every slot with names we never published: a keep of one that isn't
+    //  there (not yet, or no longer) gets its first wave and no news. A
+    //  keep held already and unchanged isn't saved again, so a repeated
+    //  keep costs no write.
+    if (f && f.value !== undefined && (keepers.has(k) || keepers.size < MAX_KEEPERS)) {
+      const kept = { ship, wire: segments(wire), folder: at[0], name: at[1] };
+      if (JSON.stringify(keepers.get(k)) !== JSON.stringify(kept)) {
+        keepers.set(k, kept);
+        keepersChanged([...keepers.values()]);
+      }
     }
     //  the first wave answers the keep, even for nothing
     poke(her, flowTo(her), 'grubbery', 'grubbery-intake', messages.intake(wire, dest, waveOf(f, at?.[1])));
@@ -1249,8 +1257,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       // Serve our files to other ships' grubbery: file(folder, name) gives
       // {mark: [path, name], value, rev, at} (at in ms; no value while there
       // is nothing there, not yet or no longer), or null for a file we don't
-      // serve. Each keep is kept until its ship drops it: saved, the keeps
-      // the last run handed onKeepers, which hears every change.
+      // serve. Each keep of a file with something in it is kept until its
+      // ship drops it: saved, the keeps the last run handed onKeepers,
+      // which hears every change.
       serve(file, saved = [], onKeepers = () => {}) {
         files = file;
         keepers = new Map(saved.map(k => [`${k.ship} ${k.folder} ${k.name}`, k]));
