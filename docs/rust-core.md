@@ -290,6 +290,38 @@ The hostile vectors' errors are matched as text, so the Rust must give the JS's 
 
 **CI** runs check.mjs (with the molds), the JS tests, every trace's replay, the vectors in the JS, the extension and the Go, and `go test`. With `REQUIRE_ALL` set, as CI sets it, a test that would skip for want of a checkout fails instead. `rerecord.yml` records the traces again on a self-hosted runner labelled `fleet`, daily and by hand, and fails on a drift. `wasm/drift.mjs` compares the calls, results and events, with dates, ids and a mined comet's name masked, and what each trace put on the wire, by kind: every grubbery message by mark and tag, keens, yawns and served scries. No such runner is registered yet, so its first job fails with an error that says nothing was recorded: set the repository variable `FLEET_RUNNER` to `yes` once one is. `traces/rerecord.sh` runs it by hand.
 
+## M2's findings (2026-10-31)
+
+**The `urb` crate** is `core/urb`. `noun.rs` has the owned `Noun` (one libmesa reference, given up on drop) and the borrowed `NounRef<'a>`, which can't outlive its owner, nor, through `with_borrowed`, the hook that lent it (doc tests check both don't compile). Neither is `Send`. Every owned noun is counted per thread (`urb::alive()`), and every test ends with it at zero. `Noun::of` builds a `Value` as mesa.mjs's `noun()` does, maps and sets as its treap. `codec.rs` holds mesa.mjs's decoders with their caps and messages, `text.rs` uv and da, and `js.rs` what the JS did for free: TextDecoder's UTF-8 (a leading byte-order mark dropped), `Number()` of text, and a JS object's key order. `mesa-sys` now binds libmesa's private `sha.h` too, for `mesa_shaf`, which `+sham` is made of.
+
+**The vectors.** `cargo test -p urb --test vectors` runs `nouns.json` and `hash.json` whole and the 43 cases of `decoders.json` and `hostile-nouns.json` that are mesa.mjs's own decoders: 245 cases, all passing, natively and under WASI. Each file's count is checked, so a case can't be skipped. Furum's and forum's reads (M5), the messages (M3, M4), deUrb (M3) and the renderers (M5b) wait for their milestones. libmesa's jam gives jam.mjs's bytes for every vector.
+
+**The property tests** (`tests/props.rs`) draw from a printed seed (`URB_SEED`). Against vere: 600 random maps and sets, with keys of every kind we use and maps nested in them, up to 400 keys, hash as `+malt` and `+silt` build them, and 200 each of mug, uv and da agree. Against the JS (`tests/oracle.mjs`, which needs `wasm/build/mesa.wasm`): 2,000 random values, with short arrays and repeated Map keys, make mesa.mjs's jam or its TypeError; 2,000 byte strings read as a TextDecoder reads them; 4,000 strings give the same `Number()`. With `REQUIRE_ALL` set, a missing vere or node fails.
+
+What they and the vectors taught:
+
+- **Port the JS's accidents too.** A cord's text drops a leading byte-order mark (TextDecoder), so `﻿o` reads as the tag `o`. `$json`'s `%n` is `Number()` of the text, so `0x10` is 16 and ` 12 ` is 12. An object's keys come out with array indices first. A Map with two equal array keys has both in its treap. Each is ported, and checked.
+- **serde_json's default float parsing is not exact,** so the tests compare numbers with `float_roundtrip` on. Node's `Number()` rounds hex to nearest, ties to even, as `js.rs` does.
+- **libmesa's `mesa_eq` walks a noun as a tree,** so comparing two equal copies of a shared noun takes as long as its tree is big, and jam's dedup compares with it. The first fuzz run found this (the cue target's round trip). It is why every noun from another ship is measured before anything walks it, as the JS does; `tangText` measures nothing itself, so its caller measures, as `on_poke` does.
+
+**Fuzzing.** `core/urb/fuzz` has a `cargo fuzz` target for every decoder: cue, measure, list, entries, segments (with pathOf and knot), json (with `Number()` and TextDecoder), tang, tangText, fileOf, ballOf and ship. An input is a jam or a program for a small stack machine that makes shared cells vast as trees, the tags the decoders look for, long lists and big atoms. Each checks it never panics, that every error is a hostile-noun error, and that no noun is left alive. `fuzz/seed.mjs` seeds them from the vectors. Every target ran for 21 minutes twice, with AddressSanitizer and without, and found nothing past the cue round trip above:
+
+| Target | Runs, with ASan | Runs, without |
+|---|---|---|
+| cue | 8,226,052 | 28,053,135 |
+| measure | 69,675 | 82,335 |
+| list | 22,853 | 88,537 |
+| entries | 44,250 | 147,460 |
+| segments | 35,978 | 162,538 |
+| json | 96,835 | 353,536 |
+| tang | 54,766 | 190,187 |
+| tangText | 42,975 | 199,334 |
+| fileOf | 12,647 | 137,576 |
+| ballOf | 84,447 | 202,564 |
+| ship | 65,979 | 166,959 |
+
+A run is slow (tens to hundreds a second) because a hostile input makes a decoder walk to its 200,000 cap before it refuses. The slowest is the hostile ballOf vector of over 200,000 trees and files: 0.8 s in a release build, about 6 s under ASan, since each file's path is copied, as the JS's `[...at, name]` copies it. It is bounded, but on a loaded machine it passed libFuzzer's 10 s limit, so the targets run with a 30 s one. CI runs each for a minute.
+
 ## Testing beyond the traces
 
 - **The fake fleet, automated.** One script resets the furum set to `hus-lattice` and runs the stage 3, furum and lattice forum checks against the JS engine and then the Rust engine, with the same assertions. Run it for every milestone from M3 on.
