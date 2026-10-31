@@ -6,7 +6,7 @@
 //! Each is a port of `wasm/mesa.mjs`, which is the specification: where
 //! this crate would behave differently from the JS, this crate is wrong.
 
-
+pub mod codec;
 pub mod js;
 pub mod noun;
 pub mod text;
