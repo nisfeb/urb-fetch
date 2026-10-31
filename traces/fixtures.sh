@@ -7,7 +7,8 @@
 #         know entries fleet/granted and fleet/withheld
 #         group m1c: trace 3's moon may peek fleet/granted and the page
 #         fleet-check's code grub (a group, not /share-file: its notice
-#         to a ship that never ran leaves ~hus unanswering it after)
+#         to a ship that never sent ~hus anything goes over ames, and
+#         ~hus then drops that ship's mesa; docs/rust-core.md)
 #   ~rup  furum board m1c (poster by default), post 0, comment 0
 #
 #   traces/fixtures.sh
