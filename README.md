@@ -122,8 +122,9 @@ Don't point `URB_FETCH_STATE` at a folder a running gateway is using. `URB_FETCH
 - `mesa.mjs` runs the engine as a comet and reads pages the way the gateway does. `read` gives each page's `mark` with its body, and `renderAs(mark, body)` says how to render it: `html` (sandboxed), `md`, `gmi` or `text`, as the gateway does. It works in Node and in a browser. Its host supplies a transport for datagrams and a store for the comet and the engine's state. Each commit's changes are saved before the datagrams it released go out.
 - `host.mjs` reads one page from Node, and `node.mjs` has what Node's command lines share: the state folder, UDP, and the options that pick who runs.
 - `furum.mjs` talks to [furum](https://github.com/nisfeb/furum) boards on another ship: it reads a board's posts, comments and votes, and posts, comments and votes through the host's public `inbox.sig`. `furum-cli.mjs` drives it from Node.
+- `forum.mjs` reads [lattice](https://github.com/nisfeb/lattice)'s forum boards on another ship, as lattice release 81 does: a board and a thread by two deep peeks of the board's granted `pub` and `content` directories, and posts, comments and votes poked at the host's `/forum.sig` as `[/lattice %forum-action]`. A host's refusal comes back as a note, `[host board reason at]`, which `onNote` hears. `deUrb` reads `urb://~host/forum/<board>[/<post>]` as mount `forum`, as lattice's `+de-urb` does. `forum-cli.mjs` drives it from Node.
 - `pub.mjs` publishes pages from the engine, each under its format's mark as lattice 74 and later do (`pub-cli.mjs` takes it from the file's extension: `.md`, `.html`, `.txt`, `.js`, `.css`, else gemtext), so lattice readers on other ships open them at `urb://~our-ship/<name>`. It lays them out as lattice does: `/pub/index` and `/pub/revs` and each page's vault file answer grubbery peeks, a keep on a page's vault file hears its edits, and each revision's body answers remote scry at an unguessable id. `pub-cli.mjs` publishes and serves from Node.
-- `check.mjs` checks serving with no ship. vere's `urbit eval` computes the hashes, maps, ids and dates that other ships check, and the engine must agree. Then two engines in one process publish and read pages, edits and removals.
+- `check.mjs` checks serving with no ship. vere's `urbit eval` computes the hashes, maps, ids and dates that other ships check, and the engine must agree. It clams every forum action `forum.mjs` sends against lattice's own `action:ft`, `test/lattice-forum-types.hoon`, copied from release 81. Then two engines in one process publish and read pages, edits and removals.
 - `test/` holds the unit tests, run with `node --test wasm/test/` after `build.sh`. `open` takes optional `now` and `entropy` hooks, the clock and the random bytes, for tests and recordings: with both fixed, a session sends the same datagrams every time.
 - Every noun from another ship is read under caps, written at the top of `mesa.mjs`'s hostile nouns section: 200,000 cells counted as a tree, as lattice's `+small-noun` does, `$json` 64 deep, numbers 32 bytes, paths 64 segments. A noun past one, or of the wrong shape, fails the read that waits on it with an `UrbError`; `test/hostile.test.mjs` sends them by hand.
 
@@ -152,6 +153,14 @@ The pages, and the keeps of readers following them, are kept in `pages.json` in 
 ```
 node wasm/furum-cli.mjs --fake ~dozbud-dozzod-dozhus ~rup urbtest --post 'Hello' --body 'From a moon in wasm'
 ```
+
+And lattice's forums, on the same set with lattice 81 on `~hus` (`fleet reset furum hus-lattice`, board `m1btest`):
+
+```
+node wasm/forum-cli.mjs --fake ~sampel-sampel-dozzod-dozhus urb://~hus/forum/m1btest --post 'Hello' --body 'From a moon in wasm'
+```
+
+A fake moon the host met before must keep its state folder (`--state`): a fresh one under the same name is a replay to the host.
 
 ### The relay
 

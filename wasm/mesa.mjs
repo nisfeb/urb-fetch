@@ -50,6 +50,7 @@ const PEEK_TIMEOUT = 30_000; // +remote-timeout
 const ROLLER = 'https://roller.urbit.org/v1/azimuth';
 const STARS = 'https://bootstrap.urbit.org/comet-stars.jam';
 const KNOT = /^[a-z0-9~._-]+$/;
+const UD = /^(0|[1-9][0-9]{0,2}(\.[0-9]{3})*)$/;   // an @ud as +slaw reads it: 1.000, never 1000
 const NONE = 2n ** 64n - 1n;
 const ACK = 0;
 const LANE_GALAXY = 1, LANE_IP = 2;
@@ -82,7 +83,10 @@ export const da = ms => ((BigInt(Math.floor(ms / 1000)) + 0x8000000cce9e0d80n) <
 // mount]. Mount 'n' is a published page (rel under the pub vault); 'k' a
 // know entry (rel is its key); 't' a file anywhere in the publisher's
 // tree (rel is its absolute path); 'p' one of lattice's live pages. All
-// but 'n' are private: the publisher grants who may read them.
+// but 'n' are private: the publisher grants who may read them. Mount
+// 'forum' is a forum board, rel [board] or [board, post] with post a
+// number (forum.mjs reads it): since release 73 forum/<board>[/<post>]
+// names a board, and any other shape under forum/ is still a page.
 export function deUrb(url) {
   if (!url.startsWith('urb://')) throw new UrbError('not an urb:// url');
   const rest = url.slice(6);
@@ -94,6 +98,10 @@ export function deUrb(url) {
   if (!tail) return [who, ['index'], 'n'];
   const segs = tail.split('/');
   if (!segs.every(s => KNOT.test(s))) throw new UrbError(`bad path in ${url}`);
+  if (segs[0] === 'forum' && segs.length > 1) {
+    if (segs.length === 2) return [who, [segs[1]], 'forum'];
+    if (segs.length === 3 && UD.test(segs[2])) return [who, [segs[1], Number(segs[2].replaceAll('.', ''))], 'forum'];
+  }
   if (segs[0].length > 1) return [who, segs, 'n'];     // frozen legacy form
   if ('nkpt'.includes(segs[0])) return [who, segs.slice(1), segs[0]];
   throw new UrbError(`/${segs[0]}/ is not a mount`);
@@ -232,6 +240,10 @@ function segments(p) {
   return out;
 }
 const pathOf = p => '/' + segments(p).join('/');
+const knot = s => {
+  if (s.size > MAX_KNOT) throw hostile(`has a path segment over ${MAX_KNOT} bytes`);
+  return s.text();
+};
 
 // a $json noun as JS
 function json(n) {
@@ -295,9 +307,40 @@ function fileOf(snap, silo, conv) {
   return val ? conv(val) : null;   // convert now: nouns are borrowed
 }
 
+// The files of a directory's %snap, deep: [[path, noun]], each path
+// relative to it, name last; null if the silo lacks its tree. A tree
+// ject is [%tree nek gain bang fil=(map @ta jobe) dir=(map @ta [jobe
+// weir])]. A tree reached twice, which hashes can fake, is read once,
+// and one deeper than MAX_SEGS is refused. conv takes the list.
+function ballOf(snap, silo, conv) {
+  const pace = snap.tail.head;
+  const top = ['firm', 'temp'].includes(pace.head.text()) ? unit(pace.tail) : null;
+  if (!top) return null;
+  const jects = new Map(entries(silo.tail).map(e => [e.head.int(), e.tail.tail]));
+  const nouns = new Map(entries(silo.head).map(e => [e.head.int(), e.tail.tail]));
+  const out = [], seen = new Set();
+  const walk = (jobe, at) => {
+    const ject = jects.get(jobe);
+    if (!ject || ject.head.text() !== 'tree' || seen.has(jobe)) return false;
+    if (at.length > MAX_SEGS) throw hostile(`has a directory over ${MAX_SEGS} deep`);
+    seen.add(jobe);
+    const fil = ject.tail.tail.tail.tail.head, dir = ject.tail.tail.tail.tail.tail;
+    for (const e of entries(fil)) {
+      const leaf = jects.get(e.tail.int());
+      if (!leaf || leaf.head.text() !== 'leaf') continue;
+      const val = nouns.get(leaf.tail.head.int());
+      if (val) out.push([[...at, knot(e.head)], val]);
+    }
+    for (const e of entries(dir)) walk(e.tail.head.int(), [...at, knot(e.head)]);
+    return true;
+  };
+  if (!walk(top.int(), [])) return null;
+  return conv(out);   // convert now: nouns are borrowed
+}
+
 // the decoders of other ships' nouns, for tests: each takes any noun
 // with isCell, head, tail, size, bytes(), text() and int()
-export const decoders = { measure, list, entries, unit, cord, segments, pathOf, json, tang, tangText, fileOf };
+export const decoders = { measure, list, entries, unit, cord, segments, pathOf, json, tang, tangText, fileOf, ballOf };
 
 // ------------------------------------------------------------- the relay
 
@@ -674,11 +717,16 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     return flows.get(k);
   }
 
-  // grubbery's cross-ship peek of one file: [dest-dir, name]
-  function peek(her, folder, name, conv) {
+  // grubbery's cross-ship peek of one file: [dest-dir, name], or with
+  // name null of the directory folder and all under it (a deep peek, as
+  // lattice's +peek-remote-wait). conv takes the file's noun, or the
+  // directory's files as [[path, noun]]. Null after wait ms.
+  function peek(her, folder, name, conv, wait = PEEK_TIMEOUT) {
     const wire = `/urb-fetch/${nonce}/${++wires}`;
+    const lane = name === null ? [false, path(folder)] : [true, path(folder), name];
     return new Promise((resolve, reject) => {
-      const st = { conv, snap: null, done: false, her: `${her[0]}:${her[1]}` };
+      const st = { read: name === null ? (snap, silo) => ballOf(snap, silo, conv) : (snap, silo) => fileOf(snap, silo, conv),
+                   snap: null, done: false, her: `${her[0]}:${her[1]}` };
       const settle = f => {
         if (st.done) return;
         st.done = true;
@@ -689,12 +737,11 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       };
       st.finish = v => settle(() => resolve(v));   // null: refused, nothing there, or no answer
       st.fail = e => settle(() => reject(e));      // an answer we could not read
-      st.timer = setTimeout(() => st.finish(null), PEEK_TIMEOUT);
+      st.timer = setTimeout(() => st.finish(null), wait);
       peeks.set(wire, st);
       txn(() => {
         st.bone = flowTo(her);
-        poke(her, st.bone, 'grubbery', 'grubbery-load',
-             [[path(wire), [true, path(folder), name]], ['peek', null, true]]);
+        poke(her, st.bone, 'grubbery', 'grubbery-load', [[path(wire), lane], ['peek', null, true]]);
       });
     });
   }
@@ -793,7 +840,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       for (const st of wants) {
         let v;
         try {
-          v = tag === 'data' ? fileOf(st.snap, r, st.conv) : null;
+          v = tag === 'data' ? st.read(st.snap, r) : null;
         } catch (e) {
           st.fail(e);
           continue;
@@ -815,7 +862,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
         poke(her, st.bone, 'grubbery', 'grubbery-transfer', [wireN, 'want', r.head, id]);
         return;
       }
-      st.finish(snap ? fileOf(snap, data, st.conv) : null);
+      st.finish(snap ? st.read(snap, data) : null);
       return;
     }
     st.finish(null);   // %veto, %miss
@@ -1008,6 +1055,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     const [who, rel, mount] = deUrb(url);
     const her = shipOf(who);
     if (mount === 'p') throw new UrbError(`${url} is a live Lattice page, which only Lattice shows`);
+    if (mount === 'forum') throw new UrbError(`${url} is a forum board: forum.mjs reads it`);
     if (mount === 'k') {
       if (!rel.length) throw new UrbError(`${url} names no know entry`);
       return readPrivate(her, who, url, `${await base(her, who)}/know/vault/${rel.join('/')}`, 'entry');
@@ -1079,7 +1127,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     // grubbery on other ships: read a file, poke a grub, and hear grubs
     // that poke ours (f({from, to, mark, noun}), during the hook)
     grub: {
-      peek: (ship, folder, name, conv) => peek(shipOf(ship), folder, name, conv),
+      // name null peeks the directory folder, deep: conv([[path, noun]]),
+      // each path relative to it, name last. wait is ms (the default 30 s)
+      peek: (ship, folder, name, conv, wait) => peek(shipOf(ship), folder, name, conv, wait),
       poke: (ship, folder, name, mark, value) => grubPoke(shipOf(ship), folder, name, mark, value),
       onInbox: f => { inbox = f; },
       // Serve our files to other ships' grubbery: file(folder, name) gives
