@@ -20,13 +20,19 @@ jobs:
         run: core/mesa-sys/fetch-deps.sh
       - name: the toolchain
         working-directory: core
-        # rust-toolchain.toml names the version, targets and components
-        run: rustup toolchain install
+        # rust-toolchain.toml names the version, targets and components;
+        # the checks stop the job if cargo is any other toolchain's
+        run: |
+          rustup toolchain install
+          want=$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)
+          rustc --version | grep -q "^rustc $want " || { rustc --version; exit 1; }
+          rustup target list --installed | grep -qx wasm32-wasip1
       - name: fmt and clippy
         working-directory: core
         run: |
           cargo fmt --check
           cargo clippy --all-targets -- -D warnings
+          cargo clippy --all-targets --target wasm32-wasip1 -- -D warnings
       - name: cargo test
         working-directory: core
         run: |
