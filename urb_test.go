@@ -7,6 +7,9 @@ import (
 	"testing"
 )
 
+// zodLink is the gateway's linker for a page at urb://~zod/p.
+var zodLink = pageLink("urb://~zod/p", "8475")
+
 // The cases of lattice's tests/lib/lattice-urls.hoon that this gateway
 // serves, and the ones it refuses.
 func TestDeUrb(t *testing.T) {
@@ -60,9 +63,9 @@ func TestRender(t *testing.T) {
 		t.Errorf("rewriteHTML: %s", got)
 	}
 	g := renderGemtext("# Hi <there>\n=> urb://~zod/a A link\n* one\n* two\n```\n<pre>\n```\n> quote",
-		"t", func(s string) string { return strings.Replace(s, "urb://~zod", "http://gw", 1) })
-	for _, want := range []string{"<h1>Hi &lt;there&gt;</h1>", `<a href="http://gw/a">A link</a>`,
-		"<ul>\n<li>one</li>\n<li>two</li>\n</ul>", "<pre>&lt;pre&gt;\n</pre>", "<blockquote>quote</blockquote>"} {
+		"t", zodLink)
+	for _, want := range []string{"<h1>Hi &lt;there&gt;</h1>", `<a href="http://zod.urb.localhost:8475/a">A link</a>`,
+		"<ul>\n<li>one</li>\n<li>two</li>\n</ul>", "<pre>\n&lt;pre&gt;</pre>", "<blockquote>quote</blockquote>"} {
 		if !strings.Contains(g, want) {
 			t.Errorf("renderGemtext lacks %q in %s", want, g)
 		}
@@ -103,14 +106,14 @@ func TestRenderMarkdown(t *testing.T) {
 		"- one\n- [two](urb://~zod/b)\n\n1. first\n2. second\n\n> quoted\n\n---\n\n" +
 		"```\n<script>alert(1)</script>\n```\n\n<script>alert(2)</script>\n\n" +
 		"[bad](javascript:alert(3)) [web](https://example.com/a?b=1&c=2) [rel](notes/intro)"
-	g := renderMarkdown(src, "t", func(s string) string { return strings.Replace(s, "urb://~zod", "http://gw", 1) })
+	g := renderMarkdown(src, "t", zodLink)
 	for _, want := range []string{
 		"<h1>Title &lt;x&gt;</h1>",
 		"<p>Some <em>em</em> and <strong>strong</strong> and <code>&lt;code&gt;</code>, wrapped.</p>",
-		"<ul>\n<li>one</li>\n<li><a href=\"http://gw/b\">two</a></li>\n</ul>",
+		"<ul>\n<li>one</li>\n<li><a href=\"http://zod.urb.localhost:8475/b\">two</a></li>\n</ul>",
 		"<ol>\n<li>first</li>\n<li>second</li>\n</ol>",
 		"<blockquote>quoted</blockquote>", "<hr>",
-		"<pre>&lt;script&gt;alert(1)&lt;/script&gt;\n</pre>",
+		"<pre>\n&lt;script&gt;alert(1)&lt;/script&gt;</pre>",
 		"<p>&lt;script&gt;alert(2)&lt;/script&gt;</p>",
 	} {
 		if !strings.Contains(g, want) {
@@ -120,10 +123,11 @@ func TestRenderMarkdown(t *testing.T) {
 	if strings.Contains(g, "<script") {
 		t.Errorf("renderMarkdown let markup through: %s", g)
 	}
-	// with the gateway's own link rewriting: only safe targets are links
+	// only safe targets are links, and a relative one is on the page's ship
 	g = renderMarkdown("[bad](javascript:alert(3)) [web](https://example.com/a?b=1&c=2) [rel](notes/intro)",
-		"t", func(s string) string { return s })
-	for _, want := range []string{"bad", `<a href="https://example.com/a?b=1&amp;c=2">web</a>`, `<a href="notes/intro">rel</a>`} {
+		"t", zodLink)
+	for _, want := range []string{"bad", `<a href="https://example.com/a?b=1&amp;c=2" rel="noopener noreferrer">web</a>`,
+		`<a href="http://zod.urb.localhost:8475/notes/intro">rel</a>`} {
 		if !strings.Contains(g, want) {
 			t.Errorf("renderMarkdown lacks %q in %s", want, g)
 		}
@@ -135,7 +139,7 @@ func TestRenderMarkdown(t *testing.T) {
 
 func TestRenderText(t *testing.T) {
 	g := renderText("<b>a</b>\n  b", "t")
-	if !strings.Contains(g, "<pre>&lt;b&gt;a&lt;/b&gt;\n  b</pre>") {
+	if !strings.Contains(g, "<pre>\n&lt;b&gt;a&lt;/b&gt;\n  b</pre>") {
 		t.Errorf("renderText: %s", g)
 	}
 }
@@ -149,8 +153,8 @@ func TestGatewayRender(t *testing.T) {
 		{"gmi", "<!doctype html><p>old", sandbox, "<p>old"},
 		{"gmi", "# old gemtext\n=> urb://~zod/y y", "default-src 'none'", `<a href="http://zod.urb.localhost:8475/y">y</a>`},
 		{"md", "# md\n[z](urb://~zod/z)\n<script>x</script>", "default-src 'none'", `<a href="http://zod.urb.localhost:8475/z">z</a>`},
-		{"text", "# not a heading", "default-src 'none'", "<pre># not a heading</pre>"},
-		{"css", "a{color:red}", "default-src 'none'", "<pre>a{color:red}</pre>"},
+		{"text", "# not a heading", "default-src 'none'", "<pre>\n# not a heading</pre>"},
+		{"css", "a{color:red}", "default-src 'none'", "<pre>\na{color:red}</pre>"},
 	} {
 		csp, out := g.render("urb://~zod/p", c.mark, c.body)
 		if !strings.HasPrefix(csp, c.csp) || !strings.Contains(out, c.want) {
@@ -175,12 +179,12 @@ func TestSafeLinks(t *testing.T) {
 			t.Errorf("allowed %q", s)
 		}
 	}
-	id := func(s string) string { return s }
-	g := renderGemtext("=> //evil.example evil\n=> javascript:alert(1) js\n=> /ok fine", "t", id)
-	if strings.Contains(g, "evil.example\"") || strings.Contains(g, `href="javascript`) || !strings.Contains(g, `<a href="/ok">fine</a>`) {
+	g := renderGemtext("=> //evil.example evil\n=> javascript:alert(1) js\n=> /ok fine", "t", zodLink)
+	if strings.Contains(g, "evil.example\"") || strings.Contains(g, `href="javascript`) ||
+		!strings.Contains(g, `<a href="http://zod.urb.localhost:8475/ok">fine</a>`) {
 		t.Errorf("renderGemtext links: %s", g)
 	}
-	m := renderMarkdown("[evil](//evil.example) [back](\\\\evil.example)", "t", id)
+	m := renderMarkdown("[evil](//evil.example) [back](\\\\evil.example)", "t", zodLink)
 	if strings.Contains(m, "<a ") {
 		t.Errorf("renderMarkdown links: %s", m)
 	}
@@ -211,8 +215,7 @@ func TestSafeLinkControls(t *testing.T) {
 			t.Errorf("allowed %q", s)
 		}
 	}
-	id := func(s string) string { return s }
-	if m := renderMarkdown("[x](\x01//evil.com)", "t", id); strings.Contains(m, "<a ") {
+	if m := renderMarkdown("[x](\x01//evil.com)", "t", zodLink); strings.Contains(m, "<a ") {
 		t.Errorf("control link kept: %s", m)
 	}
 }
@@ -230,16 +233,15 @@ func TestSafeLinkSchemesAndHostile(t *testing.T) {
 			t.Errorf("allowed %q", s)
 		}
 	}
-	id := func(s string) string { return s }
-	m := renderMarkdown("[s](HTTPS://a.b) [click](javascript:alert(1)) [data](data:text/html;base64,PHNjcmlwdD4=) [off](//evil.example/x)", "t", id)
-	if !strings.Contains(m, `<a href="HTTPS://a.b">s</a>`) || strings.Count(m, "<a ") != 1 {
+	m := renderMarkdown("[s](HTTPS://a.b) [click](javascript:alert(1)) [data](data:text/html;base64,PHNjcmlwdD4=) [off](//evil.example/x)", "t", zodLink)
+	if !strings.Contains(m, `<a href="https://a.b" rel="noopener noreferrer">s</a>`) || strings.Count(m, "<a ") != 1 {
 		t.Errorf("renderMarkdown: %s", m)
 	}
 }
 
 // A link's text and target are capped, so they stay text past the cap.
 func TestMarkdownLinkCaps(t *testing.T) {
-	id := func(s string) string { return s }
+	id := zodLink
 	ok := renderMarkdown("["+strings.Repeat("a", 256)+"](/"+strings.Repeat("b", 511)+")", "t", id)
 	if !strings.Contains(ok, "<a ") {
 		t.Error("link at the caps dropped")
