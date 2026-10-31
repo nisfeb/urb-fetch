@@ -32,6 +32,12 @@
 //              the ids of the %snaps we answer and a mined comet's seed;
 //              pub.mjs takes its page ids from it. With both fixed, a
 //              session's inputs decide its outputs.
+//   timers     optional: {setTimeout(f, ms) -> id, clearTimeout(id)}, every
+//              timer the engine sets (its wake, each keen, peek and poke
+//              timeout, close's wait), the globals by default
+//   fetch      optional: fetch(url, opts) for the roller's key lookups and
+//              the comet stars, the global by default. trace.mjs gives all
+//              four to record a session and replay it.
 //
 //   const urb = await open({ wasm, transport, store })
 //   const { key, body, how, mark } = await urb.read('urb://~sampel-palnet/page')
@@ -426,9 +432,13 @@ export function relayTransport(url, log = console.error) {
 // ------------------------------------------------------------- the engine
 
 const randomBytes = n => crypto.getRandomValues(new Uint8Array(n));
+const globalTimers = { setTimeout: (f, ms) => globalThis.setTimeout(f, ms), clearTimeout: t => globalThis.clearTimeout(t) };
+const globalFetch = (...a) => globalThis.fetch(...a);
 
 export async function open({ wasm, transport, store, log = console.error, env = {}, fake = false,
-                             now = Date.now, entropy = randomBytes }) {
+                             now = Date.now, entropy = randomBytes,
+                             timers = globalTimers, fetch = globalFetch }) {
+  const { setTimeout, clearTimeout } = timers;
   let X;
   const mem = () => new Uint8Array(X.memory.buffer);   // replaced when memory grows
   const imports = {
