@@ -63,7 +63,7 @@ jobs:
           submodules: true
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
       - name: tools
         run: core/ci/tools.sh "$RUNNER_TEMP/tools"
       # the extension whose renderers the vectors are of, and grubbery,
@@ -86,7 +86,7 @@ jobs:
       - name: the JS tests
         env:
           GRUBBERY: ${{ github.workspace }}/grubbery
-        run: node --test wasm/test/
+        run: node --test wasm/test/*.test.mjs
       - name: every trace, replayed into the JS
         run: node wasm/replay.mjs
       - name: the conformance vectors, in the JS and the extension
@@ -108,7 +108,7 @@ jobs:
           go-version-file: go.mod
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
       - name: tools
         run: core/ci/tools.sh "$RUNNER_TEMP/tools"
       # the conformance vectors the Go implements, its own tests, and its
