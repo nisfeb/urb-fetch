@@ -177,8 +177,15 @@ export function writeRows(rows) {
 //               (shaz eny), an @uvJ of 512 bits
 //   MAX_SEGS    64 segments in a path, each at most MAX_KNOT, 256 bytes,
 //               as libmesa caps them (PATH_MAX_SEGS, KNOT_MAX)
-//   text        an atom read as text is not capped here: libmesa takes
-//               no message over 64 MiB (ENG_MAX_MSG)
+//   MAX_BYTES   64 MiB of atoms in one noun, counted as a tree, as
+//               MAX_CELLS is: one big atom a jam backrefs at each of its
+//               places counts at each. 64 MiB is the most libmesa takes
+//               in one message (ENG_MAX_MSG), so no noun a peer sends
+//               unshared is over it. A decode that reads a noun more than
+//               once (a tank's separator, printed between each two kids,
+//               or a directory's files, a tree read at each place it is
+//               named) counts what it reads, or prints, at each reading
+//               against the same caps.
 //   shape       an atom where a cell goes, a cell where an atom goes, or
 //               a tag we don't know, is refused
 //
@@ -192,16 +199,27 @@ export const TANK_DEPTH = 32;
 export const MAX_NUMBER = 32;
 export const MAX_SEGS = 64;
 export const MAX_KNOT = 256;
+export const MAX_BYTES = 64 << 20;
 
 const hostile = what => new UrbError(`another ship's noun ${what}`);
 
-// n, once it is known to have at most cap cells as a tree
-function measure(n, cap = MAX_CELLS) {
-  let seen = 0;
+// what one decode may still read: cells and atom bytes, counted as a
+// tree, at each place they are read
+const budget = () => ({ cells: MAX_CELLS, bytes: MAX_BYTES });
+const spend = (b, bytes) => {
+  if ((b.bytes -= bytes) < 0) throw hostile(`has over ${MAX_BYTES} bytes of atoms`);
+};
+
+// n, once it is known to have at most MAX_CELLS cells and MAX_BYTES
+// bytes of atoms as a tree, spent from b
+function measure(n, b = budget()) {
   for (const todo = [n]; todo.length;) {
     const t = todo.pop();
-    if (!t.isCell) continue;
-    if (++seen > cap) throw hostile(`has over ${cap} cells`);
+    if (!t.isCell) {
+      spend(b, t.size);
+      continue;
+    }
+    if (--b.cells < 0) throw hostile(`has over ${MAX_CELLS} cells`);
     todo.push(t.tail, t.head);
   }
   return n;
@@ -271,7 +289,10 @@ function json(n) {
 function tape(t) {
   return dec.decode(Uint8Array.from([...list(t)].map(c => (c.isCell || c.size > MAX_NUMBER ? 63 : Number(c.int() & 0xffn)))));
 }
-function tankText(t, depth = 0) {
+// A rose's separator is printed between each two kids, so a long one
+// over many kids prints far more than the noun holds: what it prints
+// past the first is spent from b, a byte a character.
+function tankText(t, b, depth = 0) {
   if (depth > TANK_DEPTH || !t.isCell || t.head.isCell) return '';
   const tag = t.head.text();
   if (tag === 'leaf') return tape(t.tail);
@@ -280,19 +301,22 @@ function tankText(t, depth = 0) {
   const [sep, opn, cls] = tag === 'rose'
     ? [tape(pre.head), tape(pre.tail.head), tape(pre.tail.tail)]
     : [tape(pre.head), tape(pre.tail.head) + tape(pre.tail.tail.head), tape(pre.tail.tail.tail)];
-  return opn + [...list(t.tail.tail)].map(k => tankText(k, depth + 1)).join(sep) + cls;
+  const kids = [...list(t.tail.tail)];
+  if (kids.length > 1) spend(b, (kids.length - 1) * [...list(pre.head)].length);
+  return opn + kids.map(k => tankText(k, b, depth + 1)).join(sep) + cls;
 }
 
-// the lines of a tang
-const tangText = t => [...list(t)].map(k => tankText(k)).join('\n  ');
+// the lines of a tang, whose caller measured it
+const tangText = (t, b = budget()) => [...list(t)].map(k => tankText(k, b)).join('\n  ');
 
 // the lines of an error noun [tag tang] (a nack's naxplanation), or what
 // was wrong with it
 function tang(err) {
   try {
-    measure(err);
+    const b = budget();
+    measure(err, b);
     if (!err.isCell) return '';
-    return [err.head.isCell ? '' : err.head.text(), ...[...list(err.tail)].map(t => tankText(t))].join('\n  ');
+    return [err.head.isCell ? '' : err.head.text(), ...[...list(err.tail)].map(t => tankText(t, b))].join('\n  ');
   } catch (e) {
     if (e instanceof UrbError) return e.message;
     throw e;
@@ -319,21 +343,25 @@ function fileOf(snap, silo, conv) {
 // same contents are one ject, read at each place it is, as lattice's
 // ball holds both. A tree that holds itself, which hashes can fake, is
 // refused, and so is one deeper than MAX_SEGS, or a walk past MAX_CELLS
-// trees and files (shared trees fake a vast one). A name that is not a
-// leaf where a file goes, or not a tree where a directory goes, is
-// skipped, as one missing from the silo is. conv takes the list.
+// trees and their entries, files and directories (shared trees fake a
+// vast one). A name that is not a leaf where a file goes, or not a tree
+// where a directory goes, is skipped, as one missing from the silo is.
+// Each file's noun and the bytes of its path are spent from one budget,
+// at each place the file is: one noun named by many files, or one tree
+// at many places, counts at each. conv takes the list.
 function ballOf(snap, silo, conv) {
   const pace = snap.tail.head;
   const top = ['firm', 'temp'].includes(pace.head.text()) ? unit(pace.tail) : null;
   if (!top) return null;
   const jects = new Map(entries(silo.tail).map(e => [e.head.int(), e.tail.tail]));
   const nouns = new Map(entries(silo.head).map(e => [e.head.int(), e.tail.tail]));
-  const out = [], above = new Set();
+  const out = [], above = new Set(), b = budget();
   let work = 0;
   const count = () => {
     if (++work > MAX_CELLS) throw hostile(`has a directory of over ${MAX_CELLS} trees and files`);
   };
-  const walk = (jobe, at) => {
+  //  at: the path's segments, and their bytes
+  const walk = (jobe, at, len) => {
     const ject = jects.get(jobe);
     if (!ject || ject.head.text() !== 'tree') return false;
     if (above.has(jobe)) throw hostile('has a directory that holds itself');
@@ -346,13 +374,19 @@ function ballOf(snap, silo, conv) {
       const leaf = jects.get(e.tail.int());
       if (!leaf || leaf.head.text() !== 'leaf') continue;
       const val = nouns.get(leaf.tail.head.int());
-      if (val) out.push([[...at, knot(e.head)], val]);
+      if (!val) continue;
+      const name = knot(e.head);
+      spend(b, len + e.head.size);
+      out.push([[...at, name], measure(val, b)]);
     }
-    for (const e of entries(dir)) walk(e.tail.head.int(), [...at, knot(e.head)]);
+    for (const e of entries(dir)) {
+      count();
+      walk(e.tail.head.int(), [...at, knot(e.head)], len + e.head.size);
+    }
     above.delete(jobe);
     return true;
   };
-  if (!walk(top.int(), [])) return null;
+  if (!walk(top.int(), [], 0)) return null;
   return conv(out);   // convert now: nouns are borrowed
 }
 

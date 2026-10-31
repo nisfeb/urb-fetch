@@ -119,7 +119,7 @@ func (r *Reader) Poke(n *mesa.Node, her mesa.Ship, bone uint64, agent, mark stri
 	if !small(noun, maxCells) {
 		//  too big to read: what waits on its wire reads it as its large
 		//  value, now; for /want, each %want out to her
-		logf("%s sent a noun of over %d cells", her, maxCells)
+		logf("%s sent a noun of over %d cells or %d bytes", her, maxCells, maxBytes)
 		w := noun.Head().Path()
 		if w != "/want" {
 			if p := r.peeks[w]; p != nil {
@@ -240,6 +240,10 @@ func (r *Reader) finish(wire string, v any) {
 //	          is vast as a tree, is refused, so no decoder below walks
 //	          more than this. A peek answered past it reads as nothing,
 //	          and a revision list as an empty one, as lattice reads it.
+//	maxBytes  64 MiB of atoms in the same, counted as a tree as cells
+//	          are: one big atom a jam backrefs at each of its places
+//	          counts at each, so a 2 MB message can't read as 4 GB of
+//	          text. No message libmesa takes is over it unshared.
 //	maxDepth  64: a $json nested deeper reads as nothing, all of it
 //
 // The binding reads an atom where a cell goes as the atom 0, and a cell
@@ -248,16 +252,21 @@ func (r *Reader) finish(wire string, v any) {
 // is printed by the binding (mesa.Tang), before the reader sees it.
 const (
 	maxCells = 200_000
+	maxBytes = 64 << 20
 	maxDepth = 64
 )
 
-// small is whether n has at most limit cells, counted as a tree.
+// small is whether n has at most limit cells and maxBytes bytes of
+// atoms, counted as a tree.
 func small(n mesa.Noun, limit int) bool {
-	seen := 0
+	seen, bytes := 0, 0
 	for todo := []mesa.Noun{n}; len(todo) > 0; {
 		t := todo[len(todo)-1]
 		todo = todo[:len(todo)-1]
 		if !t.IsCell() {
+			if bytes += len(t.Bytes()); bytes > maxBytes {
+				return false
+			}
 			continue
 		}
 		if seen++; seen > limit {
