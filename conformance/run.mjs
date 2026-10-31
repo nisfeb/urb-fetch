@@ -1,8 +1,8 @@
 // Runs the conformance vectors the JS implements: every case's output,
 // or its error, must be the vector's (a hostile vector's error must
 // contain its text, within its time). The extension's need its
-// checkout at the commit they name; without one they are skipped,
-// unless --ext is given, when they must run.
+// checkout at the commit they name; without one they are skipped, or
+// fail with REQUIRE_ALL set, as CI sets it.
 //
 //   node conformance/run.mjs [--ext ../nisfeb-extension]
 
@@ -26,6 +26,7 @@ for (const name of [...JS, ...EXT]) {
   if (EXT.includes(name)) {
     if (!lib) {
       console.log(`skip  ${name}: no --ext checkout`);
+      if (process.env.REQUIRE_ALL) bad++;
       continue;
     }
     const at = execFileSync('git', ['-C', opt.ext, 'rev-parse', '--short=7', 'HEAD'], { encoding: 'utf8' }).trim();

@@ -1,7 +1,8 @@
 // test/grubbery-molds.hoon is grubbery's own text: each block under a
 // "::: lib/<file> <from>-<to>" line is those lines of grubbery's
 // desk/lib/<file> at the pinned commits. Needs a grubbery checkout
-// (GRUBBERY, default ~/software/personal/grubbery); skips without one.
+// (GRUBBERY, default ~/software/personal/grubbery); skips without one,
+// or fails with REQUIRE_ALL set, as CI sets it.
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -12,7 +13,9 @@ import { test } from 'node:test';
 const repo = process.env.GRUBBERY || `${homedir()}/software/personal/grubbery`;
 const PINS = ['b126c50', 'eed73a6'];   // ~ricsul-bilwyt's and the fleet's
 
-test('the grubbery molds are copied verbatim', { skip: !existsSync(`${repo}/.git`) && 'no grubbery checkout' }, () => {
+const missing = !existsSync(`${repo}/.git`) && `no grubbery checkout at ${repo}`;
+test('the grubbery molds are copied verbatim', { skip: !process.env.REQUIRE_ALL && missing }, () => {
+  assert.ok(!missing, missing);
   const ours = readFileSync(new URL('grubbery-molds.hoon', import.meta.url), 'utf8').split('\n');
   const blocks = [];
   for (const line of ours) {
@@ -27,8 +30,7 @@ test('the grubbery molds are copied verbatim', { skip: !existsSync(`${repo}/.git
     for (const b of copied) {
       const src = execFileSync('git', ['-C', repo, 'show', `${pin}:desk/lib/${b.file}`], { encoding: 'utf8' }).split('\n');
       const want = src.slice(b.from - 1, b.to);
-      //  a block may end where the next ::: begins with lines of ours
-      assert.deepEqual(b.lines.slice(0, want.length), want, `${pin} lib/${b.file} ${b.from}-${b.to}`);
+      assert.deepEqual(b.lines, want, `${pin} lib/${b.file} ${b.from}-${b.to}`);
     }
   }
 });

@@ -9,6 +9,10 @@ on:
   push:
   pull_request:
 
+# A test that would skip for want of a checkout or a tool fails instead
+env:
+  REQUIRE_ALL: 1
+
 jobs:
   core:
     runs-on: ubuntu-24.04
@@ -116,4 +120,5 @@ jobs:
       - name: go test
         env:
           NISFEB_EXTENSION: ${{ github.workspace }}/ext
+          GOFLAGS: -v   # so a skip shows
         run: make test
