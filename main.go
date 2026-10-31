@@ -265,12 +265,7 @@ func (g *gateway) serve(w http.ResponseWriter, req *http.Request, url string) {
 // A publisher's HTML is only ever served in the sandbox. Everything else
 // the gateway renders itself, with no scripts.
 func (g *gateway) render(url, mark, body string) (csp, out string) {
-	link := func(target string) string {
-		if u, err := gatewayURL(target, g.port); err == nil {
-			return u
-		}
-		return target
-	}
+	link := pageLink(url, g.port)
 	switch renderAs(mark, body) {
 	case "html":
 		return sandbox, rewriteHTML(body, g.port)

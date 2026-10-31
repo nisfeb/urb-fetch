@@ -17,7 +17,19 @@
 // Every ship may read a board's pub/ and a free board's content/. An
 // action that furum refuses comes back as a [%note title body ...] poked
 // into our own inbox.sig, which onNote hears.
+//
+// The host is another ship, so what it sends is hostile: mesa.mjs reads
+// every noun under its caps (MAX_CELLS and the rest), and a record of the
+// wrong shape fails the read with an UrbError. A board may claim at most
+// MAX_POSTS posts, 1,000 buckets read one peek each; past that, posts()
+// refuses it, rather than peek for ever.
+// A known limit: a threads bucket holds every comment on 100 posts as
+// one noun, so past about 25,000 comments in a bucket it is over
+// MAX_CELLS, and comments() fails for each of its posts.
 
+import { UrbError } from './mesa.mjs';
+
+export const MAX_POSTS = 100_000;
 export const FURUM_BASE = '/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app';
 const DA_UNIX_EPOCH = 0x8000000cce9e0d80n;
 const MSG = ['/furum', 'msg'];
@@ -54,6 +66,7 @@ export function furum(urb, host, base = FURUM_BASE) {
     async posts(name) {
       const next = await this.nextPost(name);
       if (next === null) throw new Error(`no board ${name} on ${host}, or it is not shared`);
+      if (next > MAX_POSTS) throw new UrbError(`${host}'s board ${name} claims ${next} posts, over ${MAX_POSTS}`);
       const out = [];
       for (let k = 0; k * 100 < next; k++) {
         const got = await urb.grub.peek(host, `${board(name)}/content/posts`, `b${k}`, n => entries(n.tail).map(e => post(e.tail)));
