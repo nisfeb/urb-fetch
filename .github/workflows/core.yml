@@ -1,6 +1,8 @@
 # The Rust core (docs/rust-core.md): cargo test natively and under
 # WASI, libmesa's own suites against mesa-sys's build and against its
-# zig build, and check.mjs against vere.
+# zig build; check.mjs against vere, the JS tests, every trace replayed
+# into the JS, and the conformance vectors in the JS, the extension's
+# renderers and the Go. rerecord.yml records the traces again.
 name: core
 
 on:
@@ -64,8 +66,54 @@ jobs:
           node-version: 22
       - name: tools
         run: core/ci/tools.sh "$RUNNER_TEMP/tools"
+      # the extension whose renderers the vectors are of, and grubbery,
+      # whose molds check.mjs's copies are checked against
+      - uses: actions/checkout@v4
+        with:
+          repository: nisfeb/nisfeb-extension
+          ref: 78c30bb6fdbb1e32588fd05b3ac9922e1dac786e
+          path: ext
+      - uses: actions/checkout@v4
+        with:
+          repository: nisfeb/grubbery
+          fetch-depth: 0
+          path: grubbery
       - name: mesa.wasm
         run: wasm/build.sh
       - name: check.mjs
         working-directory: wasm
         run: node check.mjs
+      - name: the JS tests
+        env:
+          GRUBBERY: ${{ github.workspace }}/grubbery
+        run: node --test wasm/test/
+      - name: every trace, replayed into the JS
+        run: node wasm/replay.mjs
+      - name: the conformance vectors, in the JS and the extension
+        run: node conformance/run.mjs --ext ext
+
+  go:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/checkout@v4
+        with:
+          repository: nisfeb/nisfeb-extension
+          ref: 78c30bb6fdbb1e32588fd05b3ac9922e1dac786e
+          path: ext
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: tools
+        run: core/ci/tools.sh "$RUNNER_TEMP/tools"
+      # the conformance vectors the Go implements, its own tests, and its
+      # renderers against the extension's (TestExtensionParity)
+      - name: go test
+        env:
+          NISFEB_EXTENSION: ${{ github.workspace }}/ext
+        run: make test
