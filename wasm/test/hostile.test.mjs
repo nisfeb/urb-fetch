@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DESK_BASE, MAX_CELLS, UrbError, decoders } from '../mesa.mjs';
+import { DESK_BASE, MAX_BYTES, MAX_CELLS, UrbError, decoders } from '../mesa.mjs';
 import { furum } from '../furum.mjs';
 import { publish } from '../pub.mjs';
 import { fleet, late, victim } from './fleet.mjs';
@@ -103,6 +103,81 @@ test('list, paths and tangs', () => {
   assert.equal(typeof decoders.tang(C(A('err'), C(C(A('rose'), A(1)), nil))), 'string');
 });
 
+// refused with exactly this message, quickly
+const refusedAs = (f, what, ms) => quick(() => assert.throws(f, e => {
+  assert.ok(e instanceof UrbError, `not an UrbError: ${e}`);
+  assert.equal(e.message, `another ship's noun ${what}`);
+  return true;
+}), ms);
+const OVER_BYTES = `has over ${MAX_BYTES} bytes of atoms`;
+
+test('one big atom at many places counts at each', () => {
+  //  [%a 2000 × [%s <2 MiB>]]: 2 MB as a jam, 4 GB of text as a tree
+  const big = A('x'.repeat(2 << 20)), str = C(A('s'), big);
+  let items = nil;
+  for (let i = 0; i < 2000; i++) items = C(str, items);
+  refusedAs(() => decoders.measure(C(A('a'), items)), OVER_BYTES);
+  refusedAs(() => decoders.json(C(A('a'), items)), OVER_BYTES);
+  //  and as an object's keys
+  let map = nil;
+  for (let i = 0; i < 2000; i++) map = C(C(big, C(A('n'), A('1'))), C(map, nil));
+  refusedAs(() => decoders.json(C(A('o'), map)), OVER_BYTES);
+  //  31 copies, 62 MiB, is not over
+  let fits = nil;
+  for (let i = 0; i < 31; i++) fits = C(str, fits);
+  assert.equal(quick(() => decoders.json(C(A('a'), fits))).length, 31);
+  assert.equal(quick(() => decoders.tang(C(big, nil))).length, 2 << 20);
+});
+
+test('a tank\'s separator, printed between each two of many kids', () => {
+  //  a rose whose separator is 20,000 characters, over 20,000 kids:
+  //  60,000 cells, but 400 MB printed
+  const tape = (c, n) => { let t = nil; for (let i = 0; i < n; i++) t = C(A(c), t); return t; };
+  const kid = C(A('leaf'), tape(104, 1));
+  let kids = nil;
+  for (let i = 0; i < 20_000; i++) kids = C(kid, kids);
+  const rose = C(A('rose'), C(C(tape(44, 20_000), C(nil, nil)), kids));
+  const palm = C(A('palm'), C(C(tape(44, 20_000), C(nil, C(nil, nil))), kids));
+  const err = r => C(A('err'), C(r, nil));
+  assert.equal(quick(() => decoders.tang(err(rose))), `another ship's noun ${OVER_BYTES}`);
+  assert.equal(quick(() => decoders.tang(err(palm))), `another ship's noun ${OVER_BYTES}`);
+  refusedAs(() => decoders.tangText(C(rose, nil)), OVER_BYTES);
+  //  under the cap it prints whole: 3,300 kids, 66 MB
+  let few = nil;
+  for (let i = 0; i < 3300; i++) few = C(kid, few);
+  const ok = C(A('rose'), C(C(tape(44, 20_000), C(nil, nil)), few));
+  assert.equal(quick(() => decoders.tang(err(ok))).length, 'err\n  '.length + 3300 + 3299 * 20_000);
+});
+
+test('ballOf: a tree at many places, its entries and its files count at each', () => {
+  const tree = (fil, dir) => C(A('tree'), C(nil, C(nil, C(nil, C(fil, dir)))));
+  const map = kvs => kvs.reduce((m, [k, v]) => C(C(k, v), C(m, nil)), nil);
+  const silo = (top, jects, nouns = []) => [C(nil, C(C(A('firm'), C(nil, A(top))), nil)),
+    C(map(nouns.map(([k, v]) => [A(k), C(nil, v)])), map(jects.map(([k, v]) => [A(k), C(nil, v)])))];
+  const ball = ([snap, s]) => decoders.ballOf(snap, s, fs => fs.length);
+  const names = n => Array.from({ length: n }, (_, i) => A(`n${i}`));
+  //  3,000 directories naming one tree, whose own 3,000 directories are
+  //  all missing from the silo: 9 million entries, none of them a tree.
+  //  The 200,000 it counts take these plain-JS nouns a second or two;
+  //  uncounted, the 9 million took a minute
+  const bogus = map(names(3000).map(k => [k, C(A(99), nil)]));
+  const fan = map(names(3000).map(k => [k, C(A(2), nil)]));
+  refusedAs(() => ball(silo(1, [[1, tree(nil, fan)], [2, tree(nil, bogus)]])),
+            `has a directory of over ${MAX_CELLS} trees and files`, 10_000);
+  //  2,000 files naming one 2 MiB noun: 4 GB as a tree
+  const files = map(names(2000).map(k => [k, A(3)]));
+  const big = A('x'.repeat(2 << 20));
+  refusedAs(() => ball(silo(1, [[1, tree(files, nil)], [3, C(A('leaf'), C(A(4), nil))]], [[4, big]])), OVER_BYTES);
+  assert.equal(quick(() => ball(silo(1, [[1, tree(map(names(31).map(k => [k, A(3)])), nil)],
+    [3, C(A('leaf'), C(A(4), nil))]], [[4, big]]))), 31);
+  //  5,000 files 63 directories down, each named by 256 bytes: 80 MB of
+  //  paths, from a few thousand cells
+  const deep = [];
+  for (let i = 1; i <= 63; i++) deep.push([i, tree(nil, map([[A('d'.repeat(256)), C(A(i + 1), nil)]]))]);
+  deep.push([64, tree(map(names(5000).map(k => [k, A(100)])), nil)], [100, C(A('leaf'), C(A(4), nil))]);
+  refusedAs(() => ball(silo(1, deep, [[4, A(1)]])), OVER_BYTES);
+});
+
 test('fileOf: a silo of the wrong shape', () => {
   const snap = C(nil, C(C(A('firm'), C(nil, A(7))), nil));
   assert.equal(decoders.fileOf(snap, C(A(1), A(2)), () => 1), null);   // a silo of atoms holds nothing
@@ -172,6 +247,32 @@ test('a hostile nack prints, bounded', { timeout: 30_000 }, async () => {
   const r = await late(p);
   assert.equal(r.ok, false);
   assert.match(r.error, /over 200000 cells/);
+  assert.deepEqual(v.trapped(), []);
+  await v.f.close();
+});
+
+test('a big atom at many places, and a long separator, through the engine', { timeout: 60_000 }, async () => {
+  const v = await victim();
+  //  a %snap of one file, [%a 64 × [%s <2 MiB>]], the atom one noun
+  const big = v.build('x'.repeat(2 << 20));
+  const items = [...Array.from({ length: 64 }, () => ['s', { n: v.X.ref(big) }]), null];
+  const p = v.urb.grub.peek('~nec', '/x', 'y', v.urb.nouns.json);
+  v.deliver('grubbery-transfer', [v.path(`/urb-fetch/${v.nonce}/1`), 'snap', null, 5, [null, [null, ['firm', null, 7], null]],
+    [null, [[[9, null, ['a', items]], null, null], [[7, null, 'leaf', 9, null], null, null]]]]);
+  v.X.unref(big);
+  const e = await late(p.then(() => null, e => e));
+  assert.ok(e instanceof UrbError, String(e));
+  assert.equal(e.message, `another ship's noun ${OVER_BYTES}`);
+  //  a %pack nack whose rose prints a 20,000-character separator
+  //  between each two of 20,000 kids
+  const tape = [...Array(20_000).fill(44), null];
+  const kid = v.build(['leaf', [104, null]]);
+  const kids = [...Array.from({ length: 20_000 }, () => ({ n: v.X.ref(kid) })), null];
+  v.X.unref(kid);
+  const q = v.urb.grub.poke('~nec', '/x', 'y', ['/furum', 'msg'], 1);
+  v.deliver('grubbery-transfer', [v.path(`/grub-poke/${v.nonce}/2`), 'pack', null, ['rose', [[tape, [null, null]], kids]], null]);
+  const r = await late(q);
+  assert.deepEqual(r, { ok: false, error: `another ship's noun ${OVER_BYTES}` });
   assert.deepEqual(v.trapped(), []);
   await v.f.close();
 });
