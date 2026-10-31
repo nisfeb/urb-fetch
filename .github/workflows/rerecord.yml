@@ -5,13 +5,14 @@
 # The fleet is on one machine, so the job runs on a self-hosted runner
 # there, labelled fleet, with the furum set's m1c-traces snapshot. Set
 # the repository variable FLEET_RUNNER to yes once one is registered.
-# Until then the job is skipped, with a warning that says so: it never
-# passes. On a runner without the fleet, rerecord.sh exits 2 and the
-# job fails, saying it was skipped.
+# Until then the runner job fails, saying no traces were recorded, so
+# the run never reads as a pass; the rerecord job is skipped. It runs
+# daily and by hand, not on every push, so that failure isn't on every
+# commit's checks. On a runner without the fleet, rerecord.sh exits 2
+# and the job fails, saying it was skipped.
 name: rerecord
 
 on:
-  push:
   schedule:
     - cron: '23 7 * * *'
   workflow_dispatch:
@@ -27,8 +28,9 @@ jobs:
           if [ "${{ vars.FLEET_RUNNER }}" = yes ]; then
             echo fleet=yes >> "$GITHUB_OUTPUT"
           else
-            echo "::warning title=rerecord skipped, not passed::no self-hosted runner with the fleet is registered (FLEET_RUNNER is not yes), so the traces were not recorded again"
+            echo "::error title=rerecord not run::no self-hosted runner with the fleet is registered (FLEET_RUNNER is not yes), so the traces were not recorded again"
             echo fleet=no >> "$GITHUB_OUTPUT"
+            exit 1
           fi
 
   rerecord:
