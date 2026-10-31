@@ -1,4 +1,4 @@
-# Records traces 1 to 9 again against the fleet and fails on a drift
+# Records traces 1 to 10 again against the fleet and fails on a drift
 # from the committed ones (docs/rust-core.md, "Re-recording in CI";
 # traces/rerecord.sh does the work, and runs the same by hand).
 #

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Records traces 1 to 9 again against the fleet and compares them with
+# Records traces 1 to 10 again against the fleet and compares them with
 # the committed ones (docs/rust-core.md, "Re-recording in CI"):
 #
 #   traces/rerecord.sh [--write]

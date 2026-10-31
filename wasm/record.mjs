@@ -1,4 +1,5 @@
-// Records docs/rust-core.md's traces 1 to 9 against the fleet's furum set
+// Records docs/rust-core.md's traces 1 to 9, and 10, a roller lookup,
+// against the fleet's furum set
 // (~rup with furum release 7, ~hus with lattice release 81), restored to
 // its m1c-traces snapshot (traces/fixtures.sh says what that holds):
 //
@@ -28,7 +29,7 @@ const wasm = readFileSync(new URL('build/mesa.wasm', import.meta.url));
 const HUS = 'http://localhost:8134/apps/lattice';
 const log = (...a) => console.error(new Date().toISOString().slice(11, 19), ...a);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const MOON = n => `~natdul-mol${['', 'nec', 'bud', 'wes', 'sev', 'per', 'sut', 'let', 'ful', 'pen'][n]}-dozzod-dozhus`;
+const MOON = n => `~natdul-mol${['', 'nec', 'bud', 'wes', 'sev', 'per', 'sut', 'let', 'ful', 'pen', 'syt'][n]}-dozzod-dozhus`;
 
 // UDP on the fake network: galaxy g at 127.0.0.1:31337+g. Bound before
 // the engine opens, so start is synchronous, as trace.mjs needs; one
@@ -227,6 +228,14 @@ const TRACES = {
       log(`  within the cache: ${(await c.call('read', 'urb://~hus/marks/md')).how}`);
       await sleep(61_000);
       log(`  past it: ${(await c.call('read', 'urb://~hus/marks/md')).how}`);
+      await c.call('close');
+    } },
+  10: { name: 'roller', desc: "a key lookup on the roller: off the fake network, a read of ~zod looks up its keys, which no fleet ship can give",
+    async run(c) {
+      //  roller.urbit.org's azimuth, read only, for the real ~zod; the
+      //  datagrams then go to the fake network's ~zod, which isn't up
+      await c.open(MOON(10), { opts: { fake: false } });
+      log(`  ${JSON.stringify(await settle(c.call('read', 'urb://~zod/page')))}`);
       await c.call('close');
     } },
 };
