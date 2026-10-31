@@ -22,6 +22,9 @@
 // put and remove hands {pages, keepers} to save, plain JSON to keep for
 // the next run.
 
+// It takes its clock and page ids from the engine (urb.now, urb.entropy),
+// so it needs the mesa.mjs of the same release: vendor the two together.
+
 import { DESK_BASE as BASE, PAGE_MARKS, da, uv } from './mesa.mjs';
 
 const enc = new TextEncoder();

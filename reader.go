@@ -46,13 +46,15 @@ type revList struct {
 
 // a peek waiting for its %grubbery-transfer
 type peek struct {
-	seq  int
-	bone uint64
-	conv func(mesa.Noun) any // runs in the hook: nouns are borrowed
-	jobe string              // the snap's content hash, while a %want is out
-	done chan any            // the converted file, or nil
-	late func(any)           // takes an answer that came after its caller gave up
-	gone time.Time           // when its caller gave up (zero: still waiting)
+	seq   int
+	her   mesa.Ship
+	bone  uint64
+	conv  func(mesa.Noun) any // runs in the hook: nouns are borrowed
+	large any                 // what an answer over maxCells reads as
+	jobe  string              // the snap's content hash, while a %want is out
+	done  chan any            // the converted file, or nil
+	late  func(any)           // takes an answer that came after its caller gave up
+	gone  time.Time           // when its caller gave up (zero: still waiting)
 }
 
 type keenResult struct {
@@ -115,20 +117,33 @@ func (r *Reader) Poke(n *mesa.Node, her mesa.Ship, bone uint64, agent, mark stri
 		return nil
 	}
 	if !small(noun, maxCells) {
-		//  too big to read: what waits on its wire gets nothing, now
+		//  too big to read: what waits on its wire reads it as its large
+		//  value, now; for /want, each %want out to her
 		logf("%s sent a noun of over %d cells", her, maxCells)
-		r.finish(noun.Head().Path(), nil)
+		w := noun.Head().Path()
+		if w != "/want" {
+			if p := r.peeks[w]; p != nil {
+				r.finish(w, p.large)
+			}
+			return nil
+		}
+		for w, p := range r.peeks {
+			if p.jobe != "" && p.her == her {
+				r.finish(w, p.large)
+			}
+		}
 		return nil
 	}
 	wire, tag, rest := noun.Head().Path(), noun.Tail().Head().Text(), noun.Tail().Tail()
 	if wire == "/want" {
 		//  +process-want answers on the fixed wire /want, not ours, so
-		//  match the content to the snap that asked for it, as grubbery's
-		//  own reader does. A %miss means the 5-minute pin expired.
+		//  match the content to the snap that asked for it, of the ship
+		//  that sent it, as grubbery's own reader does. A %miss means the
+		//  5-minute pin expired.
 		var oldest *peek
 		var oldW string
 		for w, p := range r.peeks {
-			if p.jobe == "" {
+			if p.jobe == "" || p.her != her {
 				continue
 			}
 			if tag == "data" {
@@ -223,7 +238,8 @@ func (r *Reader) finish(wire string, v any) {
 //	          tree: a cell reached twice counts twice, as lattice's
 //	          +small-noun counts. Shared structure, a small message that
 //	          is vast as a tree, is refused, so no decoder below walks
-//	          more than this.
+//	          more than this. A peek answered past it reads as nothing,
+//	          and a revision list as an empty one, as lattice reads it.
 //	maxDepth  64: a $json nested deeper reads as nothing, all of it
 //
 // The binding reads an atom where a cell goes as the atom 0, and a cell
@@ -342,11 +358,13 @@ func jsonAt(n mesa.Noun, depth int) (any, bool) {
 }
 
 // revsOf reads /pub/revs, {"/page": {"rev": 1, "id": "0v..."}}, as
-// page -> id.
+// page -> id. One that isn't a $json object is an empty list, as
+// lattice's +fetch-peer-revs reads it, and so is one over maxCells (see
+// peekRevs): its pages still read by the vault peek.
 func revsOf(n mesa.Noun) any {
 	m, ok := jsonOf(n).(map[string]any)
 	if !ok {
-		return nil
+		return map[string]string{}
 	}
 	out := map[string]string{}
 	for k, v := range m {
@@ -371,6 +389,16 @@ func textOf(n mesa.Noun) any {
 // nil, and whether she answered at all. An answer that comes after the
 // timeout goes to late, if there is one.
 func (r *Reader) peek(her mesa.Ship, folder, name string, conv func(mesa.Noun) any, late func(any)) (any, bool) {
+	return r.peekOr(her, folder, name, conv, late, nil)
+}
+
+// peekRevs peeks her /pub/revs at base b, an empty list if it is too big.
+func (r *Reader) peekRevs(her mesa.Ship, b string) (any, bool) {
+	return r.peekOr(her, b+"/pub", "revs", revsOf, r.keepRevs(her, b), map[string]string{})
+}
+
+// peekOr is peek, with an answer over maxCells read as large.
+func (r *Reader) peekOr(her mesa.Ship, folder, name string, conv func(mesa.Noun) any, late func(any), large any) (any, bool) {
 	done := make(chan any, 1)
 	var wire string
 	err := r.node.Do(func() error {
@@ -396,7 +424,7 @@ func (r *Reader) peek(her mesa.Ship, folder, name string, conv func(mesa.Noun) a
 			return err // the transaction undoes a flow it opened
 		}
 		r.flows[her] = bone
-		r.peeks[wire] = &peek{seq: r.seq, bone: bone, conv: conv, done: done, late: late}
+		r.peeks[wire] = &peek{seq: r.seq, her: her, bone: bone, conv: conv, large: large, done: done, late: late}
 		return nil
 	})
 	if err != nil {
@@ -468,7 +496,7 @@ func (r *Reader) base(her mesa.Ship) (string, error) {
 		return b, nil
 	}
 	for _, b := range []string{deskBase, appBase} {
-		v, answered := r.peek(her, b+"/pub", "revs", revsOf, r.keepRevs(her, b))
+		v, answered := r.peekRevs(her, b)
 		if m, ok := v.(map[string]string); ok {
 			r.keepRevs(her, b)(m)
 			return b, nil
@@ -506,7 +534,7 @@ func (r *Reader) revList(her mesa.Ship) (map[string]string, error) {
 	if ok && time.Since(l.at) < revsTTL {
 		return l.revs, nil
 	}
-	v, answered := r.peek(her, b+"/pub", "revs", revsOf, r.keepRevs(her, b))
+	v, answered := r.peekRevs(her, b)
 	m, _ := v.(map[string]string)
 	switch {
 	case m != nil:

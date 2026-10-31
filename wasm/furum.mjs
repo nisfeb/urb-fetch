@@ -23,6 +23,9 @@
 // wrong shape fails the read with an UrbError. A board may claim at most
 // MAX_POSTS posts, 1,000 buckets read one peek each; past that, posts()
 // refuses it, rather than peek for ever.
+// A known limit: a threads bucket holds every comment on 100 posts as
+// one noun, so past about 25,000 comments in a bucket it is over
+// MAX_CELLS, and comments() fails for each of its posts.
 
 import { UrbError } from './mesa.mjs';
 

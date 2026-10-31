@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { DESK_BASE, MAX_CELLS, UrbError, decoders } from '../mesa.mjs';
 import { furum } from '../furum.mjs';
 import { publish } from '../pub.mjs';
-import { fixed, fleet } from './fleet.mjs';
+import { fleet, late, victim } from './fleet.mjs';
 
 // ------------------------------------------------------------ the decoders
 
@@ -112,70 +112,6 @@ test('fileOf: a silo of the wrong shape', () => {
 
 // ------------------------------------------------------------ the engine
 
-// An engine whose hooks the test can call as libmesa would, with nouns it
-// builds: what a hostile ship's message is once libmesa has cued it.
-async function victim() {
-  const f = fleet(), clock = fixed(), logs = [];
-  const real = WebAssembly.instantiate;
-  let got;
-  WebAssembly.instantiate = async (w, imports) => {
-    const r = await real(w, imports);
-    got = { host: imports.host, X: (r.instance ?? r).exports };
-    return r;
-  };
-  let urb;
-  try {
-    urb = await f.engine('~zod', 0, { now: clock.now, entropy: clock.entropy, log: e => logs.push(e) });
-  } finally {
-    WebAssembly.instantiate = real;
-  }
-  const { host, X } = got;
-  const nonce = [...fixed().entropy(4)].map(b => b.toString(16).padStart(2, '0')).join('');
-  const atom = v => {
-    const b = typeof v === 'string' ? new TextEncoder().encode(v)
-      : Uint8Array.from((function* () { for (let x = BigInt(v); x > 0n; x >>= 8n) yield Number(x & 0xffn); })());
-    const p = X.alloc(b.length || 1);
-    new Uint8Array(X.memory.buffer).set(b, p);
-    try { return X.atom(p, b.length); } finally { X.free(p); }
-  };
-  // a noun of a JS value: an atom, a string, an array of two or more
-  // (right-associated cells), or a handle given as {n}
-  const build = x => {
-    if (x === null) return atom(0);
-    if (x?.n !== undefined) return x.n;
-    if (Array.isArray(x)) return x.slice(0, -1).reduceRight((t, h) => X.cell(build(h), t), build(x.at(-1)));
-    return atom(x);
-  };
-  const share = (x, n) => {   // a noun that is 2^n copies of x as a tree
-    let h = build(x);
-    for (let i = 0; i < n; i++) h = X.cell(X.ref(h), h);
-    return { n: h };
-  };
-  const path = s => [...s.split('/').filter(Boolean), null];
-  // libmesa hands a %grubbery-transfer from ~nec to the engine's hook
-  const deliver = (mark, value) => {
-    const agent = new TextEncoder().encode('grubbery\0'), p = X.alloc(agent.length);
-    new Uint8Array(X.memory.buffer).set(agent, p);
-    const m = atom(mark), n = build(value);
-    try {
-      return host.on_poke(1n, 0n, 0n, p, m, n);
-    } finally {
-      X.free(p);
-      X.unref(m);
-      X.unref(n);
-    }
-  };
-  const trapped = () => logs.filter(e => e instanceof WebAssembly.RuntimeError);
-  return { f, urb, nonce, deliver, share, path, trapped, logs };
-}
-
-// p, or an error if it takes over 5 seconds (a peek gives up at 30)
-const late = p => {
-  let t;
-  const hung = new Promise((_, no) => { t = setTimeout(() => no(new Error('hung')), 5000); });
-  return Promise.race([p, hung]).finally(() => clearTimeout(t));
-};
-
 test('hostile answers to a peek fail it, and nothing traps', { timeout: 60_000 }, async () => {
   const v = await victim();
   let k = 0;
@@ -255,8 +191,10 @@ test('a hostile publisher and a hostile furum host, over the loop', { timeout: 6
     const v = files[`${folder} ${name}`];
     return v === undefined ? null : { mark: ['/', 'noun'], value: v, rev: 1, at: 0 };
   });
+  //  a revision list we can't read is an empty one, as lattice reads it:
+  //  the page is looked for by the vault peek, which ~zod doesn't serve
   const e = await late(us.read('urb://~zod/page').then(() => null, e => e));
-  assert.ok(e instanceof UrbError && /nested over 64/.test(e.message), String(e));
+  assert.ok(e instanceof UrbError && /not published/.test(e.message), String(e));
   const board = furum(us, '~zod');
   const p = await late(board.posts('b').then(() => null, e => e));
   assert.ok(p instanceof UrbError && /over 100000/.test(p.message), String(p));
@@ -268,4 +206,34 @@ test('a hostile publisher and a hostile furum host, over the loop', { timeout: 6
   const r = await late(us.read('urb://~zod/fine'));
   assert.equal(r.body, 'ok');
   await f.close();
+});
+
+test('%want: only the ship asked answers it, and its own miss or data settles it', { timeout: 30_000 }, async () => {
+  const v = await victim();
+  const big = 'z'.repeat(50_000);
+  const snap = k => [v.path(`/urb-fetch/${v.nonce}/${k}`), 'snap', null, 5, [null, [null, ['firm', null, 7], null]], null];
+  const data = [v.path('/want'), 'data', [[9, null, big], null, null], [[7, null, 'leaf', 9, null], null, null]];
+  const p = v.urb.grub.peek('~nec', '/x', 'y', v.urb.nouns.cord);
+  v.deliver('grubbery-transfer', snap(1));   // too big to inline: we %want it
+  v.deliver('grubbery-transfer', [v.path('/want'), 'miss', null], 2n);   // ~bud
+  v.deliver('grubbery-transfer', data, 2n);
+  let settled = false;
+  p.then(() => { settled = true; }, () => { settled = true; });
+  await new Promise(r => setTimeout(r, 50));
+  assert.equal(settled, false, 'another ship settled our peek');
+  v.deliver('grubbery-transfer', data);
+  assert.equal((await late(p)).length, 50_000);
+  //  ~nec's own miss nulls it: the pin expired
+  const q = v.urb.grub.peek('~nec', '/x', 'y', v.urb.nouns.cord);
+  v.deliver('grubbery-transfer', snap(2));
+  v.deliver('grubbery-transfer', [v.path('/want'), 'miss', null]);
+  assert.equal(await late(q), null);
+  //  and a /want from ~nec we can't read fails its %want at once
+  const r = v.urb.grub.peek('~nec', '/x', 'y', v.urb.nouns.cord);
+  v.deliver('grubbery-transfer', snap(3));
+  v.deliver('grubbery-transfer', [v.path('/want'), 'data', v.share(1, 40), null]);
+  const e = await late(r.then(() => null, e => e));
+  assert.ok(e instanceof UrbError && /cells/.test(e.message), String(e));
+  assert.deepEqual(v.trapped(), []);
+  await v.f.close();
 });

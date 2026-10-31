@@ -766,11 +766,13 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       measure(n);
       transfer(wire, from, n.tail.head.text(), n.tail.tail, [lo, hi], n.head);
     } catch (e) {
-      //  what waits on this wire fails with it. A /want is matched by
-      //  content, so one we can't read fails nothing
+      //  what waits on this wire fails with it: for /want, every %want
+      //  out to the ship that sent it
       const p = pokes.get(wire), st = peeks.get(wire);
+      const wants = wire === '/want' ? [...peeks.values()].filter(w => w.snap && !w.done && w.her === from) : [];
       if (p) p.finish({ ok: false, error: e.message });
       else if (st) st.fail(e);
+      else if (wants.length) for (const w of wants) w.fail(e);
       else log(`${shipText(lo, hi)}: ${e.message}`);
     }
     return ACK;
@@ -939,11 +941,21 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     return got ? noun(got) : NONE;
   }
 
+  // A peer's /pub/revs, or null if it has none there. One we can't read
+  // (over the caps, or not a $json object) is an empty list, as lattice's
+  // +fetch-peer-revs reads it, so its pages still read by the vault peek.
+  const revsOf = n => {
+    const j = json(n);
+    return j && typeof j === 'object' && !Array.isArray(j) ? j : {};
+  };
+  const peekRevs = (her, b) => peek(her, b + '/pub', 'revs', revsOf)
+    .catch(e => (e instanceof UrbError ? {} : Promise.reject(e)));
+
   // +peer-base: where the peer runs lattice, asked, not guessed
   async function base(her, who) {
     if (!bases.has(who)) {
       for (const b of [DESK_BASE, APP_BASE]) {
-        const got = await peek(her, b + '/pub', 'revs', json);
+        const got = await peekRevs(her, b);
         if (got !== null) {
           bases.set(who, b);
           revs.set(who, { at: now(), list: got });
@@ -961,7 +973,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     const b = await base(her, who);
     let r = revs.get(who);
     if (!r || now() - r.at > REVS_TTL) {
-      r = { at: now(), list: (await peek(her, b + '/pub', 'revs', json)) ?? {} };
+      r = { at: now(), list: (await peekRevs(her, b)) ?? {} };
       revs.set(who, r);
     }
     return r.list;
