@@ -19,6 +19,8 @@ export function fleet() {
     close() { ends.delete(g); },
   });
   return {
+    // the loop's transport for galaxy g, for an engine opened elsewhere
+    transport: g => loop(g),
     // a fake galaxy on the loop; opts go to open(), and sent, if given,
     // collects every datagram it sends as [lane, hex]
     async engine(ship, g, { sent, ...opts } = {}) {
