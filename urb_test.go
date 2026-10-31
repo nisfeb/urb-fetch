@@ -201,3 +201,52 @@ func TestOwnPageHeaders(t *testing.T) {
 		t.Error("oneIdentity")
 	}
 }
+
+// Control characters anywhere in a target make it text: a browser strips
+// them, so \x01//evil.com would leave the ship.
+func TestSafeLinkControls(t *testing.T) {
+	for _, s := range []string{"\x01//evil.com", "\x1f//evil.com", "\x00//evil.com", "\x7f//evil.com", " //evil.com", "/\t/evil.com",
+		"java\tscript:alert(1)", "java\x00script:alert(1)", "\x01javascript:alert(1)", "https://a.b/\nx", "urb://~zod/x\x01"} {
+		if safeLink(s) {
+			t.Errorf("allowed %q", s)
+		}
+	}
+	id := func(s string) string { return s }
+	if m := renderMarkdown("[x](\x01//evil.com)", "t", id); strings.Contains(m, "<a ") {
+		t.Errorf("control link kept: %s", m)
+	}
+}
+
+// Schemes match in any case; the rest of the hostile class stays text.
+func TestSafeLinkSchemesAndHostile(t *testing.T) {
+	for _, s := range []string{"HTTPS://a.b", "Http://a.b", "HTTP://a.b", "URB://~zod/x", "Mailto:a@b.c", "GEMINI://a.b", "javascript&#58;alert(1)"} {
+		if !safeLink(s) {
+			t.Errorf("refused %q", s)
+		}
+	}
+	for _, s := range []string{"javascript:alert(1)", "JaVaScRiPt:alert(1)", "data:text/html,<script>", "DATA:text/html,x", "vbscript:x",
+		"//evil.example", `\\evil.example`, `/\evil.example`, "file:///etc/passwd", "chrome-extension://x/y"} {
+		if safeLink(s) {
+			t.Errorf("allowed %q", s)
+		}
+	}
+	id := func(s string) string { return s }
+	m := renderMarkdown("[s](HTTPS://a.b) [click](javascript:alert(1)) [data](data:text/html;base64,PHNjcmlwdD4=) [off](//evil.example/x)", "t", id)
+	if !strings.Contains(m, `<a href="HTTPS://a.b">s</a>`) || strings.Count(m, "<a ") != 1 {
+		t.Errorf("renderMarkdown: %s", m)
+	}
+}
+
+// A link's text and target are capped, so they stay text past the cap.
+func TestMarkdownLinkCaps(t *testing.T) {
+	id := func(s string) string { return s }
+	ok := renderMarkdown("["+strings.Repeat("a", 256)+"](/"+strings.Repeat("b", 511)+")", "t", id)
+	if !strings.Contains(ok, "<a ") {
+		t.Error("link at the caps dropped")
+	}
+	for _, body := range []string{"[a](/" + strings.Repeat("b", 512) + ")", "[" + strings.Repeat("a", 257) + "](/x)"} {
+		if m := renderMarkdown(body, "t", id); strings.Contains(m, "<a ") {
+			t.Errorf("over-cap link kept: %.80s", m)
+		}
+	}
+}

@@ -208,15 +208,20 @@ var (
 	mdItem    = regexp.MustCompile(`^\s*(?:[-*+]|\d+[.)])\s+(.*)$`)
 	mdOrdered = regexp.MustCompile(`^\s*\d+[.)]\s`)
 	mdRule    = regexp.MustCompile(`^\s*(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$`)
-	mdInline  = regexp.MustCompile("`([^`]+)`|\\[([^\\]]+)\\]\\(([^)\\s]+)\\)|\\*\\*([^*]+)\\*\\*|\\*([^*\\s][^*]*)\\*")
-	safeHref  = regexp.MustCompile(`^(?:(?:https?|urb|gemini|mailto):|[^:]*$)`)
+	mdInline  = regexp.MustCompile("`([^`]+)`|\\[([^\\]]{1,256})\\]\\(([^)\\s]{1,512})\\)|\\*\\*([^*]+)\\*\\*|\\*([^*\\s][^*]*)\\*")
+	safeHref  = regexp.MustCompile(`(?i)^(?:(?:https?|urb|gemini|mailto):|[^:]*$)`)
+	ctlLink   = regexp.MustCompile(`[\x00-\x20\x7f]`)
 	hostLink  = regexp.MustCompile(`^\s*[/\\]{2}`)
 )
 
 // safeLink is whether a page's link target may be a link: the web,
 // urb://, gemini, mail, or a path on this ship. A protocol-relative //
-// (or \\, which browsers read as //) would leave the ship's origin.
-func safeLink(t string) bool { return safeHref.MatchString(t) && !hostLink.MatchString(t) }
+// (or \\, which browsers read as //) would leave the ship's origin. A
+// control character (C0, space, DEL) anywhere makes it text, since a
+// browser strips them; schemes match in any case.
+func safeLink(t string) bool {
+	return !ctlLink.MatchString(t) && safeHref.MatchString(t) && !hostLink.MatchString(t)
+}
 
 // renderMarkdown renders a small, safe subset of Markdown, with link
 // targets passed through link: headings, paragraphs, lists, quotes, rules
