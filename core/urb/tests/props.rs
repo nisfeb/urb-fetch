@@ -238,13 +238,13 @@ fn distinct(r: &mut Rng, n: usize, depth: u32) -> Vec<Value<'static>> {
     out
 }
 
-#[cfg(not(target_os = "wasi"))]
 #[test]
 fn escapes_are_stripped_as_a_terminal_reads_them() {
     let out = "\x1b[K0xab\x1b[?25l ~.0vmm \x1b]0;title\x07[0x1.2 \x1b(B~.0v1\x1b[0m]";
     assert_eq!(answers(out), ["ab", "0vmm", "12", "0v1"]);
 }
 
+#[cfg(not(target_os = "wasi"))]
 #[test]
 fn maps_and_sets_hash_as_vere_builds_them() {
     let Some(urbit) = tool("URBIT", "urbit", "the vere checks") else {
