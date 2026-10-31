@@ -92,9 +92,11 @@ func pageLink(page, port string) linker {
 		if m := scheme.FindString(t); m != "" {
 			t = strings.ToLower(m) + t[len(m):]
 		}
-		switch {
-		case strings.HasPrefix(t, "mailto:"), strings.HasPrefix(t, "gemini:"):
+		if strings.HasPrefix(t, "mailto:") || strings.HasPrefix(t, "gemini:") {
 			return t, false
+		}
+		t = jsTrim(t) // linkTarget trims, in JavaScript's whitespace
+		switch {
 		case urbLink.MatchString(t):
 			u, err := gatewayURL(t, port)
 			return u, err == nil

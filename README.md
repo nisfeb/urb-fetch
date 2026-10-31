@@ -74,7 +74,7 @@ A page renders by the mark it was published under, as lattice's reader does. Lat
 | `%gmi` | gemtext, or HTML in the sandbox if it starts with `<` |
 | `%text`, `%js`, `%css`, `%noun` | text, in a `<pre>` |
 
-The gateway renders a small, safe subset of Markdown itself, since it has no Markdown library: headings, paragraphs, lists, quotes, rules, fenced code, inline code, links, bold and italics. Everything is escaped, so raw HTML in Markdown shows as text. Gemtext, Markdown and text read by the same rules as [nisfeb-extension](https://github.com/nisfeb/nisfeb-extension)'s reader (`render.go`): links only to the web, `urb://`, gemini, mail, or a path on the page's ship, resolved against the page; a Markdown body over 256 K UTF-16 units is shown as text. The `X-Urb-Mark` header names the mark.
+The gateway renders a small, safe subset of Markdown itself, since it has no Markdown library: headings, paragraphs, lists, quotes, rules, fenced code, inline code, links, bold and italics. Everything is escaped, so raw HTML in Markdown shows as text. Gemtext, Markdown and text read by the same rules as [nisfeb-extension](https://github.com/nisfeb/nisfeb-extension)'s reader (`render.go`): links only to the web, `urb://`, gemini, mail, or a path on the page's ship, resolved against the page; a Markdown body over 256 K UTF-16 units is shown as text. `TestExtensionParity` checks the two agree on random bodies and links, when node and a nisfeb-extension checkout (`$NISFEB_EXTENSION`, else `../nisfeb-extension`) are there. The `X-Urb-Mark` header names the mark.
 
 Release 74 also rotated every publisher's salt once, so every page's id changed. The ids come from the revision list, so a reader only needs a fresh list, which it reads every minute.
 
