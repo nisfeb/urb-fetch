@@ -389,6 +389,72 @@ impl Core {
     }
 }
 
+/// A hook's call as libmesa makes it, handed to the core by a test or a
+/// fuzzer: a %grubbery poke from a ship (its mark and noun), a nack or an
+/// ack, and a keen's answer. Keen starts a keen, as page() does, for one
+/// to answer.
+#[doc(hidden)]
+pub enum Hook<'a> {
+    Poke(&'a str, &'a str, NounRef<'a>),
+    Done(&'a str, u64, Option<NounRef<'a>>),
+    Sage(&'a str, &'a str, Option<NounRef<'a>>),
+    Keen(&'a str, &'a str),
+}
+
+/// what the core waits on: its peeks' and pokes' wires, its keens'
+/// paths, and the bones of its pokes' flows and then of its shared ones
+#[doc(hidden)]
+#[derive(Clone, Debug, Default)]
+pub struct Waiting {
+    pub peeks: Vec<String>,
+    pub pokes: Vec<String>,
+    pub keens: Vec<String>,
+    pub bones: Vec<u64>,
+}
+
+impl Core {
+    /// A hook, called as libmesa would (guarded, as the trampolines
+    /// are), but outside an engine call: what it caused.
+    #[doc(hidden)]
+    pub fn hook(&mut self, now: u64, h: Hook<'_>) -> Vec<Output> {
+        let w = &*self.w;
+        w.now.set(now);
+        let ship = |s: &str| engine::ship_parse(s).unwrap_or_default();
+        match h {
+            Hook::Poke(her, mark, noun) => {
+                let m = Noun::atom(mark.as_bytes());
+                engine::guard(w, ACK, |w| {
+                    w.hook_poke(ship(her), 0, "grubbery", Some(m.borrow()), Some(noun))
+                });
+            }
+            Hook::Done(her, bone, e) => engine::guard(w, (), |w| w.hook_done(ship(her), bone, e)),
+            Hook::Sage(her, path, g) => engine::guard(w, (), |w| w.hook_sage(ship(her), path, g)),
+            Hook::Keen(her, path) => {
+                if let Some(i) = w.inst() {
+                    let _ = keen(w, &i, ship(her), path.into());
+                }
+            }
+        }
+        w.jobs.drain(w);
+        std::mem::take(&mut *w.out.borrow_mut())
+    }
+
+    #[doc(hidden)]
+    pub fn waiting(&self) -> Waiting {
+        let Some(i) = self.w.inst() else {
+            return Waiting::default();
+        };
+        let mut bones: Vec<u64> = i.poking.borrow().keys().copied().collect();
+        bones.extend(i.flows.borrow().values().copied());
+        Waiting {
+            peeks: i.peeks.borrow().iter().map(|(k, _)| k.clone()).collect(),
+            pokes: i.pokes.borrow().iter().map(|(k, _)| k.clone()).collect(),
+            keens: i.keens.borrow().keys().cloned().collect(),
+            bones,
+        }
+    }
+}
+
 // ------------------------------------------------------------ the world
 
 /// what a promise settles with: the values mesa.mjs's promises carry

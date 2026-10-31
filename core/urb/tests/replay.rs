@@ -209,12 +209,7 @@ fn replay(lines: &str) -> Replayed {
         let now = i["now"].as_u64().unwrap();
         {
             let mut e = eny.borrow_mut();
-            e.left = i["eny"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(text)
-                .collect();
+            e.left = i["eny"].as_array().unwrap().iter().map(text).collect();
             e.drawn.clear();
         }
         let input = match i["k"].as_str().unwrap() {
