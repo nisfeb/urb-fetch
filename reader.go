@@ -119,7 +119,7 @@ func (r *Reader) Poke(n *mesa.Node, her mesa.Ship, bone uint64, agent, mark stri
 	if !small(noun, maxCells) {
 		//  too big to read: what waits on its wire reads it as its large
 		//  value, now; for /want, each %want out to her
-		logf("%s sent a noun of over %d cells or %d bytes", her, maxCells, maxBytes)
+		logf("%s sent a noun of over %d cells or %d MiB of atoms", her, maxCells, maxBytes>>20)
 		w := noun.Head().Path()
 		if w != "/want" {
 			if p := r.peeks[w]; p != nil {
@@ -264,7 +264,7 @@ func small(n mesa.Noun, limit int) bool {
 		t := todo[len(todo)-1]
 		todo = todo[:len(todo)-1]
 		if !t.IsCell() {
-			if bytes += len(t.Bytes()); bytes > maxBytes {
+			if bytes += atomSize(t); bytes > maxBytes {
 				return false
 			}
 			continue
