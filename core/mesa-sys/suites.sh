@@ -18,6 +18,10 @@
 # emulated getpid (zig-wasi-tests.diff does the same for zig), and run
 # with a 1 MiB stack, as wasm/build.sh links mesa.wasm. A wasi build
 # needs WASI_SDK_PATH; a zig run needs ZIG (0.15.2); both need wasmtime.
+#
+# Native builds are for baseline x86-64 in both, and each run prints its
+# C compiler: zig uses its own clang (20 in zig 0.15.2), and mesa-sys the
+# clang on PATH. The comparison is pass, fail or no-build per test.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/../.." && pwd)
@@ -36,21 +40,35 @@ trap 'rm -rf "$work"' EXIT
 results=$work/results
 
 cargo_suites() {
-  set -- -p mesa-sys --message-format=json
+  set -- -p mesa-sys --message-format=json-render-diagnostics
   [ "$mode" = release ] && set -- "$@" --release
   if [ "$mode" = ubsan ]; then
     export MESA_SYS_UBSAN=1 CARGO_TARGET_DIR="$repo/core/target/ubsan"
   fi
   [ "$where" = wasi ] && set -- "$@" --target wasm32-wasip1
-  out=$(cd "$repo/core" && cargo build "$@" |
-    python3 -I -c 'import json,sys
-for l in sys.stdin:
+  # rust-toolchain.toml's rustc, through rustup: a system cargo ahead of
+  # rustup's on PATH would build with another (and may lack wasip1)
+  want=$(sed -n 's/^channel = "\(.*\)"/\1/p' "$repo/core/rust-toolchain.toml")
+  have=$(cd "$repo/core" && rustc --version | cut -d' ' -f2)
+  if [ "$have" != "$want" ]; then
+    echo "suites: rustc $have, not the pinned $want: put rustup's cargo first on PATH" >&2
+    exit 1
+  fi
+  # the build's JSON goes to a file first, so a failed build fails here
+  # (sh has no pipefail)
+  if ! (cd "$repo/core" && cargo build "$@" > "$work/build.json"); then
+    echo "suites: cargo build failed" >&2
+    exit 1
+  fi
+  out=$(python3 -I -c 'import json,sys
+for l in open(sys.argv[1]):
     m=json.loads(l)
     if m.get("reason")=="build-script-executed" and "mesa-sys" in m["package_id"]:
-        print(m["out_dir"])' | tail -1)
+        print(m["out_dir"])' "$work/build.json" | tail -1)
   [ -n "$out" ] || { echo "suites: no mesa-sys build" >&2; exit 1; }
   # MESA_CC, MESA_CFLAGS, MESA_LIBDIR, MESA_ROOT, MESA_WASM
   . "$out/suite.env"
+  echo "suites: rustc $have; C: $("$MESA_CC" --version | head -1)"
   libs="$MESA_LIBDIR/libmesa.a $MESA_LIBDIR/libmesa-urcrypt.a $MESA_LIBDIR/libmesa-sqlite.a"
   for t in $TESTS; do
     name=${t%%:*} file=${t#*:}
@@ -84,6 +102,10 @@ zig_suites() {
   git -C "$upstream" archive HEAD | tar -x -C "$src"
   set -- -Dno-host=true
   [ "$mode" = release ] && set -- "$@" -Doptimize=ReleaseFast
+  # zig builds for the build machine's CPU unless told; mesa-sys builds
+  # for baseline x86-64, so the comparison does too
+  [ "$where" = native ] && set -- "$@" -Dcpu=baseline
+  echo "suites: zig $("$zig" version); C: $("$zig" cc --version | head -1)"
   if [ "$where" = wasi ]; then
     patch -s -d "$src" -p1 < "$repo/wasm/libmesa-wasm32.diff"
     patch -s -d "$src" -p1 < "$here/zig-wasi-tests.diff"
