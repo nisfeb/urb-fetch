@@ -479,3 +479,75 @@ export function digest(trace) {
   }
   return out;
 }
+
+// What a trace put on the wire, by kind: each grubbery message sent and
+// heard as "send <mark> %<tag>" or "hear <mark> %<tag>" (a load's op, a
+// transfer's kind, a wave), each keen and yawn, and each scry we served,
+// found by replaying it with the module's hooks and exports watched.
+// The kinds, not their counts: a poll's repeats vary from one recording
+// to the next. Re-recording compares these too, so a change on the wire
+// that changes no result (the %want leg gone, say) is a drift.
+export async function wire(trace, { wasm }) {
+  const seen = new Set();
+  const real = WebAssembly.instantiate;
+  WebAssembly.instantiate = async (w, imports) => {
+    let X;
+    const text = p => {
+      const m = new Uint8Array(X.memory.buffer);
+      let e = p;
+      while (m[e]) e++;
+      return new TextDecoder().decode(m.subarray(p, e));
+    };
+    const atom = n => {
+      if (X.is_cell(n)) return '?';
+      const len = X.met3(n), p = X.alloc(len || 1);
+      X.atom_bytes(n, p, len);
+      const s = new TextDecoder().decode(new Uint8Array(X.memory.buffer).slice(p, p + len));
+      X.free(p);
+      return s;
+    };
+    const tag = (mark, n) => {
+      if (!mark.startsWith('grubbery-')) return '';
+      if (mark === 'grubbery-intake') return ' %wave';
+      if (!X.is_cell(n) || !X.is_cell(X.tail(n))) return ' ?';
+      const t = X.tail(n);   // a load's op, a transfer's [kind ...]
+      return X.is_cell(t) ? ` %${atom(X.head(t))}` : ' ?';
+    };
+    const h = imports.host;
+    imports.host = {
+      ...h,
+      on_poke(lo, hi, bone, agent, markN, nounN) {
+        const mark = atom(markN);
+        seen.add(`hear ${mark}${tag(mark, nounN)}`);
+        return h.on_poke(lo, hi, bone, agent, markN, nounN);
+      },
+      on_peek(p) {
+        seen.add(`serve scry ${text(p).replace(/\/[^/]+$/, '/<id>')}`.replace(/\/page\/.*\/<id>$/, '/page/<name>/<id>'));
+        return h.on_peek(p);
+      },
+      on_sage(lo, hi, p, gage) {
+        seen.add('hear keen answer');
+        return h.on_sage(lo, hi, p, gage);
+      },
+    };
+    const r = await real(w, imports);
+    X = { ...(r.instance ?? r).exports };
+    const { poke, keen, yawn } = X;
+    X.poke = (lo, hi, bone, a, m, n) => {
+      const mark = text(m);
+      seen.add(`send ${mark}${tag(mark, n)}`);
+      return poke(lo, hi, bone, a, m, n);
+    };
+    X.keen = (lo, hi, p) => (seen.add('send keen'), keen(lo, hi, p));
+    X.yawn = (lo, hi, p) => (seen.add('send yawn'), yawn(lo, hi, p));
+    const inst = { exports: X };
+    return r.instance ? { module: r.module, instance: inst } : inst;
+  };
+  try {
+    const r = await replay(trace, { wasm, label: true });
+    if (!r.ok) throw new Error(`trace: it does not replay (step ${r.at})`);
+  } finally {
+    WebAssembly.instantiate = real;
+  }
+  return [...seen].sort();
+}
