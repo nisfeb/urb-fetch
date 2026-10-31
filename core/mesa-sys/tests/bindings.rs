@@ -51,3 +51,19 @@ fn a_bad_cue_is_none() {
         assert_eq!(mesa_cue_bytes(0, junk.as_ptr()), MESA_NONE);
     }
 }
+
+#[test]
+fn shaf_from_the_private_header() {
+    // (sham 0) is (shaf %mash 0): 0x8799.fb5d.7029.da5e.a250.7d60.e7b4.08b9
+    let mut out = [0u8; 16];
+    unsafe {
+        mesa_shaf(
+            4,
+            c"mash".as_ptr().cast(),
+            0,
+            [0u8; 1].as_ptr(),
+            out.as_mut_ptr(),
+        )
+    };
+    assert_eq!(u128::from_le_bytes(out), 0x8799fb5d7029da5ea2507d60e7b408b9);
+}

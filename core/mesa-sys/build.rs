@@ -86,6 +86,10 @@ const HEADERS: &[&str] = &[
     "gall.h",
 ];
 
+/// Private headers the bindings also cover: sha.h has +shaf, which +sham
+/// is made of. glue.c declares it by hand; here bindgen reads it.
+const PRIVATE: &[&str] = &["sha.h"];
+
 struct Target {
     wasm: bool,
     arch: String,
@@ -344,7 +348,7 @@ fn main() {
         println!("cargo:rustc-link-lib=pthread");
     }
 
-    bindings(&t, &root, &out);
+    bindings(&t, &root, &out, &flags);
     suite_env(&t, &core, &root, &out);
 
     // for crates that link against libmesa's headers
@@ -440,10 +444,13 @@ impl bindgen::callbacks::ParseCallbacks for MacroTypes {
     }
 }
 
-fn bindings(t: &Target, root: &Path, out: &Path) {
+fn bindings(t: &Target, root: &Path, out: &Path, flags: &[String]) {
     let mut wrapper = String::new();
     for h in HEADERS {
         wrapper.push_str(&format!("#include \"mesa/{h}\"\n"));
+    }
+    for h in PRIVATE {
+        wrapper.push_str(&format!("#include \"{h}\"\n"));
     }
     let header = out.join("wrapper.h");
     fs::write(&header, wrapper).unwrap();
@@ -451,6 +458,14 @@ fn bindings(t: &Target, root: &Path, out: &Path) {
     let mut b = bindgen::Builder::default()
         .header(header.to_str().unwrap())
         .clang_arg(format!("-I{}", root.join("include").display()))
+        .clang_arg(format!("-I{}", root.join("src").display()))
+        .clang_arg(format!("-I{}", root.join("vendor").display()))
+        // the private headers read c3's, which need libmesa's defines
+        .clang_args(
+            flags
+                .iter()
+                .filter(|f| f.starts_with("-D") || f.starts_with("-std=")),
+        )
         .use_core()
         .allowlist_function("mesa_.*")
         .allowlist_type("mesa_.*")
