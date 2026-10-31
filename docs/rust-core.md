@@ -269,6 +269,22 @@ So "the same results" means the same pass, fail or no-build per test, not the sa
 
 **A bindgen trap.** bindgen read `MESA_NONE`, which is `((mesa_noun)UINT64_MAX)`, as `i32 = -1`. That compiles and is wrong. build.rs now names the C type of every integer macro and stops the build on one it does not know. The same care goes into every later binding.
 
+## M1's findings (2026-10-31)
+
+**The recorder** is `wasm/trace.mjs`. open() takes two more hooks for it, `timers` and `fetch`, beside `now` and `entropy`. A trace is JSON lines: a head, then one step per input (`call`, `hear`, `tick`, `fetch`), each with its `now` and the entropy it drew, and the outputs it caused (`send`, `commit`, `saveKey`, `start`, `tclose`, `log`, `timer`, `untimer`, `fetch`, `result`, `event`). The clock is fixed for a step. Every step is a macrotask of its own and every hook is synchronous, so Node runs all of a step's microtasks before the next input and each output lands in its input's step. `timer` and `untimer` are the JS's own scheduling: a Rust replay compares the rest and takes each tick's `now`. `node wasm/replay.mjs` replays every trace into a fresh engine and compares each step's outputs, byte for byte.
+
+**The traces** are in `traces/`, recorded by `wasm/record.mjs` against the furum set's `m1c-traces` snapshot (`traces/fixtures.sh` builds it from `hus-lattice`). What the fleet taught:
+
+- On the fake network an identity can be used once per snapshot. A fresh engine is breached at every open (`fake` forces it), and a ship that heard the identity before ignores it after. So each trace is its own fake moon of `~hus`, and re-recording resets the set first.
+- A moon's sponsor on the fake network is a planet nobody runs, so a ship can reach us only once we have sent it something. Trace 5 reads `~hus` first, so its lattice can read us.
+- Lattice's `/share-file` notifies the ship it grants. Sent to an identity that never ran, the notice left `~hus` unanswering that identity later. The fixtures grant by group (`/share-group-save`), which sends nothing.
+- Lattice 81's `/unsub` culls its subscription grub and sends no `%drop`. Grubbery drops the keep when the next wave finds nobody watching (`+take-wave`'s self-heal), so trace 5's drop follows an edit.
+- A deleted page's old binding still answered our keen. Trace 6's keen that misses is of a revision list that names an id the page was never grown at, written through grubbery's `/grubbery/api/over`. Trace 9 rotates the salt the same way, since lattice's `/grub-save` may not write it (its weir refuses the dart and the request hangs).
+
+**The conformance vectors** are in `conformance/` (each file's `about` says what it holds). JS: `node conformance/run.mjs --ext <nisfeb-extension>`. Go: `go test -run TestConformance`. They are of nisfeb-extension 78c30bb, its main, which is 800ff22 plus the gemtext link fix M1a asked for. A mark of `""` is left out of `render-as`: urb.go reads it as no mark, mesa.mjs as text, and no page has it. The Go binding has no public way to make a noun, so the noun, message and decoder vectors run in the JS only; vere checks the kinds they cover in check.mjs.
+
+**CI** runs check.mjs (with the molds), the JS tests, every trace's replay, the vectors in the JS, the extension and the Go, and `go test`. `rerecord.yml` records the traces again on a self-hosted runner labelled `fleet` and fails on a drift (`wasm/drift.mjs` compares the calls, results and events, with dates, ids and a mined comet's name masked). No such runner is registered yet, so it is skipped, with a warning: set the repository variable `FLEET_RUNNER` to `yes` once one is. `traces/rerecord.sh` runs it by hand.
+
 ## Testing beyond the traces
 
 - **The fake fleet, automated.** One script resets the furum set to `hus-lattice` and runs the stage 3, furum and lattice forum checks against the JS engine and then the Rust engine, with the same assertions. Run it for every milestone from M3 on.
