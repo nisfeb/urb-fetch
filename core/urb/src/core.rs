@@ -232,6 +232,12 @@ pub enum Request {
     PubRemove(String),
     /// pub.pages()
     PubPages,
+    /// log what other ships ask of what publish() serves, as
+    /// wasm/pub-cli.mjs does by wrapping grub.serve and scry.serve: each
+    /// file looked up, each change of the keeps and each scry is a
+    /// [`Output::Log`] in pub-cli's words. For the native command line;
+    /// no trace sets it.
+    Watch(bool),
     /// furum(urb, host)'s calls
     Furum {
         host: String,
@@ -389,6 +395,7 @@ impl Core {
                 urb: RefCell::new(None),
                 publ: RefCell::new(None),
                 forums: RefCell::new(HashMap::new()),
+                watch: Cell::new(false),
             }),
         }
     }
@@ -604,6 +611,8 @@ pub(crate) struct World {
     publ: RefCell<Option<Rc<Pub>>>,
     /// trace.mjs's app.forums: forum(urb, host) for each host
     forums: RefCell<HashMap<String, Rc<ForumSt>>>,
+    /// Request::Watch
+    watch: Cell<bool>,
 }
 
 impl Drop for World {
@@ -861,6 +870,10 @@ impl World {
                 let p = self.publ("pages")?;
                 let r = Json::Obj(p.st.borrow().pages.clone());
                 Ok(Val::Reply(Reply::Json(r)))
+            }
+            Request::Watch(on) => {
+                self.watch.set(on);
+                Ok(Val::Reply(Reply::True))
             }
         }
     }
@@ -1359,10 +1372,17 @@ impl World {
         };
         let scries = i.server.borrow().scries.clone();
         match scries {
-            Some(f) => match f(self, path)? {
-                Some(v) => Ok(Some(Noun::of(&v)?)),
-                None => Ok(None),
-            },
+            Some(f) => {
+                let got = f(self, path)?;
+                if self.watch.get() {
+                    let what = if got.is_some() { "answered" } else { "nothing" };
+                    self.log(format!("scry {path}: {what}"));
+                }
+                match got {
+                    Some(v) => Ok(Some(Noun::of(&v)?)),
+                    None => Ok(None),
+                }
+            }
             None => Ok(None),
         }
     }
@@ -1698,6 +1718,11 @@ pub(crate) type Scries = Rc<dyn Fn(&World, &str) -> Result<Option<Value<'static>
 /// grub.serve's onKeepers, which hears every change of the keeps
 pub(crate) type OnKeepers = Rc<dyn Fn(&World, Vec<Json>)>;
 
+/// pub-cli's folder.replace(DESK_BASE, '<base>'), the first only
+fn watched(folder: &str) -> String {
+    folder.replacen(crate::url::DESK_BASE, "<base>", 1)
+}
+
 /// a JS Map of the keeps we answer, by `<ship> <folder> <name>`, in the
 /// order they were first set
 #[derive(Default)]
@@ -1755,7 +1780,17 @@ impl Inst {
     fn file(&self, w: &World, folder: &str, name: &str) -> Result<Option<File<'static>>, Failure> {
         let files = self.server.borrow().files.clone();
         match files {
-            Some(f) => f(w, folder, name),
+            Some(f) => {
+                let got = f(w, folder, name)?;
+                if w.watch.get() {
+                    let what = match &got {
+                        Some(f) => format!("rev {}", js::string(f.rev.as_ref())),
+                        None => "not ours".into(),
+                    };
+                    w.log(format!("file {}/{name}: {what}", watched(folder)));
+                }
+                Ok(got)
+            }
             None => Ok(None),
         }
     }
@@ -1767,6 +1802,24 @@ impl Inst {
             (s.on_keepers.clone(), s.keepers.values())
         };
         if let Some(f) = f {
+            if w.watch.get() {
+                let each: Vec<String> = ks
+                    .iter()
+                    .map(|k| {
+                        let o = |n| match k {
+                            Json::Obj(o) => js::string(o.get(n)),
+                            _ => "undefined".into(),
+                        };
+                        format!("{} {}/{}", o("ship"), watched(&o("folder")), o("name"))
+                    })
+                    .collect();
+                let all = if each.is_empty() {
+                    "none".into()
+                } else {
+                    each.join(", ")
+                };
+                w.log(format!("keeps: {all}"));
+            }
             f(w, ks);
         }
     }

@@ -756,3 +756,98 @@ fn every_forum_action_clams_against_lattices_action_ft() {
     assert_eq!(bad, 0, "{bad} of {} disagree with vere", cases.len());
 }
 
+/// Request::Watch: what other ships ask of what publish() serves, logged
+/// in wasm/pub-cli.mjs's words, as its wrappers of grub.serve and
+/// scry.serve log it (the native `urb serve` turns it on)
+#[test]
+fn watching_logs_what_pub_cli_logs() {
+    use urb::core::Hook;
+    use urb::publish::{pub_dir, vault};
+    let mut c = Core::new(|n| vec![7; n]);
+    let us = urb::engine::ship_parse("~nec").unwrap();
+    let logs = |c: &mut Core, now: u64, req: Request| -> Vec<String> {
+        let o = c.step(now, Input::Call { id: now, req }).unwrap();
+        o.into_iter()
+            .filter_map(|o| match o {
+                Output::Log(l) => Some(l),
+                _ => None,
+            })
+            .collect()
+    };
+    logs(
+        &mut c,
+        1,
+        Request::Open {
+            keyfile: Some(urb::engine::fake_keyfile(us)),
+            rows: None,
+            fresh: true,
+            fake: true,
+        },
+    );
+    // nothing is logged before publish() serves, or while not watching
+    assert!(logs(&mut c, 2, Request::Watch(true)).is_empty());
+    let pubreq = Request::Pub {
+        pages: None,
+        keepers: None,
+    };
+    assert!(logs(&mut c, 3, pubreq).is_empty());
+    let put = |name: &str| Request::PubPut {
+        name: name.into(),
+        body: "# hi".into(),
+        mark: Some("md".into()),
+    };
+    assert_eq!(
+        logs(&mut c, 4, put("notes/hello")),
+        vec![
+            "file <base>/pub/vault/notes/hello/gmi: rev 1",
+            "file <base>/pub/revs: rev 1",
+            "file <base>/pub/index: rev 1",
+        ]
+    );
+    let (dir, vault) = (pub_dir(), vault());
+    let hook = |c: &mut Core, v: Value<'static>| -> Vec<String> {
+        let n = urb::Noun::of(&v).unwrap();
+        c.hook(10, Hook::Poke("~zod", "grubbery-load", n.borrow()))
+            .into_iter()
+            .filter_map(|o| match o {
+                Output::Log(l) => Some(l),
+                _ => None,
+            })
+            .collect()
+    };
+    assert_eq!(
+        hook(&mut c, load("/peek/1", &dir, "nope", "peek")),
+        vec!["file <base>/pub/nope: not ours"]
+    );
+    assert_eq!(
+        hook(
+            &mut c,
+            load("/keep/1", &format!("{vault}/notes/hello"), "gmi", "keep")
+        ),
+        vec![
+            "file <base>/pub/vault/notes/hello/gmi: rev 1",
+            "keeps: ~zod <base>/pub/vault/notes/hello/gmi",
+        ]
+    );
+    assert_eq!(
+        hook(
+            &mut c,
+            load("/keep/1", &format!("{vault}/notes/hello"), "gmi", "drop")
+        ),
+        vec![
+            "file <base>/pub/vault/notes/hello/gmi: rev 1",
+            "keeps: none"
+        ]
+    );
+    let scry = c.hook(11, Hook::Peek("/g/x/1/grubbery//1/pub/page/nope/0v1"));
+    assert!(
+        scry.iter()
+            .any(|o| matches!(o, Output::Log(l) if l == "scry /g/x/1/grubbery//1/pub/page/nope/0v1: nothing")),
+        "{scry:?}"
+    );
+    // and off again
+    logs(&mut c, 12, Request::Watch(false));
+    assert!(logs(&mut c, 13, put("notes/hello")).is_empty());
+    drop(c);
+    assert_eq!(alive(), 0);
+}
