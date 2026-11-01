@@ -117,7 +117,15 @@ function reset() {
   const r = spawnSync(FLEET, ['--as', WHO, 'reset', 'furum', SNAP], { encoding: 'utf8' });
   if (r.status !== 0) throw new Error(`fleet reset: ${r.stderr}`);
   const jar = join(out, 'hus.jar');
-  const c = spawnSync(COOKIE, [`${process.env.HOME}/fleet/piers/hus`, HUS, jar], { encoding: 'utf8' });
+  // ~hus's web server can take a few seconds more than the reset to
+  // answer: ship-cookie is tried up to 5 times, each wait printed
+  let c;
+  for (let i = 1; ; i++) {
+    c = spawnSync(COOKIE, [`${process.env.HOME}/fleet/piers/hus`, HUS, jar], { encoding: 'utf8' });
+    if (c.status === 0 || i >= 5) break;
+    console.log(`waiting for ~hus's web server (${i}): ${c.stderr.trim()}`);
+    spawnSync('sleep', ['5']);
+  }
   if (c.status !== 0) throw new Error(`ship-cookie: ${c.stderr}`);
   const line = readFileSync(jar, 'utf8').split('\n').find(l => l.includes('urbauth-'));
   const f = line.split('\t');
@@ -130,6 +138,7 @@ function reset() {
 //   stdout and stderr:
 //   - our own ship's name, where the sides differ (`us`): read-only
 //     cases run each side as its own fake moon, so the name differs;
+//     likewise the state folder, in the cases that print it;
 //   - lattice's page ids (0v…, 20 digits or more): random per page;
 //   - in cases that write (`dates`), the minute of a new post: the
 //     two sides post minutes apart.
@@ -172,7 +181,7 @@ function normErr(text, us, dates) {
 
 // ~hus's flake (M7's findings): no answer for a new moon within the
 // base probes. Only this is retried, never a content difference.
-const flaked = x => /answered no lattice peek\s*$/.test(x[2]);
+const flaked = x => /answered no lattice peek/.test(x[2].trimEnd().split('\n').at(-1));
 
 const results = [], retries = [];
 function compare(name, n, r, us, dates = false) {
@@ -238,6 +247,19 @@ if (want('read-relay-down')) {
     writeFileSync(join(s, 'comet.key'), `${key}\n`);
   }
   check('read-relay-down', run('node', 'read', args, sn), run('rust', 'read', args, sr), []);
+}
+
+// pages.json can't be saved (its .new, or itself, a directory), and a
+// page's file is a directory: put fails in writeFileSync's, renameSync's
+// and readFileSync's words. A fake galaxy that is no fleet ship's.
+for (const [name, block] of [['serve-save-fails-open', 'pages.json.new'],
+  ['serve-save-fails-rename', 'pages.json/x'], ['serve-put-directory', null]]) {
+  if (!want(name)) continue;
+  const [sn, sr] = [state(name, 'node'), state(name, 'rust')];
+  for (const s of [sn, sr]) mkdirSync(join(s, 'fake-nec', block ?? ''), { recursive: true });
+  writeFileSync(join(out, 'page.md'), '# a page\n');
+  const args = ['--fake', '~nec', '--put', `notes=${block ? join(out, 'page.md') : out}`];
+  check(name, run('node', 'serve', args, sn), run('rust', 'serve', args, sr), [sn, sr]);
 }
 
 // ------------------------------------------------------------ the fleet
