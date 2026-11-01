@@ -142,7 +142,7 @@ fn run<'a>(f: &str, a: &[Value<'a>]) -> Result<J, String> {
             J::Array(
                 files
                     .into_iter()
-                    .map(|(p, n)| json!([p, cord_of(n)]))
+                    .map(|(p, n)| json!([p, cord_of(n.noun())]))
                     .collect(),
             )
         })

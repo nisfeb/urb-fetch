@@ -456,6 +456,16 @@ pub fn file_of<'a, T>(
     Ok(Some(conv(val.tail()?.tail()?)))
 }
 
+/// [`file_of`] of a silo measured whole: the file is a part of it, so it
+/// is measured too
+pub fn file_in<'a, T>(
+    snap: NounRef<'a>,
+    silo: Measured<'a>,
+    conv: impl FnOnce(Measured<'a>) -> T,
+) -> R<Option<T>> {
+    file_of(snap, silo.0, |n| conv(Measured(n)))
+}
+
 /// A directory's files, as [(path, noun)], each path relative to it,
 /// out of its %snap: mesa.mjs's ballOf. A tree that holds itself, one
 /// deeper than [`MAX_SEGS`], or a walk past [`MAX_CELLS`] trees and
@@ -468,7 +478,7 @@ pub fn file_of<'a, T>(
 pub fn ball_of<'a, T>(
     snap: NounRef<'a>,
     silo: NounRef<'a>,
-    conv: impl FnOnce(Vec<(Vec<String>, NounRef<'a>)>) -> T,
+    conv: impl FnOnce(Vec<(Vec<String>, Measured<'a>)>) -> T,
 ) -> R<Option<T>> {
     let Some(top) = jobe_of(snap)? else {
         return Ok(None);
@@ -498,7 +508,7 @@ pub fn ball_of<'a, T>(
 struct Ball<'a> {
     jects: HashMap<Int, NounRef<'a>>,
     nouns: HashMap<Int, NounRef<'a>>,
-    out: Vec<(Vec<String>, NounRef<'a>)>,
+    out: Vec<(Vec<String>, Measured<'a>)>,
     above: HashSet<Int>,
     work: usize,
     budget: Budget,
@@ -551,7 +561,7 @@ impl<'a> Ball<'a> {
             let name = e.head()?;
             let seg = knot(name)?;
             self.budget.print(len + 1 + name.size()?)?;
-            let val = measure_in(val, &mut self.budget)?.noun();
+            let val = measure_in(val, &mut self.budget)?;
             let mut p = at.to_vec();
             p.push(seg);
             self.out.push((p, val));

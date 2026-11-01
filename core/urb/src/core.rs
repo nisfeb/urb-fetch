@@ -1069,7 +1069,7 @@ impl World {
                     let got = {
                         let snap = st.snap.borrow();
                         let snap = snap.as_ref().expect("a want has its snap");
-                        st.read.read(snap.borrow(), r.noun())
+                        st.read.read(snap.borrow(), r)
                     };
                     match got {
                         Ok(v) => v,
@@ -1096,9 +1096,9 @@ impl World {
         };
         if tag == "snap" {
             // [dest snap-id snap=(unit [cass pace refs]) data=(unit silo)]
-            let rest = r.noun().tail()?.tail()?;
-            let snap = codec::unit(rest.head()?);
-            let data = codec::unit(rest.tail()?);
+            let rest = r.tail()?.tail()?;
+            let snap = codec::unit(rest.head()?.noun());
+            let data = rest.tail()?.tail().ok();
             if let (Some(snap), None) = (snap, data) {
                 // too big to inline: ask for the content
                 let id = r.noun().tail()?.head()?.int(64)?;
@@ -1333,7 +1333,7 @@ fn check(err: i32, what: &str) -> Result<(), Failure> {
 // ------------------------------------------------------------ the module
 
 /// how a peek reads what it got: a file or a directory, and its conv
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum Conv2 {
     /// a /pub/revs: its $json object, or {} for anything else
     Revs,
@@ -1341,17 +1341,28 @@ enum Conv2 {
     Text,
     Exists,
     Files,
+    /// an app's own reading of a file (furum's and forum's)
+    File(FileConv),
+    /// an app's own reading of a directory's files
+    Dir(DirConv),
 }
 
-#[derive(Clone, Copy)]
+/// a file's noun, read during its peek's hook: a noun is only borrowed
+pub(crate) type FileConv = Rc<dyn for<'a> Fn(Measured<'a>) -> Result<Val, Failure>>;
+/// a directory's files, [path, noun], read during its peek's hook
+pub(crate) type DirConv =
+    Rc<dyn for<'a> Fn(Vec<(Vec<String>, Measured<'a>)>) -> Result<Val, Failure>>;
+
+#[derive(Clone)]
 struct Read {
     dir: bool,
     conv: Conv2,
 }
 
 impl Read {
-    fn conv(&self, n: NounRef<'_>) -> Result<Val, Failure> {
-        Ok(match self.conv {
+    fn conv(&self, m: Measured<'_>) -> Result<Val, Failure> {
+        let n = m.noun();
+        Ok(match &self.conv {
             Conv2::Revs => match codec::json(n)? {
                 Json::Obj(o) => Val::Obj(Rc::new(o)),
                 _ => Val::Obj(Rc::new(Object::default())),
@@ -1370,31 +1381,36 @@ impl Read {
                 }
             }
             Conv2::Exists => Val::Bool(true),
-            Conv2::Files => return Err(Failure::type_error("files.map is not a function")),
+            Conv2::File(f) => return f(m),
+            Conv2::Files | Conv2::Dir(_) => {
+                return Err(Failure::type_error("files.map is not a function"));
+            }
         })
     }
 
     /// what a %snap and its silo hold, as this read reads it; Null if
     /// the silo lacks it
-    fn read(&self, snap: NounRef<'_>, silo: NounRef<'_>) -> Result<Val, Failure> {
+    fn read(&self, snap: NounRef<'_>, silo: Measured<'_>) -> Result<Val, Failure> {
         if self.dir {
-            let conv = self.conv;
-            let got = codec::ball_of(snap, silo, |files| -> Result<Val, Failure> {
+            let conv = self.conv.clone();
+            let got = codec::ball_of(snap, silo.noun(), |files| -> Result<Val, Failure> {
                 match conv {
                     Conv2::Files => {
                         let mut out = Vec::new();
                         for (p, n) in files {
+                            let n = n.noun();
                             out.push((p, if n.is_cell() { None } else { Some(n.text()?) }));
                         }
                         Ok(Val::Files(Rc::new(out)))
                     }
                     Conv2::Exists => Ok(Val::Bool(true)),
+                    Conv2::Dir(f) => f(files),
                     _ => Err(Failure::type_error("n.text is not a function")),
                 }
             })?;
             return got.unwrap_or(Ok(Val::Null));
         }
-        let got = codec::file_of(snap, silo, |n| self.conv(n))?;
+        let got = codec::file_in(snap, silo, |n| self.conv(n))?;
         got.unwrap_or(Ok(Val::Null))
     }
 }

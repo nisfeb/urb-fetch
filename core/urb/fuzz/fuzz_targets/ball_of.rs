@@ -9,7 +9,7 @@ fuzz_target!(|data: &[u8]| {
         let r = ball_of(n[0].borrow(), n[1].borrow(), |files| {
             files
                 .into_iter()
-                .map(|(p, f)| (p, cord(f)))
+                .map(|(p, f)| (p, cord(f.noun())))
                 .collect::<Vec<_>>()
         });
         urb_fuzz::hostile(&r);
