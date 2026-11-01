@@ -3,7 +3,8 @@
 //! and one to an address go out of the relay's UDP port to where the
 //! fake network has them, and a datagram back to that port comes in
 //! through the WebSocket with its address. A relay nobody runs fails
-//! the start with the shim's words.
+//! the start with the shim's words, and so, after 10 s, does one that
+//! accepts and never answers the upgrade.
 //!
 //! It builds the relay with `go build` (or takes URB_FETCH, a built
 //! one). Without go it skips, unless REQUIRE_ALL is set.
@@ -65,6 +66,26 @@ fn a_relay_nobody_runs_fails_the_start() {
         r.start("~zod", tx).unwrap_err(),
         "can't reach the relay at ws://127.0.0.1:1"
     );
+}
+
+#[test]
+fn a_relay_that_never_answers_fails_the_start() {
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("ws://{}", l.local_addr().unwrap());
+    let held = std::thread::spawn(move || l.accept());
+    let mut r = Relay::new(&url);
+    let (tx, _rx) = channel();
+    let t = std::time::Instant::now();
+    assert_eq!(
+        r.start("~zod", tx).unwrap_err(),
+        format!("can't reach the relay at {url}")
+    );
+    let took = t.elapsed();
+    assert!(
+        took >= Duration::from_secs(9) && took < Duration::from_secs(15),
+        "{took:?}"
+    );
+    drop(held);
 }
 
 #[test]

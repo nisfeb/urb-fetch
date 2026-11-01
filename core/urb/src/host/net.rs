@@ -510,11 +510,26 @@ fn frame(op: u8, data: &[u8]) -> Vec<u8> {
     f
 }
 
+/// how long the relay has to connect and upgrade, as mesa.mjs's
+/// RELAY_CONNECT_TIMEOUT: a relay that accepts and says nothing fails the
+/// start instead of hanging it
+const RELAY_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// open the WebSocket and name the ship
 fn ws_connect(url: &str, ship: &str) -> Result<TcpStream, String> {
     let fail = || format!("can't reach the relay at {url}");
     let (addr, host, path) = ws_parts(url).ok_or_else(fail)?;
-    let mut s = TcpStream::connect(&addr).map_err(|_| fail())?;
+    let end = std::time::Instant::now() + RELAY_CONNECT_TIMEOUT;
+    let left = || {
+        end.checked_duration_since(std::time::Instant::now())
+            .filter(|d| !d.is_zero())
+    };
+    let mut s = addr
+        .to_socket_addrs()
+        .map_err(|_| fail())?
+        .find_map(|a| TcpStream::connect_timeout(&a, left()?).ok())
+        .ok_or_else(fail)?;
+    s.set_write_timeout(left()).map_err(|_| fail())?;
     let key = base64(&random(16));
     let hello = format!(
         "GET {path} HTTP/1.1\r\nHost: {host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\
@@ -524,6 +539,8 @@ fn ws_connect(url: &str, ship: &str) -> Result<TcpStream, String> {
     let mut head = Vec::new();
     let mut b = [0u8; 1];
     while !head.ends_with(b"\r\n\r\n") {
+        s.set_read_timeout(Some(left().ok_or_else(fail)?))
+            .map_err(|_| fail())?;
         if s.read(&mut b).map_err(|_| fail())? == 0 || head.len() > 16384 {
             return Err(fail());
         }
@@ -535,6 +552,9 @@ fn ws_connect(url: &str, ship: &str) -> Result<TcpStream, String> {
     }
     s.write_all(&frame(1, ship.as_bytes()))
         .map_err(|_| fail())?;
+    // past the upgrade, the socket waits as long as the relay is quiet
+    s.set_read_timeout(None).map_err(|_| fail())?;
+    s.set_write_timeout(None).map_err(|_| fail())?;
     Ok(s)
 }
 
