@@ -182,3 +182,34 @@ func TestRewriteHTMLAttributes(t *testing.T) {
 		}
 	}
 }
+
+// Schemes match in any case in ASCII only, and a protocol-relative
+// link may start with any of JavaScript's whitespace, as the
+// extension's safeLink reads them. Go's (?i) folds ſ (U+017F) into s,
+// so httpſ://e.example was a link here and text there.
+func TestSafeLinkAsTheExtension(t *testing.T) {
+	for target, want := range map[string]bool{
+		"httpſ://e.example/x":       false,
+		"HTTPſ://e.example":         false,
+		"httpſ:x":                   false,
+		" //e.example":              false,
+		"\xef\xbb\xbf\\\\e.example": false,
+		"HTTPS://e.example":         true,
+		"ſ/x":                       true, // no colon: a path on the ship
+	} {
+		if got := safeLink(target); got != want {
+			t.Errorf("safeLink(%q) = %v", target, got)
+		}
+	}
+	if href, _ := zodLink("httpſ://e.example/x"); href != "" {
+		t.Errorf("httpſ:// links to %q", href)
+	}
+	g := renderGemtext("=> httpſ://e.example/x web", "t", zodLink)
+	if !strings.Contains(g, `<p class="link">web (httpſ://e.example/x)</p>`) {
+		t.Errorf("gemtext: %s", g)
+	}
+	m := renderMarkdown("[web](httpſ://e.example/x)", "t", zodLink)
+	if !strings.Contains(m, "<p>web</p>") {
+		t.Errorf("markdown: %s", m)
+	}
+}

@@ -47,6 +47,7 @@ const APP_BASE = '/apps/lattice.lattice_app';
 const REVS_TTL = 60_000;     // +revs-ttl
 const KEEN_TIMEOUT = 10_000; // +mesa-timeout
 const PEEK_TIMEOUT = 30_000; // +remote-timeout
+const RELAY_CONNECT_TIMEOUT = 10_000;   // the relay's connect and upgrade
 //  how long a revision list's peek whose caller gave up still waits for
 //  a late answer, as the Go gateway's reader waits (lateWait). A
 //  publisher holds its answers in order behind one it couldn't deliver
@@ -424,8 +425,12 @@ export function relayTransport(url, log = console.error) {
   const connect = () => new Promise((resolve, reject) => {
     const s = new WebSocket(url);
     let opened = false;
+    //  a relay that accepts and never answers the upgrade would hang
+    //  start, and every reconnect after it: give it up, which closes it
+    const late = setTimeout(() => s.close(), RELAY_CONNECT_TIMEOUT);
     s.binaryType = 'arraybuffer';
     s.onopen = () => {
+      clearTimeout(late);
       opened = true;
       ws = s;
       s.send(ship);
@@ -438,6 +443,7 @@ export function relayTransport(url, log = console.error) {
     };
     s.onerror = () => {};
     s.onclose = () => {
+      clearTimeout(late);
       if (ws === s) ws = null;
       if (!opened) reject(new Error(`can't reach the relay at ${url}`));
       if (!closed) setTimeout(() => connect().catch(() => {}), 2000);
@@ -1222,16 +1228,20 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   const our = shipText(...us);
 
   //  the transport is up before the engine opens: opening can send
+  //  and any failure after it closes it again (torn rows, a refused open)
   await transport.start(our, onPacket);
-  if (rows?.length) check(withBytes(rows, (p, n) => X.store_load(p, n)), 'store_load');
-  //  a fake ship is rebooted fresh, so it may always start from empty state
-  const breached = fake || (fresh && !rows?.length);
-  const err = call(() => withStr(keyfile, p => X.open(p, BigInt(now()), breached ? 1 : 0, fake ? 1 : 0)));
-  if (err === -2) {
+  try {
+    if (rows?.length) check(withBytes(rows, (p, n) => X.store_load(p, n)), 'store_load');
+    //  a fake ship is rebooted fresh, so it may always start from empty state
+    const breached = fake || (fresh && !rows?.length);
+    const err = call(() => withStr(keyfile, p => X.open(p, BigInt(now()), breached ? 1 : 0, fake ? 1 : 0)));
+    if (err === -2) throw new Error(`${our} has run before, and its state here is empty. Starting it from nothing would replay old messages, so breach it on its parent (|moon-breach) and add its new key.`);
+    check(err, 'open');
+  } catch (e) {
+    clearTimeout(timer);
     transport.close();
-    throw new Error(`${our} has run before, and its state here is empty. Starting it from nothing would replay old messages, so breach it on its parent (|moon-breach) and add its new key.`);
+    throw e;
   }
-  check(err, 'open');
 
   // the noun readers an app's own reading needs, valid during the call
   // that hands a noun out

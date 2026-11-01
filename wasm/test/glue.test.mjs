@@ -80,3 +80,18 @@ test('saved rows with a length past the buffer are refused, not wrapped', async 
   assert.equal(row([1, 0, 0, 0, 107, 0xfe, 0xff, 0xff, 0xff, 118]), -1);
   assert.equal(row([1, 0, 0]), -1);
 });
+
+test('torn saved rows fail the open and close the transport it started', async () => {
+  const keyfile = await fakeKeyfile(wasm, MOON);
+  const store = {
+    load: () => ({ keyfile, rows: new Uint8Array([1, 0, 0]), fresh: false }),
+    saveKey() {},
+    commit() {},
+  };
+  let started = 0, closed = 0;
+  const transport = { start() { started++; }, send() {}, close() { closed++; } };
+  const err = await open({ wasm, transport, store, fake: false, log: () => {} })
+    .then(() => null, e => e);
+  assert.match(err?.message ?? '', /store_load failed/);
+  assert.equal(closed, started);
+});
