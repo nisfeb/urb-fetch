@@ -18,3 +18,7 @@ native = ["dep:ureq"]
 urb-render = { path = "../urb-render" }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 proptest = { version = "1", default-features = false, features = ["std"] }
+
+[[test]]
+name = "host"
+required-features = ["native"]
