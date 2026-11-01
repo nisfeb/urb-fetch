@@ -8,6 +8,8 @@
 //   - a failed open() leaves nothing running: a failed saveKey starts no
 //     transport, and a failed start, torn rows or a module that stops
 //     while opening leave no timer, and no transport the core started
+//   - render.wasm compiles on its first call: a failure throws there,
+//     not at import
 //
 //   node shim/fail.mjs
 
@@ -198,6 +200,28 @@ const settle = (p, w) => Promise.race([
     /^mesa\.wasm stopped: no entropy/.test(e?.message), e?.message);
   check('stopped while opening: no timer left, and no transport left started',
     w.timers.size === 0 && w.started === w.closed, `${w.timers.size} live, started ${w.started}, closed ${w.closed}`);
+}
+
+// --------------------------------------------- render.wasm, compiled late
+
+{
+  const Module = WebAssembly.Module;
+  WebAssembly.Module = function () { throw new Error('wasm is off'); };
+  let imported = null, first = null, second = null;
+  try {
+    imported = await import('./render.js?off');
+    try { imported.call('render_looks_html', [' <p>']); } catch (e) { first = e; }
+    try { imported.call('render_looks_html', [' <p>']); } catch (e) { second = e; }
+  } catch (e) {
+    imported = e;
+  } finally {
+    WebAssembly.Module = Module;
+  }
+  check('render.wasm: importing it compiles nothing', typeof imported?.call === 'function', imported?.message);
+  check('render.wasm: a failed compile throws at the call, and at each after',
+    /wasm is off/.test(first?.message) && second?.message === first?.message, `${first?.message} / ${second?.message}`);
+  const { call } = await import('./render.js');
+  check('render.wasm: compiled on its first call, it renders', call('render_looks_html', [' <p>']) === true);
 }
 
 console.log(failed ? `\n${failed} failed` : '\nall passed');

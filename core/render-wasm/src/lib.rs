@@ -4,7 +4,8 @@
 //! mesa.mjs's renderAs, looksHtml, deUrb, uv and da. The extension's
 //! service worker imports them, and a module service worker can't wait
 //! on a top-level await, so the shim compiles this module synchronously
-//! from bytes it carries. It has no imports at all, WASI's included.
+//! from bytes it carries. It imports the WASI calls mesa.wasm does, and
+//! nothing else.
 //!
 //! Every export takes its arguments as one JSON array, through a buffer
 //! from `render_alloc`, and leaves its answer as JSON in the result
