@@ -47,6 +47,7 @@ const APP_BASE = '/apps/lattice.lattice_app';
 const REVS_TTL = 60_000;     // +revs-ttl
 const KEEN_TIMEOUT = 10_000; // +mesa-timeout
 const PEEK_TIMEOUT = 30_000; // +remote-timeout
+const RELAY_CONNECT_TIMEOUT = 10_000;   // the relay's connect and upgrade
 const ROLLER = 'https://roller.urbit.org/v1/azimuth';
 const STARS = 'https://bootstrap.urbit.org/comet-stars.jam';
 const KNOT = /^[a-z0-9~._-]+$/;
@@ -418,8 +419,12 @@ export function relayTransport(url, log = console.error) {
   const connect = () => new Promise((resolve, reject) => {
     const s = new WebSocket(url);
     let opened = false;
+    //  a relay that accepts and never answers the upgrade would hang
+    //  start, and every reconnect after it: give it up, which closes it
+    const late = setTimeout(() => s.close(), RELAY_CONNECT_TIMEOUT);
     s.binaryType = 'arraybuffer';
     s.onopen = () => {
+      clearTimeout(late);
       opened = true;
       ws = s;
       s.send(ship);
@@ -432,6 +437,7 @@ export function relayTransport(url, log = console.error) {
     };
     s.onerror = () => {};
     s.onclose = () => {
+      clearTimeout(late);
       if (ws === s) ws = null;
       if (!opened) reject(new Error(`can't reach the relay at ${url}`));
       if (!closed) setTimeout(() => connect().catch(() => {}), 2000);
