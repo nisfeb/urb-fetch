@@ -58,6 +58,8 @@ const GONE = 0xffffffff;     // a deleted row's vlen
 // ponytail: a cap on the keeps we answer, so a ship can't grow our state
 // without bound; past it a keep gets its first wave and no news
 const MAX_KEEPERS = 256;
+// and each ship's share of them
+const PER_SHIP = 64;
 
 // wasm hands 64-bit integers to JS as signed BigInts: read them unsigned
 const u64 = x => BigInt.asUintN(64, x);
@@ -1022,6 +1024,13 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   // A %peek, %keep or %drop of one of our files, in a hook: answer it on
   // our flow to the asker's %grubbery, as grubbery's +process-peek and
   // +keep do. Only files the host serves are ever answered with content.
+  // how many keeps [ship] holds
+  const keptBy = ship => {
+    let n = 0;
+    for (const k of keepers.values()) if (k.ship === ship) n++;
+    return n;
+  };
+
   function serveLoad(her, wire, dest, tag) {
     const at = dest.head.int() ? null : [pathOf(dest.tail.head), dest.tail.tail.text()];
     const f = at && files(...at);
@@ -1037,9 +1046,18 @@ export async function open({ wasm, transport, store, log = console.error, env = 
            [wire, 'snap', dest, id, snap && [null, snap], data && [null, data]]);
       return;
     }
-    if (f && (keepers.has(k) || keepers.size < MAX_KEEPERS)) {
-      keepers.set(k, { ship, wire: segments(wire), folder: at[0], name: at[1] });
-      keepersChanged([...keepers.values()]);
+    //  A keep may wait for a page not yet published, or one taken down
+    //  and put up again, as lattice's reader keeps it. So that one ship
+    //  can't fill every slot, each ship has PER_SHIP of them, inside
+    //  MAX_KEEPERS; a keep held already is never evicted. A keep held
+    //  already and unchanged isn't saved again, so a repeated keep costs
+    //  no write.
+    if (f && (keepers.has(k) || (keepers.size < MAX_KEEPERS && keptBy(ship) < PER_SHIP))) {
+      const kept = { ship, wire: segments(wire), folder: at[0], name: at[1] };
+      if (JSON.stringify(keepers.get(k)) !== JSON.stringify(kept)) {
+        keepers.set(k, kept);
+        keepersChanged([...keepers.values()]);
+      }
     }
     //  the first wave answers the keep, even for nothing
     poke(her, flowTo(her), 'grubbery', 'grubbery-intake', [wire, dest, waveOf(f, at?.[1])]);
