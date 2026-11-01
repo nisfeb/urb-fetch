@@ -85,6 +85,8 @@ jobs:
         run: node shim/replay.mjs
       - name: saved rows, across today's mesa.wasm and the Rust one
         run: node shim/rows.mjs
+      - name: the shims' failure paths
+        run: node shim/fail.mjs
       - name: the extension's tests and renderer vectors, on the shims
         run: |
           (cd "$RUNNER_TEMP/ext-shim" && npm test)

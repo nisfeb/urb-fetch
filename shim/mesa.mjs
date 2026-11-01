@@ -179,6 +179,9 @@ function errorOf(e, kind) {
 
 // ------------------------------------------------------------- the module
 
+// an error the module answered with (code 1), not one thrown out of it
+const ANSWERED = Symbol('answered');
+
 // mesa.wasm instantiated: its exports, and text in and out of them. host
 // is {log, env, entropy}.
 export async function instantiate(wasm, { log = console.error, env = {}, entropy = randomBytes } = {}) {
@@ -198,14 +201,20 @@ export async function instantiate(wasm, { log = console.error, env = {}, entropy
   });
   X = inst.exports;
   // fn(...pre, text): its answer as text; 1 is an error, thrown as
-  // err(message)
+  // err(message) and tagged as the module's answer. Anything else thrown
+  // is thrown out of the module (a trap, proc_exit, a host hook's throw,
+  // a stack overflow), and the module may be left half way.
   const text = (fn, pre, t, err = m => new Error(m)) => {
     const b = enc.encode(t);
     const p = X.urb_alloc(b.length);
     new Uint8Array(X.memory.buffer).set(b, p);
     const code = X[fn](...pre, p, b.length);
     const out = dec.decode(new Uint8Array(X.memory.buffer, X.urb_out_ptr(), X.urb_out_len()));
-    if (code !== 0) throw err(out);
+    if (code !== 0) {
+      const e = err(out);
+      e[ANSWERED] = true;
+      throw e;
+    }
     return out;
   };
   const answer = () => dec.decode(new Uint8Array(X.memory.buffer, X.urb_out_ptr(), X.urb_out_len()));
@@ -311,9 +320,12 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   // for it to be saved, as do the transport's close and everything after
   // a start, until each settles. With a store that answers at once,
   // nothing waits.
+  // Nothing runs after a failed saveKey or start: open() then throws
+  // with nothing more started or saved, as before.
   let tail = null;
   function after(f, failed) {
     const run = () => {
+      if (keyFailed || startFailed) return;
       try {
         return f();
       } catch (e) {
@@ -336,27 +348,36 @@ export async function open({ wasm, transport, store, log = console.error, env = 
 
   // ----------------------------------------------------------- stepping
 
-  let stepping = 0;
   let live = [];             // the core's timers: [kind, due], in the order set
 
-  function step(input) {
-    if (dead) throw dead;
-    let r;
-    stepping++;
-    try {
-      r = JSON.parse(text('urb_core_step', [h, now()], JSON.stringify(input)));
-    } catch (e) {
-      if (e instanceof WebAssembly.RuntimeError) {
-        dead = new Error(`mesa.wasm stopped: ${e.message}`);
-        for (const [, c] of calls) c.reject?.(dead);
-        calls.clear();
-        clearTimeout(timer);
-        throw dead;
-      }
-      throw e;
-    } finally {
-      stepping--;
+  // Anything thrown out of the module but its own answer stops it: a
+  // step that didn't finish has the core taken out, and the module may be
+  // half way. Every waiting call is rejected, later ones are refused, and
+  // the timer stops.
+  function die(e) {
+    if (!dead) {
+      dead = new Error(`mesa.wasm stopped: ${e?.message ?? e}`);
+      for (const [, c] of calls) c.reject?.(dead);
+      calls.clear();
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      timerDue = null;
+      live = [];
     }
+    return dead;
+  }
+  // text() on the module, its throws (but its answers) stopping it
+  function guarded(fn, pre, t, err) {
+    if (dead) throw dead;
+    try {
+      return text(fn, pre, t, err);
+    } catch (e) {
+      throw e?.[ANSWERED] ? e : die(e);
+    }
+  }
+
+  function step(input) {
+    const r = JSON.parse(guarded('urb_core_step', [h, now()], JSON.stringify(input)));
     live = r.timers;
     for (const o of r.out) act(o);
     if (!firing) arm();
@@ -409,6 +430,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   };
 
   let startFailed = null, keyFailed = null;
+  let started = false, stopped = false;   // the transport's start and close run
   const onPacket = (ip, port, bytes) => {
     if (dead) return;
     try {
@@ -428,9 +450,15 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     } else if ('saveKey' in o) {
       after(() => store.saveKey(o.saveKey), e => { keyFailed = e; });
     } else if ('start' in o) {
-      after(() => transport.start(o.start, onPacket), e => { startFailed = e; });
+      after(() => {
+        started = true;
+        return transport.start(o.start, onPacket);
+      }, e => { startFailed = e; });
     } else if ('tclose' in o) {
-      after(() => transport.close(), log);
+      after(() => {
+        stopped = true;
+        return transport.close();
+      }, log);
     } else if ('log' in o) {
       log(o.log);
     } else if ('fetch' in o) {
@@ -512,24 +540,40 @@ export async function open({ wasm, transport, store, log = console.error, env = 
 
   // ----------------------------------------------------------- start
 
-  const { keyfile, rows, fresh } = await store.load();
-  let our;
+  // A failed open leaves nothing running: no engine, no timer, and no
+  // transport (closed if it started and the core didn't close it).
+  let our, failed = null;
   try {
+    const { keyfile, rows, fresh } = await store.load();
     ({ our } = await call('open', { keyfile: keyfile ?? null, rows: rows?.length ? hex(rows) : null, fresh: Boolean(fresh) }, { fake }));
-  } finally {
-    await settled();
+  } catch (e) {
+    failed = e;
   }
-  if (keyFailed) throw keyFailed;
-  if (startFailed) {
-    clearTimeout(timer);
-    X.urb_core_free(h);
-    throw startFailed;
+  await settled();
+  failed = keyFailed ?? startFailed ?? failed;
+  if (failed) {
+    if (started && !startFailed && !stopped) {
+      try {
+        transport.close();
+      } catch (e) {
+        log(e);
+      }
+    }
+    const wasDead = dead;
+    die(failed);
+    if (!wasDead) {
+      try {
+        X.urb_core_free(h);
+      } catch {}
+    }
+    throw failed;
   }
 
   const hash = (fn, x) => {
     try {
-      return text(fn, [], JSON.stringify(enc_(x)));
+      return guarded(fn, [], JSON.stringify(enc_(x)));
     } catch (e) {
+      if (e === dead) throw e;
       const m = /^(\w+): (.*)$/s.exec(e.message);
       throw m ? new (ERRORS[m[1]] ?? Error)(m[2]) : e;
     }
