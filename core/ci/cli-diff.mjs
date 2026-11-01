@@ -21,11 +21,10 @@
 // snapshot on the fake network, so read-only cases run on one reset,
 // each side as its own fake moon, the name masked; a case that writes
 // (a post, a comment, a vote, a page served) resets the set before each
-// side, which then runs as the same moon. What is masked: the time at
-// the start of each log line, durations (`1.2s`), our own ship's name
-// where the two sides differ, lattice's random page ids (0v…), and, in
-// cases that write, the minute a new post was made. Node's stack traces
-// are dropped, keeping the error's own line.
+// side, which then runs as the same moon. Exit code, stdout and stderr
+// are compared byte for byte once masked; mask() and normErr() list each
+// mask and why. A read-only case is retried only for ~hus's flake (no
+// answer at all), and every retry is printed and counted.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -125,35 +124,65 @@ function reset() {
   cookie = `${f[5]}=${f[6]}`;
 }
 
-// what differs from run to run, masked. Of the lines without a time,
-// only an error's own line (and a Rust panic's) is kept: the rest is
-// Node's printing of an uncaught error, its source line and stack.
-function norm(text, us, dates) {
-  const lines = [];
-  for (let l of text.split('\n')) {
+// What differs from run to run, masked, the same on both sides. Each
+// normalisation, and why (docs/rust-core.md, M7's findings, lists them
+// too):
+//   stdout and stderr:
+//   - our own ship's name, where the sides differ (`us`): read-only
+//     cases run each side as its own fake moon, so the name differs;
+//   - lattice's page ids (0v…, 20 digits or more): random per page;
+//   - in cases that write (`dates`), the minute of a new post: the
+//     two sides post minutes apart.
+//   stderr only:
+//   - the time at the start of a log line (`mm:ss.sss `): wall clock;
+//   - durations (`1.2s`): wall clock;
+//   - Node's printing of an error's stack, which the native command
+//     line leaves out by design: an uncaught error's source line block
+//     (`file:///…:N` or `node:…:N`, the source line, the caret, a blank
+//     line), the `    at …` frames, the `{ code: … }` block after them
+//     and the closing `Node.js vN.N.N`. The error's own line is kept.
+// Nothing else is dropped: stdout is compared byte for byte once masked.
+function mask(text, us, dates) {
+  for (const u of us) text = text.split(u).join('<us>');
+  text = text.replace(/0v[0-9a-v.]{20,}/g, '<id>');
+  if (dates) text = text.replace(/\b\d{4}-\d\d-\d\dT\d\d:\d\d\b/g, '<date>');
+  return text;
+}
+function normErr(text, us, dates) {
+  const ls = text.split('\n'), kept = [];
+  let frames = false;
+  for (let i = 0; i < ls.length; i++) {
+    let l = ls[i];
+    if (/^(file:\/\/\/|node:)\S+:\d+$/.test(l) && /^\s*\^+\s*$/.test(ls[i + 2] ?? '') && ls[i + 3] === '') {
+      i += 3;
+      continue;
+    }
+    if (/^    at /.test(l)) { frames = true; continue; }
+    if (frames && (/^  [\w$]+: /.test(l) || l === '}')) continue;
+    frames = false;
+    if (/^Node\.js v\d+\.\d+\.\d+$/.test(l)) {
+      if (kept.at(-1) === '') kept.pop();
+      continue;
+    }
     if (/^\d\d:\d\d\.\d\d\d /.test(l)) l = l.slice(10);
-    else if (!/^\w*Error( \[\w+\])?: /.test(l) && !/^thread '/.test(l)) continue;
-    for (const u of us) l = l.split(u).join('<us>');
-    l = l.replace(/\b\d+\.\ds\b/g, '<t>s').replace(/0v[0-9a-v.]{20,}/g, '<id>');
-    if (dates) l = l.replace(/\b\d{4}-\d\d-\d\dT\d\d:\d\d\b/g, '<date>');
-    lines.push(l);
+    kept.push(l.replace(/\b\d+\.\ds\b/g, '<t>s'));
   }
-  return lines.join('\n');
+  return mask(kept.join('\n'), us, dates);
 }
 
-const results = [];
-// the same? A first try that may be retried is reported as such, and
-// not counted
-function compare(name, n, r, us, dates = false, again = false) {
-  const show = x => `exit ${x[0]}\n--- stdout\n${norm(x[1], us, dates)}\n--- stderr\n${norm(x[2], us, dates)}\n`;
+// ~hus's flake (M7's findings): no answer for a new moon within the
+// base probes. Only this is retried, never a content difference.
+const flaked = x => /answered no lattice peek\s*$/.test(x[2]);
+
+const results = [], retries = [];
+function compare(name, n, r, us, dates = false) {
+  const show = x => `exit ${x[0]}\n--- stdout\n${mask(x[1], us, dates)}\n--- stderr\n${normErr(x[2], us, dates)}\n`;
   const [a, b] = [show(n), show(r)];
-  writeFileSync(join(out, `${name}.node`), `${a}\n=== raw stderr\n${n[2]}`);
-  writeFileSync(join(out, `${name}.rust`), `${b}\n=== raw stderr\n${r[2]}`);
-  const same = a === b;
-  if (!same && again) {
-    console.log(`retry ${name}: ${norm(n[2], us).split('\n').at(-1)} | ${norm(r[2], us).split('\n').at(-1)}`);
-    return false;
-  }
+  writeFileSync(join(out, `${name}.node`), `${a}\n=== raw stdout\n${n[1]}\n=== raw stderr\n${n[2]}`);
+  writeFileSync(join(out, `${name}.rust`), `${b}\n=== raw stdout\n${r[1]}\n=== raw stderr\n${r[2]}`);
+  return [a === b, a, b];
+}
+function report(name, [same, a, b]) {
   results.push([name, same]);
   console.log(`${same ? 'same' : 'DIFF'}  ${name}`);
   if (!same) {
@@ -164,6 +193,7 @@ function compare(name, n, r, us, dates = false, again = false) {
   }
   return same;
 }
+const check = (name, n, r, us, dates) => report(name, compare(name, n, r, us, dates));
 
 const want = name => !only.size || only.has(name);
 const state = (name, side) => join(out, 'state', `${name}-${side}`);
@@ -175,6 +205,7 @@ const offline = [
   ['read-unknown-option', 'read', ['--nope', 'urb://~hus']],
   ['read-missing-value', 'read', ['urb://~hus', '--tries']],
   ['read-moon-missing', 'read', ['--moon', '/nonexistent/moon.key', 'urb://~hus']],
+  ['read-moon-directory', 'read', ['--moon', '/tmp', 'urb://~hus']],
   ['read-fake-and-relay', 'read', ['--fake', '~hus', '--relay', 'ws://localhost:1', 'urb://~hus']],
   ['read-fake-not-a-ship', 'read', ['--fake', '~natdul-molfab-dozzod-dozhus', 'urb://~hus']],
   ['furum-usage', 'furum', ['~rup']],
@@ -193,7 +224,7 @@ const offline = [
 }
 for (const [name, cmd, args] of offline) {
   if (!want(name)) continue;
-  compare(name, run('node', cmd, args, state(name, 'node')), run('rust', cmd, args, state(name, 'rust')), []);
+  check(name, run('node', cmd, args, state(name, 'node')), run('rust', cmd, args, state(name, 'rust')), []);
 }
 // a comet whose relay is down: open fails as the transport's start does
 // (trace 1's comet, so nothing is mined from the live bootstrap)
@@ -206,7 +237,7 @@ if (want('read-relay-down')) {
     mkdirSync(s, { recursive: true });
     writeFileSync(join(s, 'comet.key'), `${key}\n`);
   }
-  compare('read-relay-down', run('node', 'read', args, sn), run('rust', 'read', args, sr), []);
+  check('read-relay-down', run('node', 'read', args, sn), run('rust', 'read', args, sr), []);
 }
 
 // ------------------------------------------------------------ the fleet
@@ -244,18 +275,30 @@ if (reads.some(r => want(r[0]))) {
   for (const [name, cmd, args, what] of reads) {
     if (!want(name)) continue;
     // ~hus now and then answers no new moon for a few seconds, Node's
-    // and ours alike (docs/rust-core.md, M7's findings): a read-only
-    // case that differs is run once more, both sides as new moons
+    // and ours alike (docs/rust-core.md, M7's findings): a case where
+    // one side got no answer at all is run once more, both sides as new
+    // moons, the side that went first now second. Any other difference
+    // is reported as it is. Each try keeps its own files.
     for (let tries = 1; ; tries++) {
       const [a, b] = [moon(), moon()];
-      const n = run('node', cmd, ['--fake', a, ...args], state(`${name}-${tries}`, 'node'));
-      const r = run('rust', cmd, ['--fake', b, ...args], state(`${name}-${tries}`, 'rust'));
-      // a traced run's datagrams are as many as the network made them
-      if (what === 'stdout') {
-        n[2] = n[2].split('\n').filter(l => / (as|ok) /.test(l)).join('\n');
-        r[2] = r[2].split('\n').filter(l => / (as|ok) /.test(l)).join('\n');
+      const go = side => {
+        const x = run(side, cmd, ['--fake', side === 'node' ? a : b, ...args], state(`${name}-${tries}`, side));
+        // a traced run's datagrams are as many as the network made them
+        if (what === 'stdout') x[2] = x[2].split('\n').filter(l => / (as|ok) /.test(l)).join('\n');
+        return x;
+      };
+      let n, r;
+      if (tries % 2) { n = go('node'); r = go('rust'); } else { r = go('rust'); n = go('node'); }
+      const label = tries > 1 ? `${name}-try${tries}` : name;
+      const c = compare(label, n, r, [a, b]);
+      if (!c[0] && tries < 2 && (flaked(n) || flaked(r))) {
+        const who = [flaked(n) && `node as ${a}`, flaked(r) && `rust as ${b}`].filter(Boolean).join(', ');
+        retries.push(`${name}: no answer for ${who} (first ${tries % 2 ? 'node' : 'rust'})`);
+        console.log(`retry ${name}: ~hus answered no lattice peek for ${who}`);
+        continue;
       }
-      if (compare(name, n, r, [a, b], false, tries < 2) || tries >= 2) break;
+      report(name, c);
+      break;
     }
   }
 }
@@ -277,7 +320,7 @@ for (const [name, cmd, args] of writes) {
   const n = run('node', cmd, ['--fake', m, ...args], state(name, 'node'));
   reset();
   const r = run('rust', cmd, ['--fake', m, ...args], state(name, 'rust'));
-  compare(name, n, r, [], true);
+  check(name, n, r, [], true);
 }
 
 // serving: pages put and one removed, read by ~hus's lattice; then each
@@ -298,15 +341,15 @@ if (want('serve')) {
   const n = await serveRun('node', args, sn, urls);
   reset();
   const r = await serveRun('rust', args, sr, urls);
-  compare('serve', n, r, []);
+  check('serve', n, r, []);
   // again, crossed: no ship can read a fake moon heard before, so only
   // what each says of the pages it finds
   const again = ['--fake', m];
   const n2 = await serveRun('node', again, sr, []);
   const r2 = await serveRun('rust', again, sn, []);
-  compare('serve-again-crossed', n2, r2, []);
+  check('serve-again-crossed', n2, r2, []);
   const bad = ['--fake', m, '--put', 'BAD NAME=' + join(dir, 'hello.md')];
-  compare('serve-bad-name', await serveRun('node', bad, state('serve-bad', 'node'), []),
+  check('serve-bad-name', await serveRun('node', bad, state('serve-bad', 'node'), []),
     await serveRun('rust', bad, state('serve-bad', 'rust'), []), []);
 }
 
@@ -315,6 +358,6 @@ finish();
 
 function finish() {
   const bad = results.filter(r => !r[1]).map(r => r[0]);
-  console.log(`\ncli-diff: ${results.length - bad.length} of ${results.length} the same${bad.length ? `; differ: ${bad.join(', ')}` : ''} (outputs in ${out})`);
+  console.log(`\ncli-diff: ${results.length - bad.length} of ${results.length} the same${bad.length ? `; differ: ${bad.join(', ')}` : ''}; ${retries.length} retried${retries.map(r => `\n  retry ${r}`).join('')}\n(outputs in ${out})`);
   process.exit(bad.length ? 1 : 0);
 }
