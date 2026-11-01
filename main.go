@@ -75,7 +75,7 @@ func main() {
 		}
 		stop()
 	}()
-	srv := &http.Server{Handler: &gateway{r, port}, ReadHeaderTimeout: 10 * time.Second}
+	srv := newServer(&gateway{r, port})
 	for _, ln := range lns[1:] {
 		go srv.Serve(ln)
 	}
@@ -88,6 +88,21 @@ func main() {
 		log.Fatal(err)
 	}
 	node.Close()
+}
+
+// newServer is the gateway's HTTP server. A web page can open
+// connections to it, so none is held for a client that sends nothing
+// or sends slowly: 10 s for a request's head, 10 s from its start for
+// its head and body together (the body Go discards for a kept-alive
+// connection), and 10 s for the next request to start on a kept-alive
+// connection, which was unbounded.
+func newServer(h http.Handler) *http.Server {
+	return &http.Server{
+		Handler:           h,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		IdleTimeout:       10 * time.Second,
+	}
 }
 
 // oneIdentity refuses -fake with -moon: each names who the gateway runs as.
