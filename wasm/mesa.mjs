@@ -47,6 +47,12 @@ const APP_BASE = '/apps/lattice.lattice_app';
 const REVS_TTL = 60_000;     // +revs-ttl
 const KEEN_TIMEOUT = 10_000; // +mesa-timeout
 const PEEK_TIMEOUT = 30_000; // +remote-timeout
+//  how long a revision list's peek whose caller gave up still waits for
+//  a late answer, as the Go gateway's reader waits (lateWait). A
+//  publisher holds its answers in order behind one it couldn't deliver
+//  (to an earlier run), so after a restart the first can come a minute
+//  or two late.
+const LATE_WAIT = 300_000;
 const ROLLER = 'https://roller.urbit.org/v1/azimuth';
 const STARS = 'https://bootstrap.urbit.org/comet-stars.jam';
 const KNOT = /^[a-z0-9~._-]+$/;
@@ -783,8 +789,16 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   // grubbery's cross-ship peek of one file: [dest-dir, name], or with
   // name null of the directory folder and all under it (a deep peek, as
   // lattice's +peek-remote-wait). conv takes the file's noun, or the
-  // directory's files as [[path, noun]]. Null after wait ms.
-  function peek(her, folder, name, conv, wait = PEEK_TIMEOUT) {
+  // directory's files as [[path, noun]]. Null after wait ms; with late,
+  // undefined (no answer) after wait ms, and an answer that comes after
+  // that goes to late, for LATE_WAIT.
+  function peek(her, folder, name, conv, wait = PEEK_TIMEOUT, late = null) {
+    for (const [w, st] of peeks) {
+      if (st.gone !== undefined && now() - st.gone > LATE_WAIT) {
+        peeks.delete(w);
+        if (st.snap) X.unref(st.snap.n);
+      }
+    }
     const wire = `/urb-fetch/${nonce}/${++wires}`;
     const lane = name === null ? [false, path(folder)] : [true, path(folder), name];
     return new Promise((resolve, reject) => {
@@ -793,14 +807,26 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       const settle = f => {
         if (st.done) return;
         st.done = true;
-        clearTimeout(st.timer);
+        if (st.gone === undefined) clearTimeout(st.timer);
         peeks.delete(wire);
         if (st.snap) X.unref(st.snap.n);
         f();
       };
-      st.finish = v => settle(() => resolve(v));   // null: refused, nothing there, or no answer
-      st.fail = e => settle(() => reject(e));      // an answer we could not read
-      st.timer = setTimeout(() => st.finish(null), wait);
+      //  null: refused, nothing there, or no answer. Once its caller has
+      //  its answer (none), an answer goes to late.
+      st.finish = v => settle(() => {
+        if (st.gone === undefined) return resolve(v);
+        if (v !== null) {
+          log(`a late answer came in on ${wire}`);
+          late(v);
+        }
+      });
+      st.fail = e => settle(() => st.gone === undefined && reject(e));   // an answer we could not read
+      st.timer = setTimeout(() => {
+        if (!late) return st.finish(null);
+        st.gone = now();   // it waits on for a late answer
+        resolve(undefined);
+      }, wait);
       peeks.set(wire, st);
       txn(() => {
         st.bone = flowTo(her);
@@ -1072,26 +1098,40 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   // A peer's /pub/revs, or null if it has none there. One we can't read
   // (over the caps, or not a $json object) is an empty list, as lattice's
   // +fetch-peer-revs reads it, so its pages still read by the vault peek.
+  // An entry with no id (a non-empty string) is no entry: there is
+  // nothing to keen.
   const revsOf = n => {
     const j = json(n);
-    return j && typeof j === 'object' && !Array.isArray(j) ? j : {};
+    if (!j || typeof j !== 'object' || Array.isArray(j)) return {};
+    return Object.fromEntries(Object.entries(j).filter(([, e]) => typeof e?.id === 'string' && e.id !== ''));
   };
-  const peekRevs = (her, b) => peek(her, b + '/pub', 'revs', revsOf)
-    .catch(e => (e instanceof UrbError ? {} : Promise.reject(e)));
+  // undefined if she didn't answer in time. A list that comes after
+  // that is kept, with its base, for the next read: after a restart a
+  // publisher's first answers can come a minute or two late.
+  const peekRevs = (her, who, b) => peek(her, b + '/pub', 'revs', revsOf, PEEK_TIMEOUT, v => {
+    if (v && typeof v === 'object') {
+      bases.set(who, b);
+      revs.set(who, { at: now(), list: v });
+    }
+  }).catch(e => (e instanceof UrbError ? {} : Promise.reject(e)));
 
   // +peer-base: where the peer runs lattice, asked, not guessed
   async function base(her, who) {
     if (!bases.has(who)) {
       for (const b of [DESK_BASE, APP_BASE]) {
-        const got = await peekRevs(her, b);
+        const got = await peekRevs(her, who, b);
+        //  no answer: the other place would only wait behind the same
+        //  stall. later: a ship catching up on a comet that moved
+        //  answers in a minute or two
+        if (got === undefined) throw Object.assign(new UrbError(`${who} answered no lattice peek (offline, or no lattice)`), { later: true });
         if (got !== null) {
           bases.set(who, b);
           revs.set(who, { at: now(), list: got });
           break;
         }
       }
-      //  later: a ship catching up on a comet that moved answers in a minute or two
-      if (!bases.has(who)) throw Object.assign(new UrbError(`${who} answered no lattice peek (offline, or no lattice)`), { later: true });
+      //  each place answered, with nothing: no lattice to wait for
+      if (!bases.has(who)) throw new UrbError(`${who} answered no lattice peek (offline, or no lattice)`);
     }
     return bases.get(who);
   }
@@ -1101,18 +1141,23 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     const b = await base(her, who);
     let r = revs.get(who);
     if (!r || now() - r.at > REVS_TTL) {
-      r = { at: now(), list: (await peekRevs(her, b)) ?? {} };
+      const at = now(), got = await peekRevs(her, who, b);
+      //  no answer yet: the stale list beats none, which would read
+      //  every page by the vault peek, as %gmi
+      if (got === undefined && r) return r.list;
+      r = { at, list: got ?? {} };
       revs.set(who, r);
     }
     return r.list;
   }
 
-  // +read-page-body-rev: keen the listed id, else peek the vault file.
-  // [body, how, mark]. The vault file is %gmi whatever the page's format
-  // and carries no other mark, so a page read by peek is %gmi.
-  async function page(her, who, rel) {
+  // +read-page-body-rev: keen the id the read's list names, else peek the
+  // vault file. [body, how, mark]. The vault file is %gmi whatever the
+  // page's format and carries no other mark, so a page read by peek is
+  // %gmi.
+  async function page(her, who, rel, list) {
     const key = '/' + rel.join('/');
-    const ent = (await revList(her, who))[key];
+    const ent = list[key];
     if (ent) {
       const got = await keen(her, `/g/x/1/grubbery//1/pub/page${key}/${ent.id}`);
       if (got && PAGE_MARKS.has(got.mark) && got.body !== null) return [got.body, 'keen', got.mark];
@@ -1153,7 +1198,8 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       : Object.keys(list).length && !hit(rel) ? [rel]
       : [rel, dex];
     for (const p of tries) {
-      const [body, how, mark] = await page(her, who, p);
+      //  each try looks in the one list this read got
+      const [body, how, mark] = await page(her, who, p, list);
       if (body !== null) return { key: '/' + p.join('/'), body, how, mark };
     }
     throw new UrbError(`${url}: not published`);
