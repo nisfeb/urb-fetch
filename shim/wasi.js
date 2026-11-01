@@ -5,9 +5,11 @@
 //  for a descriptor that isn't open.
 //
 //    random_get            the standard library's hash seeds (HashMap's
-//                          RandomState, serde_json's maps): real random
-//                          bytes. They never reach an output; the
-//                          engine's entropy is the host's (host.entropy)
+//                          RandomState, serde_json's maps): random(n)'s
+//                          bytes, crypto.getRandomValues unless the host
+//                          gives one (a replay pins it). They never reach
+//                          an output; the engine's entropy is the host's
+//                          (host.entropy)
 //    environ_sizes_get,    the environment: env's entries, so MESA_TRACE=1
 //    environ_get           turns libmesa's packet log on, as before
 //    fd_write              stdout and stderr, as lines to log (a panic's
@@ -21,15 +23,22 @@
 const ESUCCESS = 0, EBADF = 8, ESPIPE = 70
 const STDIO = (fd) => fd === 0 || fd === 1 || fd === 2
 
-export function wasi(memory, log = console.error, env = {}, name = 'mesa.wasm') {
+const cryptoBytes = (n) => {
+  const b = new Uint8Array(n)
+  for (let at = 0; at < n; at += 65536) crypto.getRandomValues(b.subarray(at, Math.min(n, at + 65536)))
+  return b
+}
+
+export function wasi(memory, log = console.error, env = {}, name = 'mesa.wasm', random = cryptoBytes) {
   const enc = new TextEncoder(), dec = new TextDecoder()
   const pending = { 1: '', 2: '' }
   const vars = Object.entries(env).map(([k, v]) => enc.encode(`${k}=${v}\0`))
   const view = () => new DataView(memory().buffer)
   return {
     random_get(buf, len) {
-      const m = new Uint8Array(memory().buffer, buf, len)
-      for (let at = 0; at < len; at += 65536) crypto.getRandomValues(m.subarray(at, Math.min(len, at + 65536)))
+      const b = random(len)
+      if (!(b instanceof Uint8Array) || b.length !== len) throw new Error(`random gave ${b?.length} bytes for ${len}`)
+      new Uint8Array(memory().buffer, buf, len).set(b)
       return ESUCCESS
     },
     environ_sizes_get(count, size) {

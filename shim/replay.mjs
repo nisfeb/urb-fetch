@@ -5,7 +5,10 @@
 // the native and WASI builds. The trace's timer and untimer outputs are
 // the JS's own scheduling: after each step the core's timers must be the
 // ones the JS had live, by kind and due. Each step must draw exactly the
-// entropy the trace says it drew.
+// entropy the trace says it drew. Each trace runs twice, with WASI's
+// random_get (the standard library's hash seeds) pinned to all 0x00 and
+// then all 0xff bytes, so nothing seeded reaches an output, and a
+// failure is the same every run.
 //
 //   node shim/replay.mjs [FILE.jsonl ...]
 
@@ -29,9 +32,10 @@ function strip(o) {
   return o;
 }
 
-async function replay(t) {
+async function replay(t, seed) {
   let left = [], drawn = 0, wrong = null;
   const { X, text } = await instantiate(module, {
+    random: n => new Uint8Array(n).fill(seed),
     entropy(n) {
       const h = left.shift();
       if (h === undefined || h.length !== 2 * n) {
@@ -91,12 +95,15 @@ let bad = 0;
 for (const f of files) {
   const t = fromLines(readFileSync(f, 'utf8'));
   const name = f.split('/').pop();
-  const start = Date.now();
-  const r = await replay(t);
-  if (r.ok) console.log(`ok    ${name}: ${t.steps.length} steps (${Date.now() - start} ms)`);
-  else {
-    bad++;
-    console.log(`FAIL  ${name}: step ${r.at} of ${t.steps.length}: ${r.why}`);
+  for (const seed of [0x00, 0xff]) {
+    const start = Date.now();
+    const r = await replay(t, seed);
+    const s = `seed 0x${seed.toString(16).padStart(2, '0')}`;
+    if (r.ok) console.log(`ok    ${name} (${s}): ${t.steps.length} steps (${Date.now() - start} ms)`);
+    else {
+      bad++;
+      console.log(`FAIL  ${name} (${s}): step ${r.at} of ${t.steps.length}: ${r.why}`);
+    }
   }
 }
 process.exit(bad ? 1 : 0);

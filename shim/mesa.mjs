@@ -183,14 +183,16 @@ function errorOf(e, kind) {
 const ANSWERED = Symbol('answered');
 
 // mesa.wasm instantiated: its exports, and text in and out of them. host
-// is {log, env, entropy}.
-export async function instantiate(wasm, { log = console.error, env = {}, entropy = randomBytes } = {}) {
+// is {log, env, entropy, random}: random(n) serves WASI's random_get,
+// the standard library's hash seeds, apart from the engine's entropy so
+// it never shifts the engine's draws.
+export async function instantiate(wasm, { log = console.error, env = {}, entropy = randomBytes, random } = {}) {
   const module = wasm instanceof WebAssembly.Module ? wasm : await WebAssembly.compile(wasm);
   const left = unanswered(module);
   if (left.length) throw new Error(`mesa.wasm asks for WASI imports this host lacks: ${left.join(', ')}`);
   let X = null;
   const inst = await WebAssembly.instantiate(module, {
-    wasi_snapshot_preview1: wasi(() => X.memory, log, env),
+    wasi_snapshot_preview1: wasi(() => X.memory, log, env, 'mesa.wasm', random),
     host: {
       entropy(p, n) {
         const b = entropy(n);
@@ -302,10 +304,10 @@ const conv = name => Object.assign(() => {
 const CONVS = { cord: conv('cord'), text: conv('text'), exists: conv('exists'), files: conv('files') };
 
 export async function open({ wasm, transport, store, log = console.error, env = {}, fake = false,
-                             now = Date.now, entropy = randomBytes,
+                             now = Date.now, entropy = randomBytes, random,
                              timers = globalTimers, fetch = globalFetch }) {
   const { setTimeout, clearTimeout } = timers;
-  const { X, text, answer } = await instantiate(wasm, { log, env, entropy });
+  const { X, text, answer } = await instantiate(wasm, { log, env, entropy, random });
   const h = X.urb_core_new();
 
   let dead = null;        // why the module stopped, once it has

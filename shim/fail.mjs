@@ -8,6 +8,7 @@
 //   - a failed open() leaves nothing running: a failed saveKey starts no
 //     transport, and a failed start, torn rows or a module that stops
 //     while opening leave no timer, and no transport the core started
+//   - random_get is the host's random(n) when it gives one
 //   - render.wasm compiles on its first call: a failure throws there,
 //     not at import
 //
@@ -200,6 +201,18 @@ const settle = (p, w) => Promise.race([
     /^mesa\.wasm stopped: no entropy/.test(e?.message), e?.message);
   check('stopped while opening: no timer left, and no transport left started',
     w.timers.size === 0 && w.started === w.closed, `${w.timers.size} live, started ${w.started}, closed ${w.closed}`);
+}
+
+// --------------------------------------------- random_get
+
+{
+  let asked = 0;
+  const { X } = await M.instantiate(wasm, { random: n => { asked += n; return new Uint8Array(n).fill(0xaa); } });
+  X.urb_core_free(X.urb_core_new());
+  const w = world({ random: n => { asked += n; return new Uint8Array(n); } });
+  const urb = await M.open(w.opts);
+  await settle(urb.close(), w);
+  check('random_get is the host\'s random(n)', asked > 0, `${asked} bytes asked`);
 }
 
 // --------------------------------------------- render.wasm, compiled late
