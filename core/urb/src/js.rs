@@ -185,14 +185,23 @@ pub enum Json {
 /// first place and its last value, and the keys come out as JS orders
 /// them, array indices first, in numeric order, then the rest in the
 /// order they were first set.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Object {
-    keys: Vec<(String, Json)>,
+#[derive(Clone, Debug, PartialEq)]
+pub struct Object<V = Json> {
+    keys: Vec<(String, V)>,
     at: HashMap<String, usize>,
 }
 
-impl Object {
-    pub fn set(&mut self, key: String, value: Json) {
+impl<V> Default for Object<V> {
+    fn default() -> Self {
+        Object {
+            keys: Vec::new(),
+            at: HashMap::new(),
+        }
+    }
+}
+
+impl<V> Object<V> {
+    pub fn set(&mut self, key: String, value: V) {
         match self.at.get(&key) {
             Some(&i) => self.keys[i].1 = value,
             None => {
@@ -210,13 +219,13 @@ impl Object {
         self.keys.is_empty()
     }
 
-    pub fn get(&self, key: &str) -> Option<&Json> {
+    pub fn get(&self, key: &str) -> Option<&V> {
         self.at.get(key).map(|&i| &self.keys[i].1)
     }
 
     /// the entries, in the order Object.entries gives them
-    pub fn entries(&self) -> Vec<(&str, &Json)> {
-        let mut idx: Vec<(u32, &str, &Json)> = Vec::new();
+    pub fn entries(&self) -> Vec<(&str, &V)> {
+        let mut idx: Vec<(u32, &str, &V)> = Vec::new();
         let mut rest = Vec::new();
         for (k, v) in &self.keys {
             match array_index(k) {
@@ -450,6 +459,96 @@ fn write_str(s: &str, out: &mut String) {
     out.push('"');
 }
 
+/// A JS value as an app's call gives it back: furum's and forum's
+/// records, with their BigInts and Dates (trace.mjs's `$big` and
+/// `$date`). A Date of None is an invalid one.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Js {
+    Null,
+    Bool(bool),
+    Num(f64),
+    Big(crate::Int),
+    Str(String),
+    /// ms since 1970, within where a Date reaches
+    Date(Option<i64>),
+    Arr(Vec<Js>),
+    Obj(Object<Js>),
+}
+
+impl Js {
+    /// an object of these entries, in this order
+    pub fn obj<const N: usize>(kv: [(&str, Js); N]) -> Js {
+        let mut o = Object::default();
+        for (k, v) in kv {
+            o.set(k.into(), v);
+        }
+        Js::Obj(o)
+    }
+
+    /// text, or null
+    pub fn text(s: Option<String>) -> Js {
+        s.map_or(Js::Null, Js::Str)
+    }
+}
+
+/// the furthest a Date reaches either way, in ms
+pub const MAX_MS: i64 = 8_640_000_000_000_000;
+
+/// Number(n) of a BigInt: the nearest f64, ties to even
+pub fn int_number(n: &crate::Int) -> f64 {
+    let b = n.le();
+    if b.len() <= 16 {
+        let mut w = [0u8; 16];
+        w[..b.len()].copy_from_slice(b);
+        return u128::from_le_bytes(w) as f64;
+    }
+    // the top 64 bits, with a sticky bit for any below them, round as
+    // the whole does
+    let bits = b.len() * 8 - b[b.len() - 1].leading_zeros() as usize;
+    let shift = bits - 64;
+    let bit = |i: usize| b[i / 8] >> (i % 8) & 1 == 1;
+    let mut top = 0u64;
+    for i in 0..64 {
+        if bit(shift + i) {
+            top |= 1 << i;
+        }
+    }
+    if (0..shift).any(bit) {
+        top |= 1;
+    }
+    top as f64 * 2f64.powi(shift as i32)
+}
+
+/// Date.prototype.toISOString of ms, a time within [`MAX_MS`]
+pub fn iso(ms: i64) -> String {
+    let days = ms.div_euclid(86_400_000);
+    let t = ms.rem_euclid(86_400_000);
+    // civil_from_days (Howard Hinnant)
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    let year = if (0..=9999).contains(&y) {
+        format!("{y:04}")
+    } else if y < 0 {
+        format!("-{:06}", -y)
+    } else {
+        format!("+{y:06}")
+    };
+    format!(
+        "{year}-{m:02}-{d:02}T{:02}:{:02}:{:02}.{:03}Z",
+        t / 3_600_000,
+        t / 60_000 % 60,
+        t / 1000 % 60,
+        t % 1000
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -588,5 +687,36 @@ mod tests {
         assert_eq!(utf8(b"a\xffb"), "a\u{fffd}b");
         assert_eq!(utf8(b"\xe2\x82"), "\u{fffd}");
         assert_eq!(utf8(b"\xf0\x80\x80"), "\u{fffd}\u{fffd}\u{fffd}");
+    }
+
+    #[test]
+    fn dates_as_to_iso_string_writes_them() {
+        assert_eq!(iso(0), "1970-01-01T00:00:00.000Z");
+        assert_eq!(iso(1761902958214), "2025-10-31T09:29:18.214Z");
+        assert_eq!(iso(-1), "1969-12-31T23:59:59.999Z");
+        assert_eq!(iso(MAX_MS), "+275760-09-13T00:00:00.000Z");
+        assert_eq!(iso(-MAX_MS), "-271821-04-20T00:00:00.000Z");
+        assert_eq!(iso(-62198755200000), "-000001-01-01T00:00:00.000Z");
+        assert_eq!(iso(-62167219200000), "0000-01-01T00:00:00.000Z");
+        assert_eq!(iso(253402300800000), "+010000-01-01T00:00:00.000Z");
+    }
+
+    #[test]
+    fn big_numbers_round_as_number_does() {
+        let n = |le: &[u8]| int_number(&crate::Int::from_le(le));
+        assert_eq!(n(&[]), 0.0);
+        assert_eq!(n(&u128::MAX.to_le_bytes()), 2f64.powi(128));
+        // 2^200 + 1 rounds down, 2^200 + 2^147 (a tie) to even, and
+        // 2^200 + 2^147 + 1 up
+        let mut b = vec![0u8; 26];
+        b[25] = 1;
+        let mut one = b.clone();
+        one[0] = 1;
+        assert_eq!(n(&one), 2f64.powi(200));
+        let mut tie = b.clone();
+        tie[147 / 8] = 1 << (147 % 8);
+        assert_eq!(n(&tie), 2f64.powi(200));
+        tie[0] = 1;
+        assert_eq!(n(&tie), 2f64.powi(200) + 2f64.powi(148));
     }
 }
