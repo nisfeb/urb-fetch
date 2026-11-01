@@ -5,8 +5,9 @@
 //! ([`urb_render::gateway`]), each with its -random.json on the bodies
 //! and links of conformance/random.mjs, and render-as.json and hostile-render.json
 //! both's, so each of those cases runs on each, and a hostile case must
-//! finish within the file's `quick` ms. Each file's count is checked,
-//! so no case can be skipped.
+//! finish within the file's `quick` ms. render-go-bytes.json is the
+//! gateway's on bytes that are mostly not UTF-8, every argument and
+//! output hex. Each file's count is checked, so no case can be skipped.
 
 mod common;
 
@@ -48,7 +49,7 @@ const FILES: &[(&str, &str, usize)] = &[
     (
         "render-go-random",
         include_str!("../../../conformance/render-go-random.json"),
-        2000,
+        3800,
     ),
 ];
 
@@ -290,4 +291,72 @@ fn every_rendering_vector() {
         bad += fails;
     }
     assert_eq!(bad, 0, "rendering vectors fail");
+}
+
+/// render-go-bytes.json and its number of cases
+const BYTES: (&str, usize) = (
+    include_str!("../../../conformance/render-go-bytes.json"),
+    2520,
+);
+
+fn unhex(j: &J) -> Vec<u8> {
+    let h = j.as_str().expect("hex").as_bytes();
+    assert!(h.len().is_multiple_of(2), "odd hex");
+    let d = |c: u8| (c as char).to_digit(16).expect("hex digit") as u8;
+    h.chunks(2).map(|p| d(p[0]) << 4 | d(p[1])).collect()
+}
+
+fn hex(b: &[u8]) -> J {
+    J::String(b.iter().map(|x| format!("{x:02x}")).collect())
+}
+
+/// one render-go-bytes case: the gateway's output, strings as hex
+fn run_bytes(f: &str, a: &[Vec<u8>]) -> J {
+    let link = gateway::page_link(PAGE.as_bytes(), PORT);
+    match f {
+        "renderGemtext" => hex(&gateway::render_gemtext(&a[0], b"t", &link)),
+        "renderMarkdown" => hex(&gateway::render_markdown(&a[0], b"t", &link)),
+        "renderText" => hex(&gateway::render_text(&a[0], b"t")),
+        "rewriteHTML" => hex(&gateway::rewrite_html(&a[0], PORT)),
+        "looksHtml" => json!(gateway::looks_html(&a[0])),
+        "renderAs" => json!(gateway::render_as(
+            std::str::from_utf8(&a[0]).expect("a mark"),
+            &a[1]
+        )),
+        "safeLink" => json!(gateway::safe_link(&a[0])),
+        "pageLink" => {
+            let (href, own) = link(&a[0]);
+            json!({"href": hex(&href), "own": own})
+        }
+        _ => panic!("no {f} in render-go-bytes"),
+    }
+}
+
+#[test]
+fn every_bytes_vector() {
+    let (src, count) = BYTES;
+    let v: J = serde_json::from_str(src).expect("render-go-bytes");
+    let cases = v["cases"].as_array().expect("cases");
+    assert_eq!(cases.len(), count, "render-go-bytes' cases");
+    let mut fails = 0;
+    for (i, c) in cases.iter().enumerate() {
+        let f = c["fn"].as_str().expect("fn");
+        let a: Vec<Vec<u8>> = c["in"].as_array().expect("in").iter().map(unhex).collect();
+        let got = run_bytes(f, &a);
+        if got != c["out"] {
+            fails += 1;
+            if fails <= 5 {
+                let want: String = c["out"].to_string().chars().take(300).collect();
+                let have: String = got.to_string().chars().take(300).collect();
+                eprintln!("  render-go-bytes {i} {f}\n    want {want}\n    got  {have}");
+            }
+        }
+    }
+    eprintln!(
+        "{}  render-go-bytes: {}/{}",
+        if fails > 0 { "FAIL" } else { "ok  " },
+        cases.len() - fails,
+        cases.len()
+    );
+    assert_eq!(fails, 0, "render-go-bytes vectors fail");
 }
