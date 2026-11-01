@@ -238,7 +238,9 @@ pub struct Udp {
     port: u16,
     fake: bool,
     sock: Option<UdpSocket>,
+    /// the listener's stop flag, a fresh one each start
     stop: Arc<AtomicBool>,
+    listener: Option<thread::JoinHandle<()>>,
     /// galaxy -> (ip, when it was looked up)
     galaxies: Arc<Mutex<HashMap<u8, (Ipv4Addr, u64)>>>,
     asking: Arc<Mutex<HashSet<u8>>>,
@@ -271,6 +273,7 @@ impl Udp {
             fake,
             sock: None,
             stop: Arc::new(AtomicBool::new(false)),
+            listener: None,
             galaxies: Arc::default(),
             asking: Arc::default(),
             log,
@@ -284,7 +287,7 @@ impl Udp {
             return Some(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 31337 + u16::from(g)));
         }
         let hit = self.galaxies.lock().unwrap().get(&g).copied();
-        let stale = hit.is_none_or(|(_, at)| now_ms() - at > 300_000);
+        let stale = hit.is_none_or(|(_, at)| now_ms().saturating_sub(at) > 300_000);
         if stale && self.asking.lock().unwrap().insert(g) {
             let (galaxies, asking, log) =
                 (self.galaxies.clone(), self.asking.clone(), self.log.clone());
@@ -315,6 +318,11 @@ impl Udp {
 
 impl Transport for Udp {
     fn start(&mut self, _ship: &str, tx: Sender<Event>) -> Result<(), String> {
+        // a listener from before a close holds its socket until its
+        // 200 ms read timeout: let it go first, so the port is free
+        if let Some(old) = self.listener.take() {
+            let _ = old.join();
+        }
         let at = if self.fake {
             Ipv4Addr::LOCALHOST
         } else {
@@ -331,8 +339,9 @@ impl Transport for Udp {
         let rx = sock.try_clone().map_err(|e| e.to_string())?;
         rx.set_read_timeout(Some(Duration::from_millis(200)))
             .map_err(|e| e.to_string())?;
+        self.stop = Arc::new(AtomicBool::new(false));
         let stop = self.stop.clone();
-        thread::spawn(move || {
+        self.listener = Some(thread::spawn(move || {
             let mut buf = vec![0u8; 65536];
             while !stop.load(Ordering::Relaxed) {
                 if let Ok((n, std::net::SocketAddr::V4(from))) = rx.recv_from(&mut buf) {
@@ -346,7 +355,7 @@ impl Transport for Udp {
                     }
                 }
             }
-        });
+        }));
         self.sock = Some(sock);
         Ok(())
     }
