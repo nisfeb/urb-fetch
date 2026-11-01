@@ -251,8 +251,8 @@ fn file<'a>(j: &J, nouns: &'a [Noun], at: &mut usize) -> urb::msg::File<'a> {
     urb::msg::File {
         mark,
         value: j.get("value").map(|v| value(v, nouns, at)),
-        rev: j["rev"].as_u64().unwrap(),
-        at: j["at"].as_u64().unwrap(),
+        rev: urb::msg::File::num(j["rev"].as_u64().unwrap()),
+        at: urb::msg::File::num(j["at"].as_u64().unwrap()),
     }
 }
 
@@ -294,14 +294,14 @@ fn message(f: &str, a: &[J]) -> Result<String, String> {
             let (w, d, i) = (val(&a[0]), val(&a[1]), val(&a[2]));
             let mut at2 = 0;
             let fl = file(&a[3], &nouns, &mut at2);
-            let (sn, si) = msg::snap_of(&fl).map_err(|t| t.0)?;
+            let (sn, si) = msg::snap_of(&fl).map_err(|f| f.message)?;
             msg::snap(w, d, i, Some(sn), Some(si))
         }
         "intakeOf" => {
             let (w, d) = (val(&a[0]), val(&a[1]));
             let mut at2 = 0;
             let fl = file(&a[2], &nouns, &mut at2);
-            msg::intake(w, d, msg::wave_of(Some(&fl), "gmi"))
+            msg::intake(w, d, msg::wave_of(Some(&fl), "gmi").map_err(|f| f.message)?)
         }
         "forum.newPost" => msg::forum::new_post(
             &s(&a[0]).unwrap(),

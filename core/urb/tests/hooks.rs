@@ -129,8 +129,8 @@ fn revs_we_cannot_read_are_none_and_the_vault_is_peeked() {
     let f = urb::msg::File {
         mark: ("/".into(), "json".into()),
         value: Some(Value::Array(vec!["x".into(), 1u64.into()])),
-        rev: 1,
-        at: 0,
+        rev: urb::msg::File::num(1),
+        at: urb::msg::File::num(0),
     };
     let (snap, silo) = urb::msg::snap_of(&f).unwrap();
     let dest = Value::Array(vec![true.into(), path("/a"), "revs".into()]);
