@@ -72,7 +72,7 @@ export function publish(urb, { pages = {}, keepers = [], save = () => {} } = {})
     const key = pageKey(folder.slice(vault.length));
     if (!key) return null;
     const p = pages[key];
-    if (!p) return { rev: 0, at: 0 };   // not yet: a keep gets an empty wave, and isn't kept
+    if (!p) return { rev: 0, at: 0 };   // not yet: a keep waits for it
     return p.body === null ? { rev: p.rev, at: p.at } : { mark: ['/lattice', 'page'], value: p.body, rev: p.rev, at: p.at };
   }
 
