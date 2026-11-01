@@ -5,7 +5,9 @@
 //! scry of a fuzzer's path. Then a page is edited, which sends a wave to
 //! every keeper, and the core's timers run. No hook panics, every noun
 //! is let go, the keeps stay under the cap, and nothing the core gives
-//! is past OUT_MAX.
+//! is past OUT_MAX. Pick 5 publishes from a saved page whose key is the
+//! fuzzer's text (a key pageKey never makes: empty, or multibyte first),
+//! with a rev and time that are whole or not, and peeks the index.
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use urb::codec::path;
@@ -18,6 +20,11 @@ use urb::{Core, Input, Output, Request};
 const ZOD: &str = "~zod";
 
 fn core() -> Core {
+    core_with(None)
+}
+
+/// a core publishing, from saved pages if given
+fn core_with(pages: Option<Object>) -> Core {
     let mut c = Core::new(|n| vec![7; n]);
     let us = urb::engine::ship_parse("~nec").unwrap();
     let mut keep = Object::default();
@@ -38,7 +45,7 @@ fn core() -> Core {
             fake: true,
         },
         Request::Pub {
-            pages: None,
+            pages,
             keepers: Some(Json::Arr(vec![Json::Obj(keep)])),
         },
         put("index", "# home"),
@@ -78,9 +85,44 @@ fn check(outs: &[Output]) {
 
 fuzz_target!(|data: &[u8]| {
     let (pick, tag) = match data {
-        [.., t, p] => (p % 5, ["peek", "keep", "drop"][usize::from(t % 3)]),
+        [.., t, p] => (p % 6, ["peek", "keep", "drop"][usize::from(t % 3)]),
         _ => (0, "peek"),
     };
+    if pick == 5 {
+        let key = String::from_utf8_lossy(data.get(..data.len().saturating_sub(2)).unwrap_or(&[]));
+        let whole = tag != "drop";
+        let mut page = Object::default();
+        page.set("body".into(), Json::Str("x".into()));
+        page.set("rev".into(), Json::Num(if whole { 1.0 } else { 1.5 }));
+        page.set("id".into(), Json::Str("0v1".into()));
+        page.set("at".into(), Json::Num(if whole { 5000.0 } else { 5.5 }));
+        page.set("hash".into(), Json::Str("1".into()));
+        let mut pages = Object::default();
+        pages.set(key.into_owned(), Json::Obj(page));
+        let mut c = core_with(Some(pages));
+        let dir = urb::publish::pub_dir();
+        for name in ["index", "revs"] {
+            let v = Value::Array(vec![
+                Value::Array(vec![
+                    path("/w"),
+                    Value::Array(vec![0u64.into(), path(&dir), name.into()]),
+                ]),
+                "peek".into(),
+                Value::Null,
+            ]);
+            let n = Noun::of(&v).unwrap();
+            check(&c.hook(10, Hook::Poke(ZOD, "grubbery-load", n.borrow())));
+        }
+        let edit = Request::PubPut {
+            name: "notes/intro".into(),
+            body: "# Intro, again".into(),
+            mark: None,
+        };
+        let _ = c.step(20, Input::Call { id: 99, req: edit }).unwrap();
+        drop(c);
+        urb_fuzz::done();
+        return;
+    }
     if let Some(n) = urb_fuzz::nouns(data, 1) {
         let mut c = core();
         let mut outs = Vec::new();

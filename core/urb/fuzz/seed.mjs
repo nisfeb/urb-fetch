@@ -53,5 +53,9 @@ const put = (target, i, bytes) => {
     for (let tag = 0; tag < 3; tag++) put('serve', `${i}-${pick}-${tag}`, Buffer.concat([Buffer.from([0]), x, Buffer.from([tag, pick])]));
   }
 });
+//  serve's pick 5: saved page keys pageKey never makes, whole and not
+['', 'éx', '😀x', '/ok', 'a/é/😀'].forEach((k, i) => {
+  for (let tag = 0; tag < 3; tag++) put('serve', `key-${i}-${tag}`, Buffer.concat([Buffer.from(k), Buffer.from([tag, 5])]));
+});
 JSON.parse(readFileSync(`${here}../../../conformance/inputs/urls.json`, 'utf8')).forEach((u, i) => put('de_urb', i, Buffer.from(u)));
 console.log(`seeded ${nouns.size} nouns and ${pairs.size} pairs`);
