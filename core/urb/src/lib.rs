@@ -9,6 +9,7 @@
 pub mod codec;
 pub mod core;
 pub mod engine;
+pub mod forum;
 pub mod js;
 pub mod msg;
 pub mod noun;

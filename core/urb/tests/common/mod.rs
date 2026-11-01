@@ -235,3 +235,28 @@ pub fn answers(out: &str) -> Vec<String> {
         })
         .collect()
 }
+
+// ------------------------------------------------------------ apps
+
+/// an app's JS value as trace.mjs's enc() writes it
+pub fn js_enc(j: &urb::js::Js) -> J {
+    use serde_json::json;
+    use urb::js::Js;
+    match j {
+        Js::Null => J::Null,
+        Js::Bool(b) => J::Bool(*b),
+        Js::Num(n) if !n.is_finite() => json!({ "$num": urb::js::number_text(*n) }),
+        Js::Num(n) if n.fract() == 0.0 && n.abs() < 9007199254740992.0 => J::from(*n as i64),
+        Js::Num(n) => J::from(*n),
+        Js::Big(i) => json!({ "$big": i.decimal() }),
+        Js::Str(s) => J::String(s.clone()),
+        Js::Date(d) => json!({ "$date": d.map(urb::js::iso) }),
+        Js::Arr(v) => J::Array(v.iter().map(js_enc).collect()),
+        Js::Obj(o) => J::Object(
+            o.entries()
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), js_enc(v)))
+                .collect(),
+        ),
+    }
+}

@@ -393,3 +393,246 @@ fn every_message_and_url_vector() {
     }
     assert_eq!(bad, 0, "{bad} vectors fail");
 }
+
+// ------------------------------------------------------------ M5
+
+/// a grubbery for furum's and forum's reads, as conformance/lib.mjs's:
+/// files {"<folder> <name>": noun} and dirs {"<folder>": [[path, noun]]},
+/// each noun cued and measured whole, as a peek's answer is
+struct Grub {
+    files: std::collections::HashMap<String, Noun>,
+    dirs: std::collections::HashMap<String, Vec<(Vec<String>, Noun)>>,
+}
+
+fn noun_of(j: &J) -> Noun {
+    Noun::cue(&common::unhex(j["$noun"].as_str().unwrap())).expect("a vector's jam cues")
+}
+
+impl Grub {
+    fn of(j: &J) -> Grub {
+        let mut g = Grub {
+            files: Default::default(),
+            dirs: Default::default(),
+        };
+        for (k, v) in j.as_object().unwrap() {
+            if v.is_array() {
+                let files = v
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|f| {
+                        let p = f[0]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|s| s.as_str().unwrap().to_string());
+                        (p.collect(), noun_of(&f[1]))
+                    })
+                    .collect();
+                g.dirs.insert(k.clone(), files);
+            } else {
+                g.files.insert(k.clone(), noun_of(v));
+            }
+        }
+        g
+    }
+
+    /// peek(ship, folder, name, conv): conv of the file, or None
+    fn file<T>(
+        &self,
+        folder: &str,
+        name: &str,
+        conv: impl FnOnce(codec::Measured<'_>) -> Result<T, urb::UrbError>,
+    ) -> Result<Option<T>, urb::UrbError> {
+        match self.files.get(&format!("{folder} {name}")) {
+            Some(n) => conv(codec::measure(n.borrow())?).map(Some),
+            None => Ok(None),
+        }
+    }
+}
+
+/// a furum or forum case, on ~zod's grubbery, as ~nec
+fn app(f: &str, a: &[J]) -> Result<J, String> {
+    use urb::forum::{board, furum};
+    let host = "~zod";
+    let e = |r: urb::UrbError| r.message;
+    let dir = |name: &str| format!("{}/boards/{name}", furum::BASE);
+    let posts = |g: &Grub, name: &str| -> Result<J, String> {
+        let next = g
+            .file(&format!("{}/pub", dir(name)), "conf", furum::next_post)
+            .map_err(e)?
+            .flatten();
+        let Some(next) = next else {
+            return Err(format!("no board {name} on {host}, or it is not shared"));
+        };
+        if next > furum::MAX_POSTS {
+            return Err(format!(
+                "{host}'s board {name} claims {} posts, over 100000",
+                urb::js::number_text(next)
+            ));
+        }
+        let mut out = Vec::new();
+        let mut k = 0u64;
+        while ((k * 100) as f64) < next {
+            let got = g
+                .file(
+                    &format!("{}/content/posts", dir(name)),
+                    &format!("b{k}"),
+                    furum::posts,
+                )
+                .map_err(e)?;
+            out.extend(got.unwrap_or_default());
+            k += 1;
+        }
+        furum::sort_posts(&mut out);
+        Ok(J::Array(
+            out.iter().map(|p| common::js_enc(&p.js())).collect(),
+        ))
+    };
+    let bucket = |id: f64| format!("b{}", urb::js::number_text((id / 100.0).floor()));
+    let board_of = |g: &Grub, name: &str| -> Result<board::Board, String> {
+        // the base: the fake answers /pub/index at the first it is asked
+        let base = board::BASES[0];
+        if !board::is_name(name) {
+            return Err(format!("not a board name: {name}"));
+        }
+        let mut acc = board::Acc::new(host);
+        for sub in ["pub", "content"] {
+            let Some(files) = g.dirs.get(&format!("{base}/forum/boards/{name}/{sub}")) else {
+                return Err(format!(
+                    "{host} shares no board {name} with ~nec: unreachable, private or not there"
+                ));
+            };
+            let mut b = codec::Budget::new();
+            for (p, n) in files {
+                let m = codec::measure_in(n.borrow(), &mut b).map_err(e)?;
+                let mut pax = vec![sub.to_string()];
+                pax.extend(p.iter().cloned());
+                acc.read(&pax, m).map_err(e)?;
+            }
+        }
+        acc.assemble().map_err(e)
+    };
+    let note = |m: &J| {
+        let n = noun_of(&m["noun"]);
+        let s = |j: &J| j.as_str().unwrap().to_string();
+        (
+            s(&m["from"]),
+            (s(&m["to"][0]), s(&m["to"][1])),
+            (s(&m["mark"][0]), s(&m["mark"][1])),
+            n,
+        )
+    };
+    match f {
+        "furum.nextPost" => {
+            let g = Grub::of(&a[0]);
+            let name = a[1].as_str().unwrap();
+            let got = g.file(&format!("{}/pub", dir(name)), "conf", furum::next_post);
+            Ok(got.map_err(e)?.flatten().map_or(J::Null, J::from))
+        }
+        "furum.posts" => posts(&Grub::of(&a[0]), a[1].as_str().unwrap()),
+        "furum.comments" => {
+            let g = Grub::of(&a[0]);
+            let (name, id) = (a[1].as_str().unwrap(), a[2].as_f64().unwrap());
+            let got = g
+                .file(
+                    &format!("{}/content/threads", dir(name)),
+                    &bucket(id),
+                    |n| furum::comments(n, id),
+                )
+                .map_err(e)?;
+            let mut cs = got.flatten().unwrap_or_default();
+            furum::sort_comments(&mut cs);
+            Ok(J::Array(
+                cs.iter().map(|c| common::js_enc(&c.js())).collect(),
+            ))
+        }
+        "furum.votes" => {
+            let g = Grub::of(&a[0]);
+            let (name, id) = (a[1].as_str().unwrap(), a[2].as_f64().unwrap());
+            let got = g
+                .file(&format!("{}/content/votes", dir(name)), &bucket(id), |n| {
+                    furum::votes(n, id)
+                })
+                .map_err(e)?;
+            let (up, down) = got.flatten().unwrap_or_default();
+            Ok(common::js_enc(&furum::votes_js(&up, &down)))
+        }
+        "forum.board" => {
+            let g = Grub::of(&a[0]);
+            Ok(common::js_enc(&board_of(&g, a[1].as_str().unwrap())?.js()))
+        }
+        "forum.thread" => {
+            let g = Grub::of(&a[0]);
+            let name = a[1].as_str().unwrap();
+            let post = urb::msg::id_of(&id(&a[2])).map_err(e)?;
+            let b = board_of(&g, name)?;
+            Ok(common::js_enc(&b.thread(host, name, &post).map_err(e)?))
+        }
+        "forum.note" => {
+            let (from, to, mark, n) = note(&a[0]);
+            let m = codec::measure(n.borrow()).map_err(e)?;
+            let got = board::note(&from, host, (&to.0, &to.1), (&mark.0, &mark.1), m).map_err(e)?;
+            Ok(got.map_or(J::Null, |(b, r)| {
+                json!({"host": from, "board": b, "reason": r, "at": {"$date": urb::js::iso(1761600000000)}})
+            }))
+        }
+        "furum.note" => {
+            let (from, _, mark, n) = note(&a[0]);
+            let m = codec::measure(n.borrow()).map_err(e)?;
+            let got = furum::note((&mark.0, &mark.1), m).map_err(e)?;
+            Ok(got.map_or(
+                J::Null,
+                |(t, b)| json!({"from": from, "title": t, "body": b}),
+            ))
+        }
+        _ => unreachable!("{f} is not an app's"),
+    }
+}
+
+#[test]
+fn every_board_vector() {
+    let mut bad = 0;
+    for (name, src, want) in [
+        (
+            "decoders",
+            include_str!("../../../conformance/decoders.json"),
+            19,
+        ),
+        (
+            "hostile-nouns",
+            include_str!("../../../conformance/hostile-nouns.json"),
+            6,
+        ),
+    ] {
+        let v: J = serde_json::from_str(src).unwrap();
+        let quick = v.get("quick").and_then(J::as_u64);
+        let mut ran = 0;
+        for (i, c) in v["cases"].as_array().unwrap().iter().enumerate() {
+            let f = c["fn"].as_str().unwrap();
+            if !f.starts_with("furum.") && !f.starts_with("forum.") {
+                continue;
+            }
+            let start = Instant::now();
+            let got = app(f, c["in"].as_array().unwrap());
+            let ms = start.elapsed().as_millis() as u64;
+            ran += 1;
+            assert_eq!(alive(), 0, "{name} {i} {f} left nouns alive");
+            let ok = match (&got, c.get("error")) {
+                (Err(m), Some(J::String(w))) => m == w,
+                (Ok(o), None) => same(o, &c["out"]),
+                _ => false,
+            } && quick.is_none_or(|q| ms <= q);
+            if !ok {
+                bad += 1;
+                eprintln!(
+                    "  {name} {i} {f}\n    want {}\n    got  {got:?} ({ms} ms)",
+                    c.get("error").unwrap_or(&c["out"])
+                );
+            }
+        }
+        eprintln!("ok    {name}: {ran} board cases");
+        assert_eq!(ran, want, "{name}: ran {ran}, not {want}");
+    }
+    assert_eq!(bad, 0, "{bad} board vectors fail");
+}
