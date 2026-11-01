@@ -12,4 +12,6 @@ publish.workspace = true
 cost = []
 
 [dev-dependencies]
+# its own steps counted in its tests (tests/linear.rs)
+urb-render = { path = ".", features = ["cost"] }
 serde_json = { version = "1", features = ["preserve_order"] }
