@@ -848,3 +848,261 @@ fn serving_logs_nothing_and_lets_every_noun_go() {
     serving();
     assert_eq!(alive(), 0);
 }
+
+// ------------------------------------------------------------ forum actions
+
+/// A core posting to ~zod's lattice forum: each forum action, as the
+/// core's calls build them. The first waits on ~zod's /pub/index, which
+/// is answered, so the base is known for the rest.
+fn forum_session() {
+    use urb::core::Hook;
+    use urb::msg::{File, Id::*, Target};
+    let mut c = Core::new(|n| vec![7; n]);
+    let us = urb::engine::ship_parse("~nec").unwrap();
+    let mut id = 0;
+    let mut call = |c: &mut Core, req: Request| {
+        id += 1;
+        c.step(id, Input::Call { id, req }).unwrap()
+    };
+    call(
+        &mut c,
+        Request::Open {
+            keyfile: Some(urb::engine::fake_keyfile(us)),
+            rows: None,
+            fresh: true,
+            fake: true,
+        },
+    );
+    let t = |post: u64, comment: Option<u64>| Target {
+        post: Num(post as f64),
+        comment: comment.map(|c| Num(c as f64)),
+    };
+    let post =
+        |name: &str, title: &str, url: Option<&str>, body: Option<String>| ForumCall::NewPost {
+            name: name.into(),
+            title: Some(title.into()),
+            url: url.map(String::from),
+            body,
+        };
+    let comment = |post: u64, body: &str, parent: Option<u64>| ForumCall::NewComment {
+        name: "test".into(),
+        post: Num(post as f64),
+        body: Some(body.into()),
+        parent: parent.map(|p| Num(p as f64)),
+    };
+    let calls = vec![
+        post("test", "Hello", None, None),
+        post(
+            "test",
+            "Hello",
+            Some("https://example.com"),
+            Some("A body\nof two lines".into()),
+        ),
+        post("my-board-2", "ünïcode ✓", None, Some("x".repeat(2000))),
+        comment(1, "a comment", None),
+        comment(1_000_000, "a reply", Some(12)),
+        ForumCall::NewComment {
+            name: "test".into(),
+            post: Big(false, big("1152921504606846976")),
+            body: Some("big".into()),
+            parent: Some(Text("3".into())),
+        },
+        ForumCall::Upvote("test".into(), t(3, None)),
+        ForumCall::Upvote("test".into(), t(3, Some(4))),
+        ForumCall::Downvote("test".into(), t(3, None)),
+        ForumCall::Unvote("test".into(), t(3, Some(0))),
+    ];
+    for (k, f) in calls.into_iter().enumerate() {
+        let o = call(
+            &mut c,
+            Request::Forum {
+                host: "~zod".into(),
+                call: f,
+            },
+        );
+        assert!(
+            !o.iter()
+                .any(|o| matches!(o, Output::Done { result: Err(_), .. })),
+            "{o:?}"
+        );
+        if k == 0 {
+            // ~zod's lattice is at the desk: its /pub/index answers
+            let wire = c.waiting().peeks[0].clone();
+            let f = File {
+                mark: ("/lattice".into(), "index".into()),
+                value: Some("index".into()),
+                rev: File::num(1),
+                at: File::num(0),
+            };
+            let (snap, silo) = urb::msg::snap_of(&f).unwrap();
+            let dest = Value::Array(vec![
+                0u64.into(),
+                urb::codec::path(&format!("{}/pub", urb::url::DESK_BASE)),
+                "index".into(),
+            ]);
+            let v = urb::msg::snap(
+                urb::codec::path(&wire),
+                dest,
+                9u64.into(),
+                Some(snap),
+                Some(silo),
+            );
+            let n = urb::Noun::of(&v).unwrap();
+            c.hook(2, Hook::Poke("~zod", "grubbery-transfer", n.borrow()));
+        }
+    }
+    drop(c);
+}
+
+/// the forum actions among the pokes sent: each %grubbery-load %poke of
+/// [/lattice %forum-action], its action's jam
+fn forum_actions(sent: &[(String, Vec<u8>)]) -> Vec<Vec<u8>> {
+    let mut out = Vec::new();
+    for (mark, jam) in sent {
+        if mark != "grubbery-load" {
+            continue;
+        }
+        let n = urb::Noun::cue(jam).unwrap();
+        // [[wire dest] %poke [blot noun]]
+        let act = n.borrow().tail().unwrap();
+        if act.head().unwrap().text().unwrap() != "poke" {
+            continue;
+        }
+        let blot = act.tail().unwrap().head().unwrap();
+        let mark = (
+            urb::codec::path_of(blot.head().unwrap()).unwrap(),
+            blot.tail().unwrap().text().unwrap(),
+        );
+        if mark == ("/lattice".into(), "forum-action".into()) {
+            let a = act.tail().unwrap().tail().unwrap().to_noun();
+            if !out.contains(&a.jam()) {
+                out.push(a.jam());
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn the_forum_session_lets_every_noun_go() {
+    urb::core::capture_pokes(true);
+    forum_session();
+    let sent = urb::core::capture_pokes(false);
+    assert_eq!(forum_actions(&sent).len(), 10);
+    assert_eq!(alive(), 0);
+}
+
+#[cfg(not(target_os = "wasi"))]
+#[test]
+fn every_forum_action_clams_against_lattices_action_ft() {
+    use common::{answers, run_tool, tool, ux};
+    use urb::Int;
+    let Some(urbit) = tool("URBIT", "urbit", "the forum action clams") else {
+        return;
+    };
+    urb::core::capture_pokes(true);
+    for &(n, name, lines) in TRACES {
+        assert!(matches!(replay(lines), Replayed::Ok(_)), "{name}");
+        let _ = n;
+    }
+    let from_traces = forum_actions(&urb::core::capture_pokes(false));
+    urb::core::capture_pokes(true);
+    forum_session();
+    let from_calls = forum_actions(&urb::core::capture_pokes(false));
+    assert_eq!(alive(), 0);
+    // trace 8's two posts and trace 6's upvote, and the session's ten
+    assert_eq!(from_traces.len(), 3, "the traces' forum actions");
+    assert_eq!(from_calls.len(), 10);
+    let mut cases: Vec<(String, String)> = Vec::new();
+    for jam in from_traces.iter().chain(&from_calls) {
+        let n = urb::Noun::cue(jam).unwrap();
+        cases.push((
+            format!(
+                "`@ux`(fall (mole |.((sham ;;(action:ft (cue {}))))) 0)",
+                ux(&Int::from_le(jam))
+            ),
+            format!("{:x}", n.sham()),
+        ));
+    }
+    // and the clam bites: shapes no action has are refused
+    let v = |x: Vec<Value<'static>>| Value::Array(x);
+    for bad in [
+        v(vec![
+            "new-post".into(),
+            "test".into(),
+            v(vec!["a".into(), "b".into()]),
+            Value::Null,
+            Value::Null,
+        ]),
+        v(vec![
+            "new-post".into(),
+            "test".into(),
+            "x".into(),
+            v(vec![1u64.into(), "u".into()]),
+            Value::Null,
+        ]),
+        v(vec![
+            "upvote".into(),
+            "test".into(),
+            v(vec!["reply".into(), 1u64.into()]),
+        ]),
+        v(vec!["create".into(), "test".into()]),
+        v(vec![
+            "remove-vote".into(),
+            "test".into(),
+            v(vec!["comment".into(), 1u64.into()]),
+        ]),
+    ] {
+        let n = urb::Noun::of(&bad).unwrap();
+        cases.push((
+            format!(
+                "`@ux`?~((mole |.(;;(action:ft (cue {})))) 1 0)",
+                ux(&Int::from_le(&n.jam()))
+            ),
+            "1".into(),
+        ));
+    }
+    let types = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../wasm/test/lattice-forum-types.hoon"
+    ))
+    .unwrap();
+    let expr = format!(
+        "=/  ft\n{types}\n~[{}]",
+        cases
+            .iter()
+            .map(|c| c.0.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    let out = run_tool(&urbit, &["eval"], &expr, None);
+    let got = answers(&out);
+    assert_eq!(
+        got.len(),
+        cases.len(),
+        "vere gave {} answers for {}: ...{}",
+        got.len(),
+        cases.len(),
+        &out[out.floor_char_boundary(out.len().saturating_sub(600))..]
+    );
+    let bad = cases
+        .iter()
+        .zip(&got)
+        .filter(|((h, want), have)| {
+            let differ = have != &want;
+            if differ {
+                eprintln!(
+                    "MISMATCH {}\n  vere {have}\n  rust {want}",
+                    &h[..h.len().min(200)]
+                );
+            }
+            differ
+        })
+        .count();
+    eprintln!(
+        "{} of {} forum actions fit lattice's action:ft, and the clam bites",
+        cases.len() - 5 - bad.min(cases.len() - 5),
+        cases.len() - 5
+    );
+    assert_eq!(bad, 0, "{bad} of {} disagree with vere", cases.len());
+}
