@@ -257,6 +257,105 @@ pub fn gateway_url(url: &[u8], port: &str) -> Option<Vec<u8>> {
     )
 }
 
+/// `html.EscapeString(s)`
+pub fn html_escape(s: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(s.len());
+    esc(&mut out, s);
+    out
+}
+
+/// `urbOfHost(host, path)`: the urb:// url a gateway request names, or
+/// `None` when the host isn't a ship's (`<ship>.urb.localhost`, the
+/// ship's name holding no dot; it is not checked here, as Go's isn't)
+pub fn urb_of_host(host: &[u8], path: &[u8]) -> Option<Vec<u8>> {
+    let who = host.strip_suffix(HOST_SUFFIX.as_bytes())?;
+    if who.contains(&b'.') {
+        return None;
+    }
+    Some([b"urb://~", who, path].concat())
+}
+
+/// a path segment urb.go's `knot` takes: `^[a-z0-9~._-]+$`
+fn knot(s: &[u8]) -> bool {
+    !s.is_empty()
+        && s.iter()
+            .all(|&b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"~._-".contains(&b))
+}
+
+/// urb.go's `ud`, an @ud as +slaw reads it: `^(0|[1-9][0-9]{0,2}(\.[0-9]{3})*)$`
+fn ud(s: &[u8]) -> bool {
+    if s == b"0" {
+        return true;
+    }
+    let mut groups = s.split(|&b| b == b'.');
+    let head = groups.next().unwrap_or_default();
+    let digits = |g: &[u8]| g.iter().all(u8::is_ascii_digit);
+    if head.is_empty() || head.len() > 3 || !digits(head) || head[0] == b'0' {
+        return false;
+    }
+    groups.all(|g| g.len() == 3 && digits(g))
+}
+
+/// `deUrb(url)`, urb.go's (the gateway's, not mesa.mjs's): the ship and
+/// the page's path in the pub vault, or the HTTP status and message the
+/// gateway fails with. /p/, /k/ and /t/ and a lattice forum board are
+/// refused, as the Go gateway refuses them.
+#[allow(clippy::type_complexity)]
+pub fn de_urb(url: &[u8]) -> Result<(Vec<u8>, Vec<Vec<u8>>), (u16, Vec<u8>)> {
+    let fail = |status, parts: &[&[u8]]| Err((status, parts.concat()));
+    let Some(rest) = url.strip_prefix(b"urb://") else {
+        return fail(400, &[b"not an urb:// url: ", url]);
+    };
+    let (who, rest) = match rest.iter().position(|&b| b == b'/') {
+        Some(i) => (&rest[..i], &rest[i + 1..]),
+        None => (rest, &b""[..]),
+    };
+    // mesa.ParseShip takes a name with or without its ~, up to a NUL,
+    // and gives the ship's own rendering
+    let who = &who[..who.iter().position(|&b| b == 0).unwrap_or(who.len())];
+    let ship = match who.first() {
+        Some(b'~') => who.to_vec(),
+        _ => [b"~", who].concat(),
+    };
+    if !ship::parses(&ship) {
+        return fail(400, &[b"no ship in ", url]);
+    }
+    // urb://~s/site/ is urb://~s/site
+    let rest = rest.strip_suffix(b"/").unwrap_or(rest);
+    if rest.is_empty() {
+        return Ok((ship, vec![b"index".to_vec()]));
+    }
+    let segs: Vec<&[u8]> = rest.split(|&b| b == b'/').collect();
+    if !segs.iter().all(|s| knot(s)) {
+        return fail(400, &[b"bad path in ", url]);
+    }
+    // forum/<board>[/<post>] names a lattice forum board (release 73 and
+    // later); any other shape under forum/ is still a page
+    if segs[0] == b"forum" && (segs.len() == 2 || segs.len() == 3 && ud(segs[2])) {
+        return fail(
+            501,
+            &[
+                url,
+                b" is a lattice forum board, which this gateway does not read",
+            ],
+        );
+    }
+    let owned = |s: &[&[u8]]| s.iter().map(|x| x.to_vec()).collect();
+    match segs[0] {
+        s if s.len() > 1 => Ok((ship, owned(&segs))),
+        b"n" => Ok((ship, owned(&segs[1..]))),
+        m @ (b"p" | b"k" | b"t") => fail(
+            501,
+            &[
+                b"/",
+                m,
+                b"/ addresses read the publisher's tree, which this gateway does not do",
+            ],
+        ),
+        m => fail(404, &[b"/", m, b"/ is not an urb:// mount"]),
+    }
+}
+
 /// `resolve(base, ref)`: the path of the relative reference ref on the
 /// page at path base, as render.go reckons a WHATWG URL parser gives it
 fn resolve(base: &[u8], r: &[u8]) -> Vec<u8> {
