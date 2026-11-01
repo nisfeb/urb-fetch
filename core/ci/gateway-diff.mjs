@@ -6,6 +6,7 @@
 // normalisation below is applied.
 //
 //   FLEET_WHO=lattice-loop-m8 node core/ci/gateway-diff.mjs [--out DIR] [NAME...]
+//   node core/ci/gateway-diff.mjs --offline     the startup cases only
 //
 // The run is also the state migration test. The Go gateway runs first,
 // as a fake moon of ~hus, on a fresh state folder, and answers the list.
@@ -23,7 +24,8 @@
 // snapshot, urb-fetch built (make urb-fetch; GO_GATEWAY), urb-gateway
 // built (cargo build --release -p urb-gateway; URB_GATEWAY), and go
 // for the comet case. Without them it says what is missing and exits 2,
-// a skip, never a pass. It leaves the set on the snapshot.
+// a skip, never a pass. It leaves the set on the snapshot. The startup
+// cases need no ship, and run first (and alone with --offline, in CI).
 
 import { spawn, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -45,7 +47,8 @@ const AT = { go: '127.0.0.2', rust: '127.0.0.3' };
 const MOON = '~natdul-molbud-dozzod-dozhus';
 
 const argv = process.argv.slice(2);
-let out = null;
+let out = null, offlineOnly = false;
+if (argv[0] === '--offline') { offlineOnly = true; argv.shift(); }
 if (argv[0] === '--out') { out = argv[1]; argv.splice(0, 2); }
 out ??= mkdtempSync(join(tmpdir(), 'gateway-diff-'));
 mkdirSync(out, { recursive: true });
@@ -55,6 +58,62 @@ const want = name => !only.size || only.has(name);
 const skip = why => { console.error(`gateway-diff: SKIPPED, not passed: ${why}`); process.exit(2); };
 if (!existsSync(GO)) skip(`no Go gateway at ${GO} (make urb-fetch)`);
 if (!existsSync(RUST)) skip(`no urb-gateway at ${RUST} (cargo build --release -p urb-gateway)`);
+// ------------------------------------------------------------ startup
+
+// Each binary started with flags it refuses, or an identity it can't
+// open: exit code and stderr must be the same, with the log's
+// `2006/01/02 15:04:05 ` time and the program's path in `Usage of`
+// masked. No network: each listens on 127.0.0.2 (if it gets that far)
+// and fails before it opens a socket to any ship.
+const results = [];
+function report(name, same, a, b) {
+  results.push([name, same]);
+  console.log(`${same ? 'same' : 'DIFF'}  ${name}`);
+  writeFileSync(join(out, `${name}.go`), a);
+  writeFileSync(join(out, `${name}.rust`), b);
+  if (!same) {
+    const d = spawnSync('diff', ['-u', '--label', 'go', '--label', 'rust', join(out, `${name}.go`), join(out, `${name}.rust`)], { encoding: 'utf8' });
+    console.log(d.stdout.split('\n').slice(0, 40).map(l => `      ${l}`).join('\n'));
+  }
+}
+
+const stamp = t => t.replace(/^\d{4}\/\d\d\/\d\d \d\d:\d\d:\d\d /gm, '<time> ').replace(/^Usage of .*:$/m, 'Usage of <prog>:');
+{
+  const st = join(out, 'startup');
+  mkdirSync(st, { recursive: true });
+  // a fake moon's keyfile, as a moon's -moon keyfile, whose state here
+  // is empty
+  const kf = spawnSync('node', ['--input-type=module', '-e',
+    `import {fakeKeyfile} from '${join(root, 'wasm/mesa.mjs')}'; import {readFileSync} from 'node:fs';
+     console.log(await fakeKeyfile(readFileSync('${join(root, 'wasm/build/mesa.wasm')}'), '${MOON}'))`], { encoding: 'utf8' });
+  writeFileSync(join(st, 'moon.key'), kf.stdout);
+  writeFileSync(join(st, 'junk.key'), 'not a keyfile\n');
+  const listen = ['-listen', `127.0.0.2:${PORT}`];
+  const START = [
+    ['start-fake-and-moon', ['-fake', '~zod', '-moon', 'x']],
+    ['start-unknown-flag', ['-nope']],
+    ['start-help', ['-h']],
+    ['start-missing-value', ['-listen']],
+    ['start-bad-bool', ['-new-moon=maybe']],
+    ['start-no-port', ['-listen', 'nocolon']],
+    ['start-fake-not-a-ship', [...listen, '-fake', 'notaship']],
+    ['start-moon-missing', [...listen, '-moon', '/nonexistent/moon.key']],
+    ['start-moon-directory', [...listen, '-moon', '/tmp']],
+    ['start-moon-junk', [...listen, '-moon', join(st, 'junk.key')]],
+    ['start-moon-no-state', [...listen, '-moon', join(st, 'moon.key')]],
+  ];
+  for (const [name, args] of START) {
+    if (!want(name)) continue;
+    const one = side => {
+      const r = spawnSync(side === 'go' ? GO : RUST, ['-state', join(st, `${name}-${side}`), ...args], { encoding: 'utf8', timeout: 30_000 });
+      return `exit ${r.status ?? r.signal}\n${stamp(r.stderr.split(join(st, `${name}-${side}`)).join('<state>'))}`;
+    };
+    const [a, b] = [one('go'), one('rust')];
+    report(name, a === b, a, b);
+  }
+}
+if (offlineOnly) finish();
+
 const fleetOk = existsSync(FLEET) && WHO
   && spawnSync(FLEET, ['ls'], { encoding: 'utf8' }).stdout.split('\n').some(l => l.startsWith('furum ') && l.includes(`(${WHO})`));
 if (!fleetOk) skip('the furum set is not claimed by FLEET_WHO, or fleet is missing');
@@ -243,17 +302,6 @@ async function answers(side) {
 const udpBound = port => readFileSync('/proc/net/udp', 'utf8').split('\n')
   .some(l => l.trim().split(/\s+/)[1] === `0100007F:${Number(port).toString(16).toUpperCase().padStart(4, '0')}`);
 
-const results = [];
-function report(name, same, a, b) {
-  results.push([name, same]);
-  console.log(`${same ? 'same' : 'DIFF'}  ${name}`);
-  writeFileSync(join(out, `${name}.go`), a);
-  writeFileSync(join(out, `${name}.rust`), b);
-  if (!same) {
-    const d = spawnSync('diff', ['-u', '--label', 'go', '--label', 'rust', join(out, `${name}.go`), join(out, `${name}.rust`)], { encoding: 'utf8' });
-    console.log(d.stdout.split('\n').slice(0, 40).map(l => `      ${l}`).join('\n'));
-  }
-}
 
 const goState = join(out, 'state-go'), rustState = join(out, 'state-rust');
 const fakeArgs = state => ['-fake', MOON, '-state', state];
@@ -333,6 +381,10 @@ if (want('comet') && spawnSync('unshare', ['-rn', 'true']).status === 0) {
   report('comet-files', dbs('go') === dbs('rust'), `${dbs('go')}\n`, `${dbs('rust')}\n`);
 }
 
-const bad = results.filter(x => !x[1]).map(x => x[0]);
-console.log(`\ngateway-diff: ${results.length - bad.length} of ${results.length} the same${bad.length ? `; differ: ${bad.join(', ')}` : ''}\n(outputs in ${out})`);
-process.exit(bad.length ? 1 : 0);
+finish();
+
+function finish() {
+  const bad = results.filter(x => !x[1]).map(x => x[0]);
+  console.log(`\ngateway-diff: ${results.length - bad.length} of ${results.length} the same${bad.length ? `; differ: ${bad.join(', ')}` : ''}\n(outputs in ${out})`);
+  process.exit(bad.length ? 1 : 0);
+}

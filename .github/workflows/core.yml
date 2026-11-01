@@ -106,6 +106,13 @@ jobs:
         run: |
           (cd core && cargo build --release -p urb-cli)
           node core/ci/cli-diff.mjs --offline
+      # the Rust gateway (M8) against the Go one, in the cases that need
+      # no ship; the fleet's cases run by hand (gateway-diff.mjs)
+      - name: the Rust gateway against the Go one, at startup
+        run: |
+          (cd core && cargo build --release -p urb-gateway)
+          go build -o urb-fetch .
+          node core/ci/gateway-diff.mjs --offline
       - name: the extension's tests and renderer vectors, on the shims
         run: |
           (cd "$RUNNER_TEMP/ext-shim" && npm test)
