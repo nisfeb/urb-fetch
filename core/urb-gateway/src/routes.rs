@@ -4,6 +4,8 @@
 
 use crate::http::{self, Request, Response};
 use std::time::Instant;
+use urb::Failure;
+use urb::core::{Kind, NO_LATTICE};
 use urb_render::gateway as render;
 
 /// A page as `Reader.Fetch` gives it: its key in the vault, the mark it
@@ -19,6 +21,37 @@ pub struct Page {
 /// a failure the gateway reports with a status code (urb.go's
 /// `httpError`): the code and the message
 pub type Fail = (u16, Vec<u8>);
+
+/// What the gateway answers a read's failure with: reader.go's `fail`
+/// codes and words. The core fails as mesa.mjs does, which reads as
+/// reader.go reads (PR #13) but words each failure its own way.
+pub fn fail_of(f: &Failure) -> Fail {
+    let m = &f.message;
+    if f.kind == Kind::UrbError {
+        if let Some(who) = m.strip_suffix(&format!(" {NO_LATTICE}")) {
+            // later: no answer to a base probe; not later: each place
+            // answered, with nothing
+            return if f.later {
+                let w = format!(
+                    "{who} did not answer within 30s. It may be offline, or still catching up \
+                     after this gateway restarted, which can take a minute or two: try again \
+                     shortly"
+                );
+                (504, w.into_bytes())
+            } else {
+                let w = format!(
+                    "{who} shares no lattice pages here: it runs no lattice, one older than \
+                     release 35, or shares nothing"
+                );
+                (502, w.into_bytes())
+            };
+        }
+        if let Some(url) = m.strip_suffix(": not published") {
+            return (404, format!("{url} is not published").into_bytes());
+        }
+    }
+    (502, m.clone().into_bytes())
+}
 
 /// The gateway: the port its links name, the ship it runs as, the
 /// reading (of an url urb.go's deUrb already took), and its log.
@@ -189,6 +222,43 @@ mod tests {
             raw_query: q.into(),
             minor: 1,
         }
+    }
+
+    #[test]
+    fn failures_have_the_gos_codes_and_words() {
+        let f = |m: &str, later| Failure {
+            later,
+            ..Failure::urb(m)
+        };
+        let words = |x: Fail| (x.0, String::from_utf8(x.1).unwrap());
+        assert_eq!(
+            words(fail_of(&f(&format!("~zod {NO_LATTICE}"), true))),
+            (
+                504,
+                "~zod did not answer within 30s. It may be offline, or still catching up after \
+                 this gateway restarted, which can take a minute or two: try again shortly"
+                    .into()
+            )
+        );
+        assert_eq!(
+            words(fail_of(&f(&format!("~zod {NO_LATTICE}"), false))),
+            (
+                502,
+                "~zod shares no lattice pages here: it runs no lattice, one older than release \
+                 35, or shares nothing"
+                    .into()
+            )
+        );
+        assert_eq!(
+            words(fail_of(&f("urb://~zod/n/b: not published", false))),
+            (404, "urb://~zod/n/b is not published".into())
+        );
+        assert_eq!(
+            words(fail_of(&f("something else", false))),
+            (502, "something else".into())
+        );
+        let e = Failure::error("x: not published");
+        assert_eq!(fail_of(&e).0, 502);
     }
 
     #[test]

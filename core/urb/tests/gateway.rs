@@ -1,7 +1,11 @@
-//! The reader under Request::Gateway (M8): where it reads as the Go
-//! gateway's reader.go does and mesa.mjs does not. A core with a fake
-//! engine open as ~nec reads urb://~zod pages, and ~zod's answers are
-//! handed to its hooks as ~zod's grubbery would send them.
+//! The reader where it reads as the Go gateway's reader.go does, which
+//! mesa.mjs took from it (https://github.com/nisfeb/urb-fetch/pull/13):
+//! a base probe nobody answers ends the read, a stale list beats none,
+//! one read uses one list, a late list is kept, and an entry needs an
+//! id. A core with a fake engine open as ~nec reads urb://~zod pages,
+//! and ~zod's answers are handed to its hooks as ~zod's grubbery would
+//! send them. The gateway's status codes and words for each failure
+//! are urb-gateway's (its `status` tests).
 //!
 //! reader_test.go's cases run here as vectors: gateway-go.json's
 //! `lateAnswer` and `onTimeAnswer` (the rest of the file runs in
@@ -9,7 +13,7 @@
 
 use serde_json::Value as J;
 use urb::codec::path;
-use urb::core::{Hook, gateway_status};
+use urb::core::{Hook, NO_LATTICE};
 use urb::js::Json;
 use urb::msg::{self, File};
 use urb::noun::{Noun, Value};
@@ -17,26 +21,18 @@ use urb::{Core, Failure, Input, Output, Reply, Request, alive};
 
 const ZOD: &str = "~zod";
 
-/// a core open as fake ~nec, the gateway's reading on or off
-fn core(gateway: bool) -> Core {
+/// a core open as fake ~nec
+fn core() -> Core {
     let mut c = Core::new(|n| vec![7; n]);
     let us = urb::engine::ship_parse("~nec").unwrap();
-    let mut calls = vec![Request::Open {
+    let req = Request::Open {
         keyfile: Some(urb::engine::fake_keyfile(us)),
         rows: None,
         fresh: true,
         fake: true,
-    }];
-    if gateway {
-        calls.push(Request::Gateway(true));
-    }
-    for (id, req) in calls.into_iter().enumerate() {
-        let outs = c.step(1, Input::Call { id: id as u64, req }).unwrap();
-        assert!(
-            done(&outs, id as u64).is_some_and(Result::is_ok),
-            "{outs:?}"
-        );
-    }
+    };
+    let outs = c.step(1, Input::Call { id: 0, req }).unwrap();
+    assert!(done(&outs, 0).is_some_and(Result::is_ok), "{outs:?}");
     c
 }
 
@@ -107,6 +103,11 @@ fn sage(c: &mut Core, now: u64, path: &str, mark: &str, body: &str) -> Vec<Outpu
     c.hook(now, Hook::Sage(ZOD, path, Some(n.borrow())))
 }
 
+/// ~zod answering a keen with nothing: a miss
+fn miss(c: &mut Core, now: u64, path: &str) -> Vec<Output> {
+    c.hook(now, Hook::Sage(ZOD, path, None))
+}
+
 fn read(c: &mut Core, now: u64, id: u64, url: &str) -> Vec<Output> {
     c.step(
         now,
@@ -124,22 +125,24 @@ fn only_peek(c: &Core) -> String {
     w.peeks[0].clone()
 }
 
-/// lateAnswer: the base probe nobody answers in time fails the read with
-/// the Go's 504; the list that comes after is kept, and its peek waits
-/// no more. What it gives is reader_test.go's {kept, waiting}.
+/// lateAnswer: the base probe nobody answers in time fails the read,
+/// later (the gateway's 504); the list that comes after is kept, and
+/// its peek waits no more. What it gives is reader_test.go's {kept,
+/// waiting}.
 fn late_answer(list: &[(&str, &str)]) -> J {
-    let mut c = core(true);
+    let mut c = core();
     read(&mut c, 10, 9, "urb://~zod/n/a");
     let wire = only_peek(&c);
     let outs = run_to(&mut c, 10 + 30_000);
     let Some(Err(f)) = done(&outs, 9) else {
         panic!("{outs:?}");
     };
-    assert_eq!(gateway_status(f), 504, "{f:?}");
     assert_eq!(
-        f.message,
-        "~zod did not answer within 30s. It may be offline, or still catching up after this \
-         gateway restarted, which can take a minute or two: try again shortly"
+        (f.message.as_str(), f.later),
+        (
+            "~zod answered no lattice peek (offline, or no lattice)",
+            true
+        )
     );
     // it waits on for the answer, and no second base is asked
     assert_eq!(c.waiting().peeks, vec![wire.clone()]);
@@ -170,7 +173,7 @@ fn late_answer(list: &[(&str, &str)]) -> J {
 /// onTimeAnswer: an answer in time goes to the read, and nothing comes
 /// in late. What it gives is reader_test.go's {caller, late}.
 fn on_time_answer(body: &str) -> J {
-    let mut c = core(true);
+    let mut c = core();
     read(&mut c, 10, 9, "urb://~zod/n/a");
     let wire = only_peek(&c);
     let outs = answer(&mut c, 20, &wire, revs(&[("/a", "0v1")]));
@@ -214,8 +217,8 @@ fn reader_tests_cases_pass_as_vectors() {
 }
 
 #[test]
-fn a_ship_that_answers_no_base_is_the_gos_502() {
-    let mut c = core(true);
+fn a_ship_that_answers_no_base_with_anything_is_not_later() {
+    let mut c = core();
     read(&mut c, 10, 9, "urb://~zod/n/a");
     let wire = only_peek(&c);
     veto(&mut c, 20, &wire);
@@ -226,20 +229,16 @@ fn a_ship_that_answers_no_base_is_the_gos_502() {
         panic!("{outs:?}");
     };
     assert_eq!(
-        (gateway_status(f), f.message.as_str()),
-        (
-            502,
-            "~zod shares no lattice pages here: it runs no lattice, one older than release 35, \
-             or shares nothing"
-        )
+        (f.message.as_str(), f.later),
+        (format!("~zod {NO_LATTICE}").as_str(), false)
     );
     drop(c);
     assert_eq!(alive(), 0);
 }
 
 #[test]
-fn a_page_not_listed_is_the_gos_404() {
-    let mut c = core(true);
+fn a_page_not_listed_is_not_published() {
+    let mut c = core();
     read(&mut c, 10, 9, "urb://~zod/n/b");
     let wire = only_peek(&c);
     answer(&mut c, 20, &wire, revs(&[("/a", "0v1")]));
@@ -249,17 +248,14 @@ fn a_page_not_listed_is_the_gos_404() {
     let Some(Err(f)) = done(&outs, 9) else {
         panic!("{outs:?}");
     };
-    assert_eq!(
-        (gateway_status(f), f.message.as_str()),
-        (404, "urb://~zod/n/b is not published")
-    );
+    assert_eq!(f.message, "urb://~zod/n/b: not published");
     drop(c);
     assert_eq!(alive(), 0);
 }
 
 #[test]
 fn a_stale_list_beats_none_and_an_entry_needs_an_id() {
-    let mut c = core(true);
+    let mut c = core();
     read(&mut c, 10, 9, "urb://~zod/n/a");
     let wire = only_peek(&c);
     // /c has no id: no entry, as reader.go's revsOf reads it
@@ -290,24 +286,25 @@ fn a_stale_list_beats_none_and_an_entry_needs_an_id() {
 }
 
 #[test]
-fn without_it_the_reader_is_mesa_mjss() {
-    // no answer to the first base: the second is asked, and the words
-    // are the JS's
-    let mut c = core(false);
+fn one_read_looks_in_the_one_list_it_got() {
+    let mut c = core();
     read(&mut c, 10, 9, "urb://~zod/n/a");
-    let first = only_peek(&c);
-    run_to(&mut c, 10 + 30_000);
-    let second = only_peek(&c);
-    assert_ne!(first, second);
-    let outs = run_to(&mut c, 10 + 60_000);
-    let Some(Err(f)) = done(&outs, 9) else {
+    let wire = only_peek(&c);
+    answer(&mut c, 20, &wire, revs(&[("/a", "0v1")]));
+    // the listed id misses, which drops the cached list, and the vault
+    // has no /a
+    miss(&mut c, 30, "/g/x/1/grubbery//1/pub/page/a/0v1");
+    let vault = only_peek(&c);
+    veto(&mut c, 40, &vault);
+    // so /a/index, from the vault: the peek out is the vault's, not a
+    // second ask for the list
+    let index = only_peek(&c);
+    let outs = answer(&mut c, 50, &index, Value::Text("the index".into()));
+    let Some(Ok(Reply::Read(p))) = done(&outs, 9) else {
         panic!("{outs:?}");
     };
-    assert_eq!(
-        f.message,
-        "~zod answered no lattice peek (offline, or no lattice)"
-    );
-    assert!(c.waiting().peeks.is_empty());
+    assert_eq!((p.key.as_str(), p.how), ("/a/index", "peek"));
+    assert_eq!(p.body, "the index");
     drop(c);
     assert_eq!(alive(), 0);
 }

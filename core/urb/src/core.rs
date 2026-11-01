@@ -56,8 +56,8 @@ const ROLLER_WAIT: u64 = 30_000;
 pub const ROLLER: &str = "https://roller.urbit.org/v1/azimuth";
 pub const STARS: &str = "https://bootstrap.urbit.org/comet-stars.jam";
 const NONE: u64 = sys::MESA_NONE;
-/// reader.go's lateWait: how long a revision list's peek its caller gave
-/// up on still waits for its answer (Request::Gateway only)
+/// mesa.mjs's LATE_WAIT (reader.go's lateWait): how long a revision
+/// list's peek its caller gave up on still waits for its answer
 pub const LATE_WAIT: u64 = 300_000;
 const ACK: sys::mesa_plea_result = sys::mesa_plea_result_MESA_ACK;
 
@@ -241,15 +241,6 @@ pub enum Request {
     /// [`Output::Log`] in pub-cli's words. For the native command line;
     /// no trace sets it.
     Watch(bool),
-    /// Read as the Go gateway's reader (reader.go) reads, where it
-    /// differs from mesa.mjs's, for the native gateway (M8), whose HTTP
-    /// answers must stay the Go gateway's: a base probe nobody answers
-    /// ends the probe, and each failure has the Go's words (see
-    /// [`gateway_status`]); a revision list nobody answers keeps the
-    /// stale one; a list's answer that comes after its caller gave up
-    /// is kept, for [`LATE_WAIT`]; a list's entry with no id is no
-    /// entry. No trace sets it.
-    Gateway(bool),
     /// furum(urb, host)'s calls
     Furum {
         host: String,
@@ -408,7 +399,6 @@ impl Core {
                 publ: RefCell::new(None),
                 forums: RefCell::new(HashMap::new()),
                 watch: Cell::new(false),
-                gateway: Cell::new(false),
             }),
         }
     }
@@ -646,8 +636,6 @@ pub(crate) struct World {
     forums: RefCell<HashMap<String, Rc<ForumSt>>>,
     /// Request::Watch
     watch: Cell<bool>,
-    /// Request::Gateway
-    pub(crate) gateway: Cell<bool>,
 }
 
 impl Drop for World {
@@ -908,10 +896,6 @@ impl World {
             }
             Request::Watch(on) => {
                 self.watch.set(on);
-                Ok(Val::Reply(Reply::True))
-            }
-            Request::Gateway(on) => {
-                self.gateway.set(on);
                 Ok(Val::Reply(Reply::True))
             }
         }
@@ -1473,7 +1457,7 @@ impl Read {
         let n = m.noun();
         Ok(match &self.conv {
             Conv2::Revs => match codec::json(n)? {
-                Json::Obj(o) => Val::Obj(Rc::new(o)),
+                Json::Obj(o) => Val::Obj(revs_of(&o)),
                 _ => Val::Obj(Rc::new(Object::default())),
             },
             Conv2::Cord => codec::cord(n)?.map_or(Val::Null, Val::Str),
@@ -1533,13 +1517,13 @@ struct PeekSt {
     bone: Cell<Option<u64>>,
     timer: Cell<u64>,
     p: Promise,
-    /// Request::Gateway: what takes an answer that comes after the
-    /// caller gave up, and when it gave up
+    /// what takes an answer that comes after the caller gave up (a
+    /// revision list's peek only), and when it gave up
     late: RefCell<Option<Late>>,
     gone: Cell<Option<u64>>,
 }
 
-/// what takes a late answer (reader.go's peek.late)
+/// what takes a late answer (mesa.mjs's peek's late)
 type Late = Box<dyn FnOnce(&World, Val)>;
 
 impl PeekSt {
@@ -2230,9 +2214,9 @@ fn peek(
     peek_late(w, i, her, folder, name, read, wait, None)
 }
 
-/// peek, and under Request::Gateway, reader.go's peek: no answer in time
-/// is Undef (where an answer of nothing is Null), and an answer that
-/// comes after that goes to late, if there is one, for LATE_WAIT
+/// peek, with late: no answer in time is Undef (where an answer of
+/// nothing is Null), and an answer that comes after that goes to late,
+/// for LATE_WAIT
 #[allow(clippy::too_many_arguments)]
 fn peek_late(
     w: &World,
@@ -2244,14 +2228,12 @@ fn peek_late(
     wait: u64,
     late: Option<Late>,
 ) -> Promise {
-    if w.gateway.get() {
-        let now = w.now();
-        i.peeks.borrow_mut().retain(|(_, st)| {
-            st.gone
-                .get()
-                .is_none_or(|g| now.saturating_sub(g) <= LATE_WAIT)
-        });
-    }
+    let now = w.now();
+    i.peeks.borrow_mut().retain(|(_, st)| {
+        st.gone
+            .get()
+            .is_none_or(|g| now.saturating_sub(g) <= LATE_WAIT)
+    });
     let wire = format!("/urb-fetch/{}/{}", i.nonce, i.next_wire());
     let p = Promise::new();
     let st = Rc::new(PeekSt {
@@ -2269,14 +2251,12 @@ fn peek_late(
     let (st2, i2) = (st.clone(), i.clone());
     st.timer.set(w.set_timeout(
         Box::new(move |w| {
-            if !w.gateway.get() {
-                st2.finish(w, &i2, Val::Null)
-            } else if st2.late.borrow().is_some() && !st2.done.get() {
+            if st2.late.borrow().is_some() && !st2.done.get() {
                 // it waits on for a late answer
                 st2.gone.set(Some(w.now()));
                 resolve(w, &st2.p, Ok(Val::Undef));
             } else {
-                st2.finish(w, &i2, Val::Undef)
+                st2.finish(w, &i2, Val::Null)
             }
         }),
         wait,
@@ -2388,21 +2368,20 @@ fn keen(w: &World, i: &Rc<Inst>, her: Ship, path: String) -> Result<Promise, Fai
     Ok(p)
 }
 
-/// A peer's /pub/revs, or Null if it has none there. One we can't read
-/// is an empty list, as lattice's +fetch-peer-revs reads it.
-fn peek_revs(w: &World, i: &Rc<Inst>, her: Ship, base: &'static str) -> Promise {
-    // Request::Gateway: a list that comes late is kept, as reader.go's
-    // keepRevs keeps it
-    let late: Option<Late> = w.gateway.get().then(|| {
+/// A peer's /pub/revs, or Null if it has none there, or Undef if it
+/// didn't answer in time. One we can't read is an empty list, as
+/// lattice's +fetch-peer-revs reads it. A list that comes after that is
+/// kept, with its base, for the next read.
+fn peek_revs(w: &World, i: &Rc<Inst>, her: Ship, who: String, base: &'static str) -> Promise {
+    let late: Late = {
         let i = Rc::downgrade(i);
         Box::new(move |w: &World, v: Val| {
             if let (Some(i), Val::Obj(o)) = (i.upgrade(), v) {
-                let who = ship_text(her);
                 i.bases.borrow_mut().insert(who.clone(), base);
-                i.revs.borrow_mut().insert(who, (w.now(), go_revs(&o)));
+                i.revs.borrow_mut().insert(who, (w.now(), o));
             }
-        }) as Late
-    });
+        })
+    };
     let p = peek_late(
         w,
         i,
@@ -2414,28 +2393,17 @@ fn peek_revs(w: &World, i: &Rc<Inst>, her: Ship, base: &'static str) -> Promise 
             conv: Conv2::Revs,
         },
         PEEK_TIMEOUT,
-        late,
+        Some(late),
     );
-    let p = on_err(w, &p, |w, e| match &e {
+    on_err(w, &p, |w, e| match &e {
         Val::Err(f) if f.kind == Kind::UrbError => Ok(Val::Obj(Rc::new(Object::default()))),
         _ => Ok(Val::Promise(rejected(w, e))),
-    });
-    if !w.gateway.get() {
-        return p;
-    }
-    then(
-        w,
-        &p,
-        Box::new(|_, r| match r {
-            Ok(Val::Obj(o)) => Ok(Val::Obj(go_revs(&o))),
-            r => r,
-        }),
-    )
+    })
 }
 
-/// reader.go's revsOf: a list's entries that name an id (a non-empty
-/// string); any other entry is no entry
-fn go_revs(o: &Object) -> Rc<Object> {
+/// mesa.mjs's revsOf: a list's entries that name an id (a non-empty
+/// string); any other entry is no entry, since there is nothing to keen
+fn revs_of(o: &Object) -> Rc<Object> {
     let mut out = Object::default();
     for (k, v) in o.entries() {
         if let Json::Obj(row) = v
@@ -2446,30 +2414,6 @@ fn go_revs(o: &Object) -> Rc<Object> {
         }
     }
     Rc::new(out)
-}
-
-/// reader.go's words for a ship that answered no base probe in time
-fn go_no_answer(who: &str) -> Failure {
-    Failure::urb(format!(
-        "{who} did not answer within 30s. It may be offline, or still catching up \
-         after this gateway restarted, which can take a minute or two: try again shortly"
-    ))
-}
-
-/// The HTTP status the Go gateway answers a reader's failure with,
-/// under Request::Gateway: reader.go's fail() codes, by its words. Any
-/// other failure is the gateway's default, 502.
-pub fn gateway_status(f: &Failure) -> u16 {
-    let m = &f.message;
-    if f.kind != Kind::UrbError {
-        502
-    } else if m.ends_with(" is not published") {
-        404
-    } else if m.contains(" did not answer within 30s. It may be offline") {
-        504
-    } else {
-        502
-    }
 }
 
 /// +peer-base: where the peer runs lattice, asked, not guessed
@@ -2486,21 +2430,16 @@ fn base(w: &World, i: &Rc<Inst>, her: Ship, who: String) -> Promise {
 fn base_try(w: &World, i: Rc<Inst>, her: Ship, who: String, k: usize) -> Step {
     let bases = [DESK_BASE, APP_BASE];
     if k == bases.len() {
-        if w.gateway.get() {
-            return throw(Failure::urb(format!(
-                "{who} shares no lattice pages here: it runs no lattice, one older than \
-                 release 35, or shares nothing"
-            )));
-        }
         return base_done(i, who);
     }
     let b = bases[k];
-    let p = peek_revs(w, &i, her, b);
+    let p = peek_revs(w, &i, her, who.clone(), b);
     wait_ok(Val::Promise(p), move |w, got| {
-        // reader.go: the other place would only wait behind the same
-        // stall
-        if w.gateway.get() && matches!(got, Val::Undef) {
-            return throw(go_no_answer(&who));
+        // no answer: the other place would only wait behind the same
+        // stall. later: a ship catching up on a comet that moved
+        // answers in a minute or two
+        if matches!(got, Val::Undef) {
+            return throw(Failure::urb(format!("{who} {NO_LATTICE}")).later());
         }
         if got.is_null() {
             return base_try(w, i, her, who, k + 1);
@@ -2515,17 +2454,15 @@ fn base_try(w: &World, i: Rc<Inst>, her: Ship, who: String, k: usize) -> Step {
     })
 }
 
+/// how a base probe fails, after the ship's name: later if it didn't
+/// answer, not if each place answered with nothing
+pub const NO_LATTICE: &str = "answered no lattice peek (offline, or no lattice)";
+
 fn base_done(i: Rc<Inst>, who: String) -> Step {
     match i.bases.borrow().get(&who) {
         Some(b) => Step::Ret(Val::Str(b.to_string())),
-        // later: a ship catching up on a comet that moved answers in a
-        // minute or two
-        None => throw(
-            Failure::urb(format!(
-                "{who} answered no lattice peek (offline, or no lattice)"
-            ))
-            .later(),
-        ),
+        // each place answered, with nothing: no lattice to wait for
+        None => throw(Failure::urb(format!("{who} {NO_LATTICE}"))),
     }
 }
 
@@ -2548,12 +2485,12 @@ fn rev_list(w: &World, i: &Rc<Inst>, her: Ship, who: String) -> Promise {
                     // {at: now(), list: await ...}: at is read first
                     let at = w.now();
                     let b = if b == APP_BASE { APP_BASE } else { DESK_BASE };
-                    let p = peek_revs(w, &i, her, b);
-                    wait_ok(Val::Promise(p), move |w, got| {
-                        // reader.go: no answer yet, so the stale list
-                        // beats none
-                        if w.gateway.get()
-                            && matches!(got, Val::Undef)
+                    let p = peek_revs(w, &i, her, who.clone(), b);
+                    wait_ok(Val::Promise(p), move |_, got| {
+                        // no answer yet: the stale list beats none,
+                        // which would read every page by the vault
+                        // peek, as %gmi
+                        if matches!(got, Val::Undef)
                             && let Some((_, old)) = r
                         {
                             return Step::Ret(Val::Obj(old));
@@ -2571,52 +2508,41 @@ fn rev_list(w: &World, i: &Rc<Inst>, her: Ship, who: String) -> Promise {
     })
 }
 
-/// +read-page-body-rev: keen the listed id, else peek the vault file.
-/// [body, how, mark]. The vault file is %gmi whatever the page's format.
-/// Under Request::Gateway, given is the list the read already has: as
-/// in reader.go, each page of one read is looked up in the same list,
-/// asked for once.
+/// +read-page-body-rev: keen the id the read's list names, else peek
+/// the vault file. [body, how, mark]. The vault file is %gmi whatever
+/// the page's format.
 fn page(
     w: &World,
     i: &Rc<Inst>,
     her: Ship,
     who: String,
     rel: Vec<String>,
-    given: Option<Rc<Object>>,
+    list: Rc<Object>,
 ) -> Promise {
     let i = i.clone();
     spawn(w, move |w| {
         let key = format!("/{}", rel.join("/"));
-        let list = match given {
-            Some(l) => Val::Obj(l),
-            None => Val::Promise(rev_list(w, &i, her, who.clone())),
+        let ent = list.get(&key);
+        if !js::truthy(ent) {
+            return vault(w, i, her, who, key);
+        }
+        let id = match ent {
+            Some(Json::Obj(o)) => js::string(o.get("id")),
+            _ => js::string(None),
         };
-        wait_ok(list, move |w, list| {
-            let Val::Obj(list) = list else {
-                return throw(Failure::error("no list"));
-            };
-            let ent = list.get(&key);
-            if !js::truthy(ent) {
-                return vault(w, i, her, who, key);
+        let k = match keen(w, &i, her, format!("/g/x/1/grubbery//1/pub/page{key}/{id}")) {
+            Ok(k) => k,
+            Err(e) => return throw(e),
+        };
+        wait_ok(Val::Promise(k), move |w, got| {
+            if let Val::Gage(mark, Some(body)) = &got
+                && keen_is_page(mark, true)
+            {
+                return Step::Ret(Val::Page(Some((body.clone(), "keen", mark.clone()))));
             }
-            let id = match ent {
-                Some(Json::Obj(o)) => js::string(o.get("id")),
-                _ => js::string(None),
-            };
-            let k = match keen(w, &i, her, format!("/g/x/1/grubbery//1/pub/page{key}/{id}")) {
-                Ok(k) => k,
-                Err(e) => return throw(e),
-            };
-            wait_ok(Val::Promise(k), move |w, got| {
-                if let Val::Gage(mark, Some(body)) = &got
-                    && keen_is_page(mark, true)
-                {
-                    return Step::Ret(Val::Page(Some((body.clone(), "keen", mark.clone()))));
-                }
-                // a miss, or a %del tombstone: the list is stale
-                i.revs.borrow_mut().remove(&who);
-                vault(w, i, her, who, key)
-            })
+            // a miss, or a %del tombstone: the list is stale
+            i.revs.borrow_mut().remove(&who);
+            vault(w, i, her, who, key)
         })
     })
 }
@@ -2757,8 +2683,8 @@ fn read(w: &World, i: &Rc<Inst>, url: String) -> Promise {
                     } else {
                         vec![rel, dex]
                     };
-                    let given = w.gateway.get().then(|| list.clone());
-                    try_pages(w, i, her, who, url, tries, 0, given)
+                    // each try looks in the one list this read got
+                    try_pages(w, i, her, who, url, tries, 0, list)
                 })
             }
         }
@@ -2774,16 +2700,13 @@ fn try_pages(
     url: String,
     tries: Vec<Vec<String>>,
     k: usize,
-    given: Option<Rc<Object>>,
+    list: Rc<Object>,
 ) -> Step {
     let Some(p) = tries.get(k).cloned() else {
-        if w.gateway.get() {
-            return throw(Failure::urb(format!("{url} is not published")));
-        }
         return throw(Failure::urb(format!("{url}: not published")));
     };
     let key = format!("/{}", p.join("/"));
-    let pg = page(w, &i, her, who.clone(), p, given.clone());
+    let pg = page(w, &i, her, who.clone(), p, list.clone());
     wait_ok(Val::Promise(pg), move |w, got| match got {
         Val::Page(Some((body, how, mark))) => Step::Ret(Val::Reply(Reply::Read(Page {
             key,
@@ -2791,7 +2714,7 @@ fn try_pages(
             how,
             mark: Some(mark),
         }))),
-        _ => try_pages(w, i, her, who, url, tries, k + 1, given),
+        _ => try_pages(w, i, her, who, url, tries, k + 1, list),
     })
 }
 

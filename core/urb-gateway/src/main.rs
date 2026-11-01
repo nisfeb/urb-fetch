@@ -16,12 +16,11 @@ mod run {
     use std::sync::{Arc, Mutex};
     use std::thread;
     use std::time::Duration;
-    use urb::core::gateway_status;
     use urb::host::net::{Log, NetIo, libmesa_log, random};
     use urb::host::{Event, Host};
     use urb::{Reply, Request};
     use urb_gateway::flags::{self, Flag, Kind};
-    use urb_gateway::routes::{Fail, Gateway, Page};
+    use urb_gateway::routes::{Fail, Gateway, Page, fail_of};
     use urb_gateway::state::{self, GatewayUdp, go_path_error};
     use urb_gateway::{golog, http};
 
@@ -232,10 +231,6 @@ mod run {
                     return;
                 }
             };
-            if let Err(f) = host.call(Request::Gateway(true)) {
-                let _ = open_tx.send(Err(f.message));
-                return;
-            }
             let _ = open_tx.send(Ok((our, waker)));
             let mut pending: HashMap<u64, Sender<Result<Page, Fail>>> = HashMap::new();
             loop {
@@ -263,8 +258,8 @@ mod run {
                                 body: p.body.into_bytes(),
                                 how: p.how.into(),
                             }),
-                            Ok(other) => Err((502, format!("read gave {other:?}").into_bytes())),
-                            Err(f) => Err((gateway_status(&f), f.message.into_bytes())),
+                            Ok(_) => Err((502, b"the read gave no page".to_vec())),
+                            Err(f) => Err(fail_of(&f)),
                         });
                     }
                 }
