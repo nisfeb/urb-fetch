@@ -42,6 +42,9 @@ pub enum Event {
         id: u64,
         answer: Result<(u16, Vec<u8>), String>,
     },
+    /// nothing from the world: a caller on another thread wants the
+    /// host to take its turn now (the gateway, with a request)
+    Wake,
 }
 
 /// why [`Io::wait`] came back
@@ -288,6 +291,7 @@ impl<I: Io> Host<I> {
                 self.step(Input::Hear { ip, port, bytes })
             }
             Wake::Event(Event::Fetched { id, answer }) => self.step(Input::Fetched { id, answer }),
+            Wake::Event(Event::Wake) => {}
             Wake::Timer => {
                 let now = self.io.now();
                 if let Some((kind, due)) = self.core.due(now) {

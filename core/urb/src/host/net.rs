@@ -103,6 +103,13 @@ impl NetIo {
     }
 }
 
+impl NetIo {
+    /// what wakes the host from another thread: send it [`Event::Wake`]
+    pub fn waker(&self) -> Sender<Event> {
+        self.tx.clone()
+    }
+}
+
 impl Io for NetIo {
     fn now(&mut self) -> u64 {
         now_ms()
@@ -268,7 +275,13 @@ impl Udp {
                 p
             }
         };
-        Ok(Udp {
+        Ok(Udp::with_port(port, fake, log))
+    }
+
+    /// on a port the caller keeps (the Go gateway keeps it in
+    /// `<ship>.db.port`)
+    pub fn with_port(port: u16, fake: bool, log: Log) -> Udp {
+        Udp {
             port,
             fake,
             sock: None,
@@ -277,7 +290,7 @@ impl Udp {
             galaxies: Arc::default(),
             asking: Arc::default(),
             log,
-        })
+        }
     }
 
     /// where galaxy g is, if known; looked up in the background when not,
