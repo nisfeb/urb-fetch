@@ -93,7 +93,9 @@ export function furum(urb, host, base = FURUM_BASE) {
     // {ok} once the host's inbox took it in; furum then applies it, or
     // refuses it with a note
     newPost: (name, { title, url = null, body = null }) => act('new-post', name, title, some(url), some(body)),
-    newComment: (name, postId, body, parent = null) => act('new-comment', name, postId, some(parent), body),
+    //  comment ids start at 0, so only an absent parent is none
+    newComment: (name, postId, body, parent = null) =>
+      act('new-comment', name, postId, parent == null ? null : [null, parent], body),
     upvote: (name, postId) => act('upvote', name, ['post', postId]),
 
     // f({from, title, body}) for each note furum sends us, such as a refusal
