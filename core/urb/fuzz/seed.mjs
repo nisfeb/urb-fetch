@@ -4,11 +4,13 @@
 // hooks gets each noun twice, with each of its picks (the last byte);
 // serve gets each noun with each of its picks and tags (the last two
 // bytes); forum and apps each furum and forum vector's nouns, two at a
-// time, with their picks; de_urb the urls deurb.json is made from.
+// time, with their picks, and apps each whole board, its pick 7;
+// de_urb the urls deurb.json is made from.
 //
 //   node core/urb/fuzz/seed.mjs   (writes core/urb/fuzz/corpus/<target>/)
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cue, hex, jam, unhex } from '../../../wasm/jam.mjs';
 
 const here = new URL('.', import.meta.url).pathname;
 const vec = name => JSON.parse(readFileSync(`${here}../../../conformance/${name}.json`, 'utf8')).cases;
@@ -81,6 +83,21 @@ uniq.forEach((a, i) => {
   for (let p = 0; p < 12; p++) put('forum', `${i}-${p}`, two(a, b, [p, p + 1, p % 2 ? p : 2 * p]));
   for (let p = 0; p < 7; p++) put('apps', `${i}-${p}`, two(a, b, [i % 16, p]));
 });
+//  apps' pick 7: each whole lattice board of a forum.board or
+//  forum.thread vector, as [card conf] and [posts threads votes], for
+//  each post id the target can pick (k % 4)
+let whole = 0;
+for (const c of vec('decoders')) {
+  if (!['forum.board', 'forum.thread'].includes(c.fn)) continue;
+  const files = Object.entries(c.in[0]).flatMap(([dir, fs]) =>
+    fs.map(([p, n]) => [`${dir.split('/').at(-1)}/${p.join('/')}`, cue(unhex(n.$noun))]));
+  const at = k => files.find(([p]) => p === k)?.[1];
+  const [card, conf, posts, threads, votes] = ['pub/card', 'pub/conf', 'content/posts/b0', 'content/threads/b0', 'content/votes/b0'].map(at);
+  if ([card, conf, posts, threads, votes].includes(undefined)) continue;
+  const x = jam([card, conf]), y = jam([posts, [threads, votes]]);
+  for (let k = 0; k < 4; k++) put('apps', `whole-${whole}-${k}`, two(hex(x), hex(y), [k, 7]));
+  whole++;
+}
 //  serve's pick 5: saved page keys pageKey never makes, whole and not
 ['', 'éx', '😀x', '/ok', 'a/é/😀'].forEach((k, i) => {
   for (let tag = 0; tag < 3; tag++) put('serve', `key-${i}-${tag}`, Buffer.concat([Buffer.from(k), Buffer.from([tag, 5])]));

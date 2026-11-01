@@ -3,7 +3,8 @@
 //! votes buckets, and a lattice board's pub/ and content/ directories,
 //! each a file or a directory of files whose nouns are the fuzzer's in
 //! a well-formed %snap, so the apps' own convs read them during the
-//! hook; and notes poked into our inbox for each app's onNote. Then the
+//! hook; a whole lattice board, a and b split into its grubs; and
+//! notes poked into our inbox for each app's onNote. Then the
 //! timers run out. No hook panics, every noun is let go, and nothing
 //! the core gives is past OUT_MAX.
 #![no_main]
@@ -11,12 +12,17 @@ use libfuzzer_sys::fuzz_target;
 use urb::codec::path;
 use urb::core::{ForumCall, FurumCall, Hook};
 use urb::forum::{board, furum};
-use urb::noun::{Noun, Value};
+use urb::noun::{Noun, NounRef, Value};
 use urb::url::DESK_BASE;
 use urb::{Core, Input, Output, Reply, Request};
 use urb_fuzz::{bounded, js_len};
 
 const ZOD: &str = "~zod";
+
+/// a cell's head and tail, or an atom twice
+fn half(x: NounRef<'_>) -> (NounRef<'_>, NounRef<'_>) {
+    (x.head().unwrap_or(x), x.tail().unwrap_or(x))
+}
 
 fn v(x: Vec<Value<'_>>) -> Value<'_> {
     Value::Array(x)
@@ -178,7 +184,7 @@ fuzz_target!(|data: &[u8]| {
         call,
     };
     let id = f64::from(*k % 4);
-    match pick % 7 {
+    match pick % 8 {
         0 => {
             r.call(fu(FurumCall::NextPost("b".into())));
             r.answer(&[(&["conf"], a)], false);
@@ -217,11 +223,33 @@ fuzz_target!(|data: &[u8]| {
             r.call(fu(FurumCall::OnNote));
             r.poke(furum::BASE, "inbox.sig", furum::MSG, a);
         }
-        _ => {
+        6 => {
             r.call(fo(ForumCall::OnNote));
             let to = board::BASES[*k as usize % 2];
             r.poke(to, "forum.sig", board::NOTE, a);
             r.poke(DESK_BASE, "forum.sig", board::NOTE, b);
+        }
+        _ => {
+            // a whole board, each grub where load:fb reads it: a is
+            // [card conf] and b is [posts threads votes], buckets b0,
+            // so a well-formed pair (seed.mjs's) is assembled and its
+            // thread found
+            r.call(fo(ForumCall::Thread("b".into(), urb::msg::Id::Num(id))));
+            r.answer(&[(&["index"], Value::Null)], false);
+            let (x, y) = (n[0].borrow(), n[1].borrow());
+            let (card, conf) = half(x);
+            let (posts, rest) = half(y);
+            let (threads, votes) = half(rest);
+            let nv = Value::Noun;
+            r.answer(&[(&["card"], nv(card)), (&["conf"], nv(conf))], true);
+            r.answer(
+                &[
+                    (&["posts", "b0"], nv(posts)),
+                    (&["threads", "b0"], nv(threads)),
+                    (&["votes", "b0"], nv(votes)),
+                ],
+                true,
+            );
         }
     }
     let mut outs = std::mem::take(&mut r.outs);
