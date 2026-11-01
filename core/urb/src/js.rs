@@ -279,6 +279,112 @@ pub fn string(j: Option<&Json>) -> String {
     }
 }
 
+/// `Number(x)`, ToNumber of a JS value (None is undefined)
+pub fn to_number(j: Option<&Json>) -> f64 {
+    match j {
+        None => f64::NAN,
+        Some(Json::Null) => 0.0,
+        Some(Json::Bool(b)) => f64::from(u8::from(*b)),
+        Some(Json::Num(n)) => *n,
+        Some(Json::Str(s)) => number(s),
+        Some(Json::Arr(_)) => number(&string(j)),
+        Some(Json::Obj(_)) => f64::NAN,
+    }
+}
+
+/// `a + b` of two JS values: text if either is text (or an array or an
+/// object, which are text to `+`), else their numbers added
+pub fn add(a: Option<&Json>, b: Option<&Json>) -> Json {
+    let texty = |j: Option<&Json>| matches!(j, Some(Json::Str(_) | Json::Arr(_) | Json::Obj(_)));
+    if texty(a) || texty(b) {
+        return Json::Str(format!("{}{}", string(a), string(b)));
+    }
+    Json::Num(to_number(a) + to_number(b))
+}
+
+/// `BigInt(x)` of a JS value, or what it throws, word for word
+pub fn bigint(j: Option<&Json>) -> Result<crate::Int, crate::core::Failure> {
+    use crate::core::Failure;
+    match j {
+        None => Err(Failure::type_error("Cannot convert undefined to a BigInt")),
+        Some(Json::Null) => Err(Failure::type_error("Cannot convert null to a BigInt")),
+        Some(Json::Bool(b)) => Ok(u64::from(*b).into()),
+        Some(Json::Num(n)) => bigint_of_number(*n),
+        Some(Json::Obj(_)) => Err(Failure::syntax_error(
+            "Cannot convert [object Object] to a BigInt",
+        )),
+        Some(j) => {
+            let t = string(Some(j));
+            bigint_of_text(&t)
+                .ok_or_else(|| Failure::syntax_error(format!("Cannot convert {t} to a BigInt")))
+        }
+    }
+}
+
+/// BigInt of a number: a whole one, or a RangeError. A negative one is
+/// what noun() makes of it, 0.
+pub fn bigint_of_number(n: f64) -> Result<crate::Int, crate::core::Failure> {
+    if !n.is_finite() || n.fract() != 0.0 {
+        return Err(crate::core::Failure::range_error(format!(
+            "The number {} cannot be converted to a BigInt because it is not an integer",
+            number_text(n)
+        )));
+    }
+    if n <= 0.0 {
+        return Ok(crate::Int::default());
+    }
+    // a whole f64 is its mantissa shifted: exact
+    let bits = n.to_bits();
+    let exp = ((bits >> 52) & 0x7ff) as i64 - 1075;
+    let mant = (bits & ((1 << 52) - 1)) | (1 << 52);
+    if exp < 0 {
+        return Ok((mant >> (-exp)).into());
+    }
+    let (bytes, sh) = ((exp / 8) as usize, (exp % 8) as u32);
+    let mut le = vec![0u8; bytes];
+    let wide = u128::from(mant) << sh;
+    le.extend_from_slice(&wide.to_le_bytes());
+    Ok(crate::Int::from_le(&le))
+}
+
+/// StringToBigInt: blank is 0n; decimal, or 0x, 0o or 0b digits; a sign
+/// only on decimal (and a negative one is noun()'s 0); else None
+fn bigint_of_text(t: &str) -> Option<crate::Int> {
+    let t = trim(t);
+    if t.is_empty() {
+        return Some(crate::Int::default());
+    }
+    let (radix, digits, neg) = match t.as_bytes() {
+        [b'0', b'x' | b'X', ..] => (16, &t[2..], false),
+        [b'0', b'o' | b'O', ..] => (8, &t[2..], false),
+        [b'0', b'b' | b'B', ..] => (2, &t[2..], false),
+        [b'-', ..] => (10, &t[1..], true),
+        [b'+', ..] => (10, &t[1..], false),
+        _ => (10, t, false),
+    };
+    if digits.is_empty() || !digits.chars().all(|c| c.is_digit(radix)) {
+        return None;
+    }
+    if neg {
+        return Some(crate::Int::default());
+    }
+    // little-endian bytes, times radix plus each digit
+    let mut le: Vec<u8> = Vec::new();
+    for c in digits.chars() {
+        let mut carry = c.to_digit(radix).unwrap_or(0);
+        for b in le.iter_mut() {
+            let v = u32::from(*b) * radix + carry;
+            *b = v as u8;
+            carry = v >> 8;
+        }
+        while carry > 0 {
+            le.push(carry as u8);
+            carry >>= 8;
+        }
+    }
+    Some(crate::Int::from_le(&le))
+}
+
 /// JS's `String.prototype.trim`: JS's white space at both ends, as
 /// StrWhiteSpaceChar has it
 pub fn trim(s: &str) -> &str {
@@ -418,6 +524,46 @@ mod tests {
         let keys: Vec<&str> = o.entries().iter().map(|e| e.0).collect();
         assert_eq!(keys, ["1", "2", "b", "a", "01", "4294967295"]);
         assert_eq!(o.get("b"), Some(&Json::Num(5.0)));
+    }
+
+    #[test]
+    fn bigint_as_js_makes_it_or_throws() {
+        let n = |x: f64| {
+            bigint(Some(&Json::Num(x)))
+                .map(|i| i.decimal())
+                .map_err(|e| e.message)
+        };
+        assert_eq!(n(1793438787341.0), Ok("1793438787341".into()));
+        assert_eq!(n(2f64.powi(80)), Ok("1208925819614629174706176".into()));
+        assert_eq!(n(1e21), Ok("1000000000000000000000".into()));
+        assert_eq!(n(0.0), Ok("0".into()));
+        assert_eq!(
+            n(1.5),
+            Err(
+                "The number 1.5 cannot be converted to a BigInt because it is not an integer"
+                    .into()
+            )
+        );
+        assert!(n(f64::NAN).unwrap_err().contains("The number NaN"));
+        let t = |x: &str| {
+            bigint(Some(&Json::Str(x.into())))
+                .map(|i| i.decimal())
+                .map_err(|e| e.message)
+        };
+        assert_eq!(t("0xff"), Ok("255".into()));
+        assert_eq!(t(" 12 "), Ok("12".into()));
+        assert_eq!(t(""), Ok("0".into()));
+        assert_eq!(t("0xnull"), Err("Cannot convert 0xnull to a BigInt".into()));
+        assert_eq!(t("1.5"), Err("Cannot convert 1.5 to a BigInt".into()));
+        assert_eq!(
+            bigint(None).unwrap_err().message,
+            "Cannot convert undefined to a BigInt"
+        );
+        assert!(matches!(add(Some(&Json::Num(1.0)), None), Json::Num(n) if n.is_nan()));
+        assert_eq!(
+            add(Some(&Json::Num(0.0)), Some(&Json::Str("3".into()))),
+            Json::Str("03".into())
+        );
     }
 
     #[test]

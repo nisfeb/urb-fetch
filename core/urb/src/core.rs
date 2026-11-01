@@ -60,6 +60,8 @@ pub enum Kind {
     UrbError,
     Error,
     TypeError,
+    RangeError,
+    SyntaxError,
 }
 
 /// An error, as the JS throws it: its kind and its message, word for
@@ -91,6 +93,22 @@ impl Failure {
     pub fn type_error(m: impl Into<String>) -> Failure {
         Failure {
             kind: Kind::TypeError,
+            message: m.into(),
+            later: false,
+        }
+    }
+
+    pub fn range_error(m: impl Into<String>) -> Failure {
+        Failure {
+            kind: Kind::RangeError,
+            message: m.into(),
+            later: false,
+        }
+    }
+
+    pub fn syntax_error(m: impl Into<String>) -> Failure {
+        Failure {
+            kind: Kind::SyntaxError,
             message: m.into(),
             later: false,
         }
@@ -1166,7 +1184,12 @@ impl World {
                 ),
             );
         }
-        if let (Some(_), Some(k), Some((folder, name))) = (&f, &k, &at) {
+        // Only a file with something in it is kept, so one ship can't
+        // fill every slot with names we never published; a keep held
+        // already and unchanged isn't saved again.
+        if let (Some(f), Some(k), Some((folder, name))) = (&f, &k, &at)
+            && f.value.is_some()
+        {
             let room = {
                 let s = i.server.borrow();
                 s.keepers.get(k).is_some() || s.keepers.len() < MAX_KEEPERS
@@ -1181,8 +1204,18 @@ impl World {
                 );
                 o.set("folder".into(), Json::Str(folder.clone()));
                 o.set("name".into(), Json::Str(name.clone()));
-                i.server.borrow_mut().keepers.set(k.clone(), Json::Obj(o));
-                i.keepers_changed(self);
+                let kept = Json::Obj(o);
+                // JSON.stringify(keepers.get(k)) !== JSON.stringify(kept)
+                let same = i
+                    .server
+                    .borrow()
+                    .keepers
+                    .get(k)
+                    .is_some_and(|old| js::stringify(old) == js::stringify(&kept));
+                if !same {
+                    i.server.borrow_mut().keepers.set(k.clone(), kept);
+                    i.keepers_changed(self);
+                }
             }
         }
         // the first wave answers the keep, even for nothing
@@ -1196,7 +1229,7 @@ impl World {
             msg::intake(
                 Value::Noun(wire),
                 Value::Noun(dest),
-                msg::wave_of(f.as_ref(), &name),
+                msg::wave_of(f.as_ref(), &name)?,
             ),
         )
     }
@@ -1272,8 +1305,11 @@ impl World {
             return Ok(None);
         };
         let scries = i.server.borrow().scries.clone();
-        match scries.and_then(|f| f(self, path)) {
-            Some(v) => Ok(Some(Noun::of(&v)?)),
+        match scries {
+            Some(f) => match f(self, path)? {
+                Some(v) => Ok(Some(Noun::of(&v)?)),
+                None => Ok(None),
+            },
             None => Ok(None),
         }
     }
@@ -1589,7 +1625,7 @@ impl Inst {
 /// grub.serve's file(folder, name): None for a file we don't serve
 pub(crate) type Files = Rc<dyn Fn(&World, &str, &str) -> Result<Option<File<'static>>, Failure>>;
 /// scry.serve's f(path): [mark, value], or None
-pub(crate) type Scries = Rc<dyn Fn(&World, &str) -> Option<Value<'static>>>;
+pub(crate) type Scries = Rc<dyn Fn(&World, &str) -> Result<Option<Value<'static>>, Failure>>;
 /// grub.serve's onKeepers, which hears every change of the keeps
 pub(crate) type OnKeepers = Rc<dyn Fn(&World, Vec<Json>)>;
 
@@ -1709,7 +1745,7 @@ impl Inst {
                     bone,
                     "grubbery",
                     "grubbery-intake",
-                    msg::intake(wire, dest, msg::wave_of(f.as_ref(), name)),
+                    msg::intake(wire, dest, msg::wave_of(f.as_ref(), name)?),
                 )?;
             }
             Ok(())

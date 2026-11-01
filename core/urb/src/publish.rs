@@ -20,8 +20,8 @@
 use crate::core::Failure;
 use crate::js::{self, Json, Object};
 use crate::msg::File;
+use crate::msg::da_of;
 use crate::noun::Value;
-use crate::text::da;
 use crate::url::DESK_BASE;
 use crate::{Int, url};
 
@@ -56,35 +56,30 @@ pub fn page_key(name: &str) -> Option<String> {
     Some(format!("/{}", segs.join("/")))
 }
 
-/// what one put or remove makes of a page's rev, as JS adds: put's
-/// `(rev ?? 0) + 1`, and remove's `rev + 1`
-fn plus_one(rev: Option<&Json>, put: bool) -> Json {
-    match rev {
-        None if put => Json::Num(1.0),
-        None => Json::Num(f64::NAN),
-        Some(Json::Null) => Json::Num(1.0),
-        Some(Json::Num(n)) => Json::Num(n + 1.0),
-        Some(Json::Bool(b)) => Json::Num(f64::from(u8::from(*b)) + 1.0),
-        Some(j) => Json::Str(format!("{}1", js::string(Some(j)))),
+/// `k.slice(1)`: a key without its first UTF-16 unit. Without the low
+/// half of a character outside the BMP, the high half is left alone,
+/// which UTF-8 (the noun's TextEncoder) writes as U+FFFD.
+fn slice1(k: &str) -> String {
+    let mut c = k.chars();
+    match c.next() {
+        None => String::new(),
+        Some(first) if first.len_utf16() == 2 => format!("\u{fffd}{}", c.as_str()),
+        Some(_) => c.as_str().to_string(),
     }
 }
 
-/// a JS number as a whole number of the JS's BigInt() or da()
-fn whole(j: Option<&Json>) -> u64 {
-    match j {
-        Some(Json::Num(n)) if *n >= 0.0 => *n as u64,
-        _ => 0,
-    }
-}
-
-fn num(j: Option<&Json>) -> f64 {
-    match j {
-        Some(Json::Num(n)) => *n,
-        Some(Json::Bool(b)) => f64::from(u8::from(*b)),
-        Some(Json::Null) => 0.0,
-        Some(Json::Str(s)) => js::number(s),
-        _ => f64::NAN,
-    }
+/// a saved JS value as noun() takes it: undefined throws, a number must
+/// be whole, and an array or object (which pub.mjs never saves) is its
+/// text
+fn noun_of(j: Option<&Json>) -> Result<Value<'static>, Failure> {
+    Ok(match j {
+        None => return Err(Failure::type_error("can't make a noun of undefined")),
+        Some(Json::Null) => Value::Null,
+        Some(Json::Bool(b)) => Value::Bool(*b),
+        Some(Json::Num(n)) => Value::Int(js::bigint_of_number(*n)?),
+        Some(Json::Str(s)) => Value::Text(s.clone()),
+        Some(j) => Value::Text(js::string(Some(j))),
+    })
 }
 
 fn field<'a>(p: &'a Json, k: &str) -> Option<&'a Json> {
@@ -134,33 +129,38 @@ impl PubState {
     }
 
     /// the list and the index change with every page: their version is
-    /// the count of every page's revisions
-    fn listed(&self) -> (u64, u64) {
+    /// the count of every page's revisions, as JS adds them, and their
+    /// time the latest, as Math.max(0, ...) finds it
+    fn listed(&self) -> (Option<Json>, Option<Json>) {
         let all = self.pages.entries();
-        let rev = all.iter().fold(0.0, |n, (_, p)| n + num(field(p, "rev")));
-        let at = all
-            .iter()
-            .fold(0.0f64, |m, (_, p)| m.max(num(field(p, "at"))));
-        (rev.max(0.0) as u64, at as u64)
+        let rev = all.iter().fold(Json::Num(0.0), |n, (_, p)| {
+            js::add(Some(&n), field(p, "rev"))
+        });
+        let at = all.iter().fold(0.0f64, |m, (_, p)| {
+            let x = js::to_number(field(p, "at"));
+            if m.is_nan() || x.is_nan() {
+                f64::NAN
+            } else {
+                m.max(x)
+            }
+        });
+        (Some(rev), Some(Json::Num(at)))
     }
 
     /// +revs-json: {"/<name>": {"rev": n, "id": "0v…"}} as a $json noun
-    fn revs(&self) -> Value<'static> {
+    fn revs(&self) -> Result<Value<'static>, Failure> {
         let s = |x: &str| Value::Text(x.into());
-        let pages = self
-            .live()
-            .into_iter()
-            .map(|(k, p)| {
-                let rev = js::string(field(p, "rev"));
-                let id = js::string(field(p, "id"));
-                let o = Value::Map(vec![
-                    (s("rev"), Value::Array(vec![s("n"), s(&rev)])),
-                    (s("id"), Value::Array(vec![s("s"), s(&id)])),
-                ]);
-                (s(k), Value::Array(vec![s("o"), o]))
-            })
-            .collect();
-        Value::Array(vec![s("o"), Value::Map(pages)])
+        let mut pages = Vec::new();
+        for (k, p) in self.live() {
+            let rev = js::string(field(p, "rev"));
+            let id = noun_of(field(p, "id"))?;
+            let o = Value::Map(vec![
+                (s("rev"), Value::Array(vec![s("n"), s(&rev)])),
+                (s("id"), Value::Array(vec![s("s"), id])),
+            ]);
+            pages.push((s(k), Value::Array(vec![s("o"), o])));
+        }
+        Ok(Value::Array(vec![s("o"), Value::Map(pages)]))
     }
 
     /// +pub-index: {/pub/<name>/gmi: [updated bytes hash]}, hash (sham
@@ -169,20 +169,17 @@ impl PubState {
         let mut out = Vec::new();
         for (k, p) in self.live() {
             let mut key: Vec<Value<'static>> = vec!["pub".into()];
-            key.extend(k[1..].split('/').map(Value::from));
+            key.extend(slice1(k).split('/').map(Value::from));
             key.push("gmi".into());
             key.push(Value::Null);
-            let body = js::string(field(p, "body"));
-            let hash = js::string(field(p, "hash"));
-            let h = hex(&hash)
-                .ok_or_else(|| Failure::error(format!("Cannot convert 0x{hash} to a BigInt")))?;
+            let at = da_of(field(p, "at"))?;
+            // TextEncoder's encode(undefined) is of ''
+            let body = field(p, "body").map_or(0, |b| js::string(Some(b)).len());
+            let hash = format!("0x{}", js::string(field(p, "hash")));
+            let h = js::bigint(Some(&Json::Str(hash)))?;
             out.push((
                 Value::Array(key),
-                Value::Array(vec![
-                    da(whole(field(p, "at"))).into(),
-                    (body.len() as u64).into(),
-                    h.into(),
-                ]),
+                Value::Array(vec![at.into(), (body as u64).into(), h.into()]),
             ));
         }
         Ok(Value::Map(out))
@@ -193,20 +190,23 @@ impl PubState {
     /// there.
     pub fn file(&self, folder: &str, name: &str) -> Result<Option<File<'static>>, Failure> {
         let (pub_dir, vault) = (pub_dir(), vault());
-        let (rev, at) = self.listed();
         let mark = |a: &str, b: &str| (a.to_string(), b.to_string());
         if folder == pub_dir && name == "index" {
+            let value = Some(self.index()?);
+            let (rev, at) = self.listed();
             return Ok(Some(File {
                 mark: mark("/lattice", "pub-index"),
-                value: Some(self.index()?),
+                value,
                 rev,
                 at,
             }));
         }
         if folder == pub_dir && name == "revs" {
+            let value = Some(self.revs()?);
+            let (rev, at) = self.listed();
             return Ok(Some(File {
                 mark: mark("/", "json"),
-                value: Some(self.revs()),
+                value,
                 rev,
                 at,
             }));
@@ -220,16 +220,19 @@ impl PubState {
         let Some(key) = page_key(rest) else {
             return Ok(None);
         };
-        let Some(p) = self.pages.get(&key) else {
-            // not yet: a keep waits for it
-            return Ok(Some(File {
-                mark: mark("", ""),
-                value: None,
-                rev: 0,
-                at: 0,
-            }));
+        let p = match self.pages.get(&key) {
+            Some(p) if js::truthy(Some(p)) => p,
+            // not yet: a keep gets an empty wave, and isn't kept
+            _ => {
+                return Ok(Some(File {
+                    mark: mark("", ""),
+                    value: None,
+                    rev: File::num(0),
+                    at: File::num(0),
+                }));
+            }
         };
-        let (rev, at) = (whole(field(p, "rev")), whole(field(p, "at")));
+        let (rev, at) = (field(p, "rev").cloned(), field(p, "at").cloned());
         Ok(Some(match field(p, "body") {
             Some(Json::Null) => File {
                 mark: mark("", ""),
@@ -237,9 +240,10 @@ impl PubState {
                 rev,
                 at,
             },
+            // a body of undefined is no value, as f.value !== undefined
             b => File {
                 mark: mark("/lattice", "page"),
-                value: Some(Value::Text(js::string(b))),
+                value: b.map(|b| noun_of(Some(b))).transpose()?,
                 rev,
                 at,
             },
@@ -249,22 +253,23 @@ impl PubState {
     /// The body at the id the list gives, as [mark body]. Only the newest
     /// revision answers, so a reader holding an older id waits out its
     /// keen and reads the vault file instead.
-    pub fn scry(&self, path: &str) -> Option<Value<'static>> {
-        let rest = path.strip_prefix(PAGE)?;
-        if !rest.starts_with('/') {
-            return None;
-        }
-        let cut = rest.rfind('/')?;
-        let p = self.pages.get(&rest[..cut])?;
+    pub fn scry(&self, path: &str) -> Result<Option<Value<'static>>, Failure> {
+        let Some(rest) = path.strip_prefix(PAGE).filter(|r| r.starts_with('/')) else {
+            return Ok(None);
+        };
+        let cut = rest.rfind('/').unwrap_or(0);
+        let Some(p) = self.pages.get(&rest[..cut]) else {
+            return Ok(None);
+        };
         let body = field(p, "body");
         if body == Some(&Json::Null) || text(field(p, "id")) != Some(&rest[cut + 1..]) {
-            return None;
+            return Ok(None);
         }
         let mark = match field(p, "mark") {
-            None | Some(Json::Null) => "gmi".to_string(),
-            m => js::string(m),
+            None | Some(Json::Null) => Value::Text("gmi".into()),
+            m => noun_of(m)?,
         };
-        Some(Value::Array(vec![mark.into(), js::string(body).into()]))
+        Ok(Some(Value::Array(vec![mark, noun_of(body)?])))
     }
 
     /// put's record: a new revision of key, with its id, time and hash
@@ -277,7 +282,11 @@ impl PubState {
         at: u64,
         hash: String,
     ) -> Json {
-        let rev = plus_one(self.pages.get(key).and_then(|p| field(p, "rev")), true);
+        // (pages[key]?.rev ?? 0) + 1
+        let rev = match self.pages.get(key).and_then(|p| field(p, "rev")) {
+            None | Some(Json::Null) => Json::Num(1.0),
+            r => js::add(r, Some(&Json::Num(1.0))),
+        };
         let mut o = Object::default();
         o.set("body".into(), Json::Str(body.into()));
         o.set("rev".into(), rev);
@@ -299,30 +308,16 @@ impl PubState {
         }
         let mut o = Object::default();
         o.set("body".into(), Json::Null);
-        o.set("rev".into(), plus_one(field(p, "rev"), false));
+        o.set(
+            "rev".into(),
+            js::add(field(p, "rev"), Some(&Json::Num(1.0))),
+        );
         o.set("id".into(), Json::Null);
         o.set("at".into(), Json::Num(at as f64));
         o.set("hash".into(), Json::Null);
         self.pages.set(key.into(), Json::Obj(o));
         true
     }
-}
-
-/// BigInt('0x' + h)
-fn hex(h: &str) -> Option<Int> {
-    if h.is_empty() || !h.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return None;
-    }
-    let digits: Vec<u8> = h
-        .bytes()
-        .rev()
-        .map(|b| (b as char).to_digit(16).unwrap_or(0) as u8)
-        .collect();
-    let le: Vec<u8> = digits
-        .chunks(2)
-        .map(|c| c[0] | c.get(1).map_or(0, |d| d << 4))
-        .collect();
-    Some(Int::from_le(&le))
 }
 
 /// a page's id: two 64-bit words of entropy, each little-endian, as a
@@ -358,15 +353,5 @@ mod tests {
         ] {
             assert_eq!(page_key(n).as_deref(), k, "{n:?}");
         }
-    }
-
-    #[test]
-    fn hex_reads_as_bigint() {
-        assert_eq!(
-            hex("8637ea05a874dc7f9a5799c3497dd554").unwrap().to_u128(),
-            Some(0x8637ea05a874dc7f9a5799c3497dd554)
-        );
-        assert_eq!(hex("abc").unwrap().to_u128(), Some(0xabc));
-        assert!(hex("").is_none() && hex("null").is_none());
     }
 }

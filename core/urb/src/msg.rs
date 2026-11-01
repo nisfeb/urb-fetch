@@ -5,8 +5,9 @@
 //! one that came in a message we answer goes back as it came, a noun.
 
 use crate::codec::path;
+use crate::core::Failure;
+use crate::js::{self, Json};
 use crate::noun::{self, TypeError, Value};
-use crate::text::da;
 use crate::{Int, UrbError};
 
 fn v<'a>(items: Vec<Value<'a>>) -> Value<'a> {
@@ -76,39 +77,67 @@ pub fn intake<'a>(wire: Value<'a>, dest: Value<'a>, wave: Value<'a>) -> Value<'a
 }
 
 /// A file we serve: its mark (a blot), its value (None while there is
-/// nothing there), its revision and when it was made, in ms.
+/// nothing there), its revision and when it was made, in ms. The rev
+/// and the time are the JS values the host gave (None is undefined), so
+/// a file whose rev or time isn't a whole number fails as the JS's
+/// BigInt() fails.
 #[derive(Clone, Debug)]
 pub struct File<'a> {
     pub mark: (String, String),
     pub value: Option<Value<'a>>,
-    pub rev: u64,
-    pub at: u64,
+    pub rev: Option<Json>,
+    pub at: Option<Json>,
+}
+
+impl File<'_> {
+    /// a whole rev and time
+    pub fn num(n: u64) -> Option<Json> {
+        Some(Json::Num(n as f64))
+    }
+}
+
+/// mesa.mjs's da() of a JS value: ms since the epoch as a @da, or what
+/// BigInt() throws for one that isn't a whole number
+pub fn da_of(ms: Option<&Json>) -> Result<Int, Failure> {
+    let ms = js::to_number(ms);
+    let secs = js::bigint_of_number((ms / 1000.0).floor())?;
+    let frac = js::bigint_of_number(ms % 1000.0)?;
+    let (Some(secs), Some(frac)) = (secs.to_u128(), frac.to_u128()) else {
+        return Err(Failure::range_error("a date past 2^128 seconds"));
+    };
+    let hi = Int::from(secs + 0x8000000cce9e0d80);
+    // (hi << 64) | ((frac << 64) / 1000)
+    let lo = ((frac << 64) / 1000) as u64;
+    let mut le = lo.to_le_bytes().to_vec();
+    le.extend_from_slice(hi.le());
+    Ok(Int::from_le(&le))
 }
 
 /// A file's version, as grubbery's cass:clay: [ud=rev da=at]
-pub fn cass(f: &File<'_>) -> Value<'static> {
-    v(vec![f.rev.into(), da(f.at).into()])
+pub fn cass(f: &File<'_>) -> Result<Value<'static>, Failure> {
+    let rev = js::bigint(f.rev.as_ref())?;
+    Ok(v(vec![rev.into(), da_of(f.at.as_ref())?.into()]))
 }
 
 /// A file's wave: its folder's [fold-cass {name: cass}] with the one file
-/// in it. Empty for a file that never was.
-pub fn wave_of(f: Option<&File<'_>>, name: &str) -> Value<'static> {
-    match f {
-        Some(f) if f.rev != 0 => v(vec![
+/// in it. Empty for a file that never was (no rev, as JS reads one).
+pub fn wave_of(f: Option<&File<'_>>, name: &str) -> Result<Value<'static>, Failure> {
+    Ok(match f {
+        Some(f) if js::truthy(f.rev.as_ref()) => v(vec![
             v(vec![
                 Value::Null,
-                cass(f),
-                Value::Map(vec![(name.into(), cass(f))]),
+                cass(f)?,
+                Value::Map(vec![(name.into(), cass(f)?)]),
             ]),
             Value::Null,
         ]),
         _ => v(vec![Value::Null, Value::Null]),
-    }
+    })
 }
 
 /// A file as grubbery's %snap, [snap silo]: its version, and the
 /// content-addressed silo that holds it, inline.
-pub fn snap_of<'a>(f: &File<'a>) -> Result<(Value<'a>, Value<'a>), TypeError> {
+pub fn snap_of<'a>(f: &File<'a>) -> Result<(Value<'a>, Value<'a>), Failure> {
     let value = f
         .value
         .clone()
@@ -127,7 +156,7 @@ pub fn snap_of<'a>(f: &File<'a>) -> Result<(Value<'a>, Value<'a>), TypeError> {
     ]);
     let jobe = noun::sham(&ject)?;
     let snap = v(vec![
-        cass(f),
+        cass(f)?,
         v(vec!["firm".into(), Value::Null, jobe.into()]),
         v(vec![
             Value::Set(vec![jobe.into()]),
