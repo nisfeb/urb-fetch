@@ -146,7 +146,10 @@ mod run {
                     })
                 });
             match got {
-                Ok(l) => lns.push(l),
+                Ok(l) => {
+                    http::go_backlog(&l);
+                    lns.push(l)
+                }
                 Err(e) if !lns.is_empty() => golog::line(&format!("not serving on {a}: {e}")),
                 Err(e) => golog::fatal(&e),
             }
@@ -311,11 +314,12 @@ mod run {
         }));
         let handle: &'static (dyn Fn(&http::Request) -> http::Response + Sync) =
             Box::leak(Box::new(|r: &http::Request| gw.handle(r)));
+        // at most MAX_CONNS connections at once, over both listeners
+        let slots = Arc::new(http::Slots::default());
         for ln in lns {
+            let slots = slots.clone();
             thread::spawn(move || {
-                for c in ln.incoming().flatten() {
-                    thread::spawn(move || http::serve_conn(c, handle));
-                }
+                http::accept(ln, handle, slots, http::MAX_CONNS, http::Limits::GO)
             });
         }
         golog::line(&format!("serving http://urb.localhost:{port}/"));

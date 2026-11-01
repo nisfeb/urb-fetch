@@ -6,7 +6,7 @@
 // normalisation below is applied.
 //
 //   FLEET_WHO=lattice-loop-m8 node core/ci/gateway-diff.mjs [--out DIR] [NAME...]
-//   node core/ci/gateway-diff.mjs --offline     the startup cases only
+//   node core/ci/gateway-diff.mjs --offline     the startup and net cases only
 //
 // The run is also the state migration test. The Go gateway runs first,
 // as a fake moon of ~hus, on a fresh state folder, and answers the list.
@@ -25,7 +25,10 @@
 // built (cargo build --release -p urb-gateway; URB_GATEWAY), and go
 // for the comet case. Without them it says what is missing and exits 2,
 // a skip, never a pass. It leaves the set on the snapshot. The startup
-// cases need no ship, and run first (and alone with --offline, in CI).
+// cases and the net cases (core/ci/gateway-net.mjs: raw requests the
+// HTTP servers refuse or take, slow clients and a flood, in a network
+// namespace with only loopback) need no ship, and run first (and alone
+// with --offline, in CI).
 
 import { spawn, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -111,6 +114,24 @@ const stamp = t => t.replace(/^\d{4}\/\d\d\/\d\d \d\d:\d\d:\d\d /gm, '<time> ').
     const [a, b] = [one('go'), one('rust')];
     report(name, a === b, a, b);
   }
+}
+
+// ------------------------------------------------------------ net
+
+// The HTTP servers themselves, with no ship: gateway-net.mjs in a
+// network namespace of its own, so both can listen on 8475 with
+// nothing else there. With REQUIRE_ALL, no unshare is a failure.
+if (spawnSync('unshare', ['-rn', 'true']).status === 0) {
+  const n = spawnSync('unshare', ['-rn', process.execPath, join(root, 'core/ci/gateway-net.mjs'), GO, RUST, join(out, 'net')],
+    { encoding: 'utf8', timeout: 300_000, maxBuffer: 1 << 26 });
+  if (n.status !== 0) throw new Error(`gateway-net: ${n.stderr}`);
+  process.stderr.write(n.stderr);
+  for (const [name, same, a, b] of JSON.parse(n.stdout)) if (want(name)) report(name, same, a, b);
+} else if (process.env.REQUIRE_ALL) {
+  results.push(['net', false]);
+  console.log('FAIL  net: unshare -rn is not allowed here');
+} else {
+  console.error('gateway-diff: the net cases are SKIPPED: unshare -rn is not allowed here');
 }
 if (offlineOnly) finish();
 

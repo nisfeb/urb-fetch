@@ -108,10 +108,13 @@ jobs:
           node core/ci/cli-diff.mjs --offline
       # the Rust gateway (M8) against the Go one, in the cases that need
       # no ship; the fleet's cases run by hand (gateway-diff.mjs)
-      - name: the Rust gateway against the Go one, at startup
+      # (its net cases run in a user and network namespace, which
+      # Ubuntu 24.04's AppArmor refuses unprivileged users by default)
+      - name: the Rust gateway against the Go one, at startup and over HTTP
         run: |
           (cd core && cargo build --release -p urb-gateway)
           go build -o urb-fetch .
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           node core/ci/gateway-diff.mjs --offline
       - name: the extension's tests and renderer vectors, on the shims
         run: |
