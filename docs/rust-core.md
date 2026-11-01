@@ -404,6 +404,52 @@ M5's exit criteria passed. Traces 4 (furum) and 8 (a lattice forum) replay into 
 
 **Running the tests by hand.** A cargo that is not rustup's (a distribution's `/usr/bin/cargo`) ignores `rust-toolchain.toml`: native tests pass on it, and WASI fails with "can't find crate for core". `core/ci/test.sh` runs fmt, clippy and cargo test natively and under WASI as CI does, with rustup's `~/.cargo/bin` first on PATH, and stops at once, naming the cargo it found, if rustc is not the pinned one. Extra arguments go to each cargo test (`core/ci/test.sh --release`). wasmtime must be on PATH (`core/ci/tools.sh`).
 
+## M5b's findings (2026-11-01)
+
+M5b's exit criteria passed. Every rendering vector passes in Rust, hostile ones included: 6,097 cases in six files, each file's count checked. Each renderer was fuzzed for 11 minutes with nothing found, and its time is asserted linear in the body's size. All ten traces still replay, and fmt, clippy (native and wasm32-wasip1) and the native and WASI tests pass through `core/ci/test.sh`.
+
+**What renders** is `core/urb-render`, pure Rust, with no dependencies and nothing from `urb`:
+
+- `ext` is the extension's `lib/gemtext.js` and `lib/markdown.js` (nisfeb-extension 78c30bb): `gemtext`, `link_target`, `link_href`, `reader_path`, `spans`, `markdown`, `md_nodes`, `safe_link` and `MD_MAX`, with the same blocks and spans as enums (`Gem`, `Block`, `Span`) and mdNodes' nodes as a DOM would hold them (`Node`). Text is a JS string, so lengths are UTF-16 units and whitespace is JavaScript's (`js`). linkTarget's `new URL(href, base).pathname` is `whatwg.rs`, the part of a WHATWG parser an href that linkTarget lets through can reach.
+- `gateway` is `render.go` and `urb.go`, byte for byte: `render_gemtext`, `render_markdown`, `render_text`, `rewrite_html`, `page`, `page_link`, `gateway_url`, `safe_link`, `looks_html`, `render_as`, and `render`, main.go's choice of renderer and Content-Security-Policy (`SANDBOX` for a publisher's HTML, `OWN` for the rest, `RAW` for `?raw`). A Go string is bytes and the Go reader hands a body over as it came, so the gateway's renderers take and give bytes: a byte that is not UTF-8 reads as Go reads it (U+FFFD, one byte, one UTF-16 unit) and is written back as it was.
+- `render_as` and `looks_html` at the top are mesa.mjs's. A mark of `""` is text there and no mark in `gateway::render_as`, as the two sources have it.
+- `ship` holds both ship checks: `is_ship` is the extension's shape check, and `parses` is libmesa's `u3_ship_of_string`, real syllables in their canonical rendering only. `parses` renders the chunks it read and compares, since `+fein` and `+fynd` are inverses; urb's `ship_names` test holds it to `mesa_ship_parse` on 20,000 names.
+
+**The vectors.** `cargo test -p urb-render --test vectors` runs render-as.json (192), render-ext.json (334), render-go.json (347), hostile-render.json (224) and two new files, render-ext-random.json (3,000) and render-go-random.json (2,000). render-as and hostile-render are both sources' rules, so each of their cases runs on both renderers. `conformance/random.mjs` makes 400 bodies and 600 link targets from a fixed seed (`inputs/random.json`), of the characters the rules turn on; gen.mjs writes the extension's readings and `UPDATE_VECTORS=1 go test` the Go's, and the JS and the Go run both, as they run the rest. Mutating `'`'s escape fails render-go, and dropping `'` from encodeURIComponent's set fails render-ext-random, which render-ext alone did not catch.
+
+**The vectors' document lost text.** conformance/lib.mjs built its elements with `Object.assign`, which calls each getter once and copies the value, so its `textContent`, `href` and `rel` setters never ran: every pre, code, strong, em and link in the mdNodes vectors had no text, and no link had an href. It now defines them as accessors, and render-ext.json was written again (only its mdNodes cases changed). The fix is on rust-core only, since conformance/ is.
+
+**Differences between the JS and the Go** (rule 2):
+
+1. **Go's `(?i)` folds `ſ` (U+017F) into `s`** and the Kelvin sign into `k`, so the gateway's safeLink, scheme and webLink took `httpſ://e.example/x` for the web and rendered `<a href="httpſ://e.example/x" rel="noopener noreferrer">`, where the extension's ASCII-only `/i` leaves it as text. A browser reads that href as a path on the ship's own origin, so nothing escaped. Fixed on main in https://github.com/nisfeb/urb-fetch/pull/10 (open, not merged), with `TestSafeLinkAsTheExtension`, and cherry-picked onto rust-core (fc9e22e) so that the Go, the vectors and the Rust agree. The Rust ports the fixed Go. hostile.mjs adds `httpſ://` twice.
+2. **hostLink's `\s` was RE2's ASCII class**, so the gateway's safeLink let `"\u00a0//e.example"` through. pageLink refused it after its trim, so no HTML changed. Fixed in the same PR (hostLink uses `jsS`), and hostile.mjs adds three such links.
+3. **Not settled: an urb:// link to a name that is not a real ship.** The extension's linkTarget checks the name's shape (`isShip`), and the gateway's pageLink parses it (`mesa.ParseShip`). So `urb://~abc/x`, `urb://~dozzod/x` and `urb://~doznec/x` are a link to the reader in the extension, which then fails to read them, and text in the gateway. The fix belongs in nisfeb-extension (its linkTarget checking a canonical @p, as `ship::parses` does), which this milestone may not touch, so it is proposed here and each renderer keeps its own check. tests/two.rs and the `two` fuzz target allow exactly this difference, and no other.
+4. `rewriteHTML`'s `(?i:href|src|action)` also folds `ſrc`. It has no counterpart in the extension and rewrites an attribute no browser reads, so it is ported as it is.
+
+**A bug in the extension: ITEM is quadratic.** markdown.js's `ITEM`, `/^\s*(?:[-*+]|\d+[.)])\s+(.*)$/`, backtracks over the space after the marker once per character when what follows holds a line terminator: `"- " + " ".repeat(n) + "a\r"` takes 1.5 s in node at n = 40,000, so a 256 KB line would hold the reader's tab for about a minute. The Go (RE2) is linear, and the Rust reads it in one pass with the same result. The proposed fix, for nisfeb-extension, matches the item by hand as headingText does; it gives ITEM's result on 300,000 random lines and reads a 256 KB line in 1 ms:
+
+```js
+function itemText(line) {
+  const s = line.trimStart()
+  const m = /^(?:[-*+]|\d+[.)])/.exec(s)
+  if (!m) return null
+  const after = s.slice(m[0].length)
+  const text = after.trimStart()
+  if (text.length === after.length || /[\n\r\u2028\u2029]/.test(text)) return null
+  return text
+}
+```
+
+The body goes into hostile.mjs once the extension has the fix (the shared vector would fail the JS's 2,000 ms today). Until then it is in urb-render's tests/linear.rs.
+
+**Each `[` costs the same.** A `[` is followed by a scan of up to 256 units for its `]` and up to 512 more for its `)`, as the regex's bounds have it. That is linear but slow: 100,000 `[` took 2.5 s in a debug build, over the vectors' 2,000 ms. So each renderer reads a line with a `[` in it once, for each byte's next `]`, next `)` or space, and UTF-16 offset, and each `[` then costs a lookup. The results are the same.
+
+**Linear time, asserted.** Each renderer counts its steps (the `cost` feature, on in urb-render's own tests and the fuzzers, and nothing otherwise). tests/linear.rs renders 31 bodies made to be slow, hostile.mjs's and those above: at most 64 steps a byte, 8 times the body at most 9 times the steps, and the clock within 24 times (quadratic is 64). An injected copy of ITEM's backtracking fails both.
+
+**The two renderers held together.** tests/two.rs reads 60,000 random bodies and 200,000 random links with both and wants the same blocks, spans, sniff, safeLink and link, as render_parity_test.go holds the Go to the JS; the only difference it allows is item 3.
+
+**Fuzzing.** Three targets in `core/urb-render/fuzz`, seeded by seed.mjs from the rendering vectors. `ext` reads a body with the extension's renderers, and each line as a link target; `gateway` renders any bytes as every mark; `two` holds the two together. None may panic, give a link the allowlist refuses (an href in the extension's nodes or the gateway's HTML that is not a reader page, http(s), mail or gemini, or that holds a control character or space), let a tag of the page's through, or take more than 64 steps a byte. Each ran for 11 minutes with AddressSanitizer, inputs up to 20,000 bytes, and found nothing: ext 322,703 inputs, gateway 152,566 and two 467,509. Injecting a scheme-blind pageLink is caught within seconds. CI runs each for a minute.
+
 ## Testing beyond the traces
 
 - **The fake fleet, automated.** One script resets the furum set to `hus-lattice` and runs the stage 3, furum and lattice forum checks against the JS engine and then the Rust engine, with the same assertions. Run it for every milestone from M3 on.
