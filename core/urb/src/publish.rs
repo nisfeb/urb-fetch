@@ -222,7 +222,7 @@ impl PubState {
         };
         let p = match self.pages.get(&key) {
             Some(p) if js::truthy(Some(p)) => p,
-            // not yet: a keep gets an empty wave, and isn't kept
+            // not yet: a keep waits for it
             _ => {
                 return Ok(Some(File {
                     mark: mark("", ""),

@@ -40,6 +40,8 @@ pub const PEEK_TIMEOUT: u64 = 30_000;
 /// a cap on the keeps we answer, so a ship can't grow our state without
 /// bound; past it a keep gets its first wave and no news
 pub const MAX_KEEPERS: usize = 256;
+/// and each ship's share of them
+pub const PER_SHIP: usize = 64;
 /// how long close() waits after the last save
 pub const CLOSE_WAIT: u64 = 500;
 /// the longest the wake timer is set for: waking early re-arms it
@@ -1184,15 +1186,16 @@ impl World {
                 ),
             );
         }
-        // Only a file with something in it is kept, so one ship can't
-        // fill every slot with names we never published; a keep held
-        // already and unchanged isn't saved again.
-        if let (Some(f), Some(k), Some((folder, name))) = (&f, &k, &at)
-            && f.value.is_some()
-        {
+        // A keep may wait for a page not yet published, or one taken
+        // down and put up again, as lattice's reader keeps it. So that one
+        // ship can't fill every slot, each ship has PER_SHIP of them,
+        // inside MAX_KEEPERS; a keep held already is never evicted, and
+        // one held already and unchanged isn't saved again.
+        if let (Some(_), Some(k), Some((folder, name))) = (&f, &k, &at) {
             let room = {
                 let s = i.server.borrow();
-                s.keepers.get(k).is_some() || s.keepers.len() < MAX_KEEPERS
+                s.keepers.get(k).is_some()
+                    || (s.keepers.len() < MAX_KEEPERS && s.keepers.kept_by(&ship) < PER_SHIP)
             };
             if room {
                 let mut o = Object::default();
@@ -1654,6 +1657,16 @@ impl Keepers {
 
     fn len(&self) -> usize {
         self.0.len()
+    }
+
+    /// how many keeps ship holds (k.ship === ship)
+    fn kept_by(&self, ship: &str) -> usize {
+        self.0
+            .iter()
+            .filter(
+                |e| matches!(&e.1, Json::Obj(o) if o.get("ship") == Some(&Json::Str(ship.into()))),
+            )
+            .count()
     }
 
     fn values(&self) -> Vec<Json> {

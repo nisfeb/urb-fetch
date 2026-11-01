@@ -140,6 +140,11 @@ fn ops() -> J {
         .cloned(),
     );
     all.extend(peeks().as_array().unwrap().iter().cloned());
+    // one ship's share: 70 keeps, of which it may hold 64
+    for i in 0..70 {
+        all.push(json!(["keep", format!("squat-{i}"), 1]));
+    }
+    all.push(json!(["keep", "other", 3]));
     all.extend(
         json!([
             ["pages"],
@@ -155,6 +160,14 @@ fn ops() -> J {
             ["remove", "never"],
             ["remove", "m1c-page"],
             ["put", "fresh/page", "new"],
+            // a keep before a page is published hears it published; one
+            // made again after a removal hears it put back
+            ["keep", "later", 2],
+            ["put", "later", "# now"],
+            ["remove", "later"],
+            ["drop", "later", 2],
+            ["keep", "later", 2],
+            ["put", "later", "# back"],
             ["pages"],
         ])
         .as_array()
