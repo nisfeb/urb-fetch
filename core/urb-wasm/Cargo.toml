@@ -1,0 +1,21 @@
+[package]
+name = "urb-wasm"
+version = "0.0.1"
+description = "the wasm host: the urb core as mesa.wasm, for the JS shims (M6)"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+urb = { path = "../urb" }
+mesa-sys = { path = "../mesa-sys" }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+render-wasm = { path = "../render-wasm", optional = true }
+
+[features]
+# link render.wasm's exports into mesa.wasm too, only to measure the
+# size of one module against two (docs/rust-core.md, M6's findings)
+render = ["dep:render-wasm"]

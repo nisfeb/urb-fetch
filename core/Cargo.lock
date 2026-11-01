@@ -328,6 +328,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
+name = "render-wasm"
+version = "0.0.1"
+dependencies = [
+ "serde_json",
+ "urb",
+ "urb-render",
+]
+
+[[package]]
 name = "rustc-hash"
 version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -422,6 +431,16 @@ version = "0.0.1"
 dependencies = [
  "serde_json",
  "urb-render",
+]
+
+[[package]]
+name = "urb-wasm"
+version = "0.0.1"
+dependencies = [
+ "mesa-sys",
+ "render-wasm",
+ "serde_json",
+ "urb",
 ]
 
 [[package]]

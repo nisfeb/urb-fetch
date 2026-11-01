@@ -1,0 +1,15 @@
+[package]
+name = "render-wasm"
+version = "0.0.1"
+description = "render.wasm: urb-render and the pure helpers, for the shims' synchronous calls (M6)"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+urb-render = { path = "../urb-render" }
+urb = { path = "../urb" }
+serde_json = { version = "1", features = ["preserve_order"] }
