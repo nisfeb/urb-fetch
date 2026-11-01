@@ -456,6 +456,82 @@ The body goes into hostile.mjs once the extension has the fix (the shared vector
 
 **Fuzzing.** Three targets in `core/urb-render/fuzz`, seeded by seed.mjs from the rendering vectors. `ext` reads a body with the extension's renderers, and each line as a link target; `gateway` renders any bytes as every mark; `two` holds the two together. None may panic, give a link the allowlist refuses (an href in the extension's nodes or the gateway's HTML that is not a reader page, http(s), mail or gemini, or that holds a control character or space), let a tag of the page's through, or take more than 64 steps a byte. Each ran for 11 minutes with AddressSanitizer, inputs up to 20,000 bytes, and found nothing: ext 322,703 inputs, gateway 152,566 and two 467,509. Injecting a scheme-blind pageLink is caught within seconds. CI runs each for a minute.
 
+## M6's findings (2026-11-01)
+
+M6's exit criteria passed. Every trace replays through the wasm build, and the extension's `npm test`, `npm run today`, `npm run urb` (in its fleet mode, see below), `npm run pub` and the furum harness pass with the new files dropped into the `lib/` of a throwaway clone of nisfeb-extension, with `lib/urb.js` and `reader.js` unchanged (their sha256 checked before and after). The new modules are 74% of today's size, and 77% gzipped. nisfeb-extension itself was not changed.
+
+**What was built:**
+
+- `core/urb-wasm` is the new `mesa.wasm`: the sans-IO core behind a few plain exports. A core's inputs and outputs cross as JSON in trace.mjs's encoding (`wire.rs`), so a trace's steps go in as they were recorded, and an output carries a little more than a trace does (an error's class, an inbox poke's grub, mark and jam). Entropy comes in through one import, `host.entropy`. It also exports keyfileInfo, fakeKeyfile, shipName, sham and mug.
+- `core/render-wasm` is `render.wasm`: urb-render's extension half (gemtext, spans, markdown, the two calls of mdNodes, safeLink, linkTarget, linkHref, readerPath), renderAs and looksHtml, and deUrb, uv, da and pageKey.
+- `shim/` holds the shims: `mesa.mjs`, `pub.mjs`, `furum.mjs` and `forum.mjs` on mesa.wasm, `gemtext.js` and `markdown.js` on render.wasm, and `render.js` and `wasi.js`. The host part stays JS, as the architecture has it: the transport (relayTransport, verbatim), the store, timers, fetch, and readRows and writeRows. `shim/build.sh` builds both modules with the `wasm` profile (release without symbol names), checks the size budget, and stages a `lib/`.
+- Tests: `shim/replay.mjs` (the traces through the wasm build), `shim/rows.mjs` (saved rows across the two modules), and unit tests of `wire.rs`. CI's core job runs them, and nisfeb-extension 78c30bb's `npm test` and renderer vectors on the shims.
+
+**Every trace through the wasm build.** `node shim/replay.mjs` feeds each trace's steps to the core in `shim/build/mesa.wasm`, in node's V8 with the shim's own WASI imports, and compares each step's outputs, timers and entropy with the trace's, as replay.rs does on the native and WASI builds. All ten pass, in under 3 s (2.5 s of it trace 1's comet mining). A trace with one commit byte changed fails at its first step.
+
+**Two modules, not one.** The plan put urb-render inside mesa.wasm. It ships as a module of its own, for a reason the plan didn't foresee rather than for size: gemtext.js, markdown.js and mesa.mjs's renderAs, deUrb, uv and da are synchronous, and the extension's service worker imports gemtext.js and mesa.mjs. A module service worker may not use a top-level await, and mesa.wasm comes as bytes to `open()`, so nothing would be there to render with. render.js compiles render.wasm synchronously from bytes it carries as base64 (`render-wasm.js`, built by build.sh, not committed). At 237 KB it is far under the 8 MB a browser lets a page compile synchronously on its main thread.
+
+| Module | Bytes | Gzipped |
+|---|---|---|
+| today's mesa.wasm (glue.c, zig) | 1,698,062 | 598,362 |
+| mesa.wasm (urb-wasm) | 1,015,334 | 368,278 |
+| render.wasm | 237,385 | 91,655 |
+| the two together | 1,252,719 | 459,933 |
+| the budget, 1.5 times today's | 2,547,093 | 897,543 |
+| mesa.wasm with render.wasm linked in (feature `render`, measured only) | 1,121,902 | 401,444 |
+
+So one module would also have fit, with room. Why the Rust module is smaller than glue.c's was not looked into.
+
+**The row-journaling store is glue.c's.** The core's store is `engine.rs`'s Journal, ported from glue.c in M3, and the shim hands its commits to the host's store as glue.c's `[klen:4][key][vlen:4][val]`, with readRows and writeRows unchanged. `node shim/rows.mjs` proves it both ways. It runs today's mesa.wasm (through wasm/mesa.mjs) and the Rust one (through the shim) side by side, on one virtual clock and one entropy, each over a store kept as the extension keeps IndexedDB: a commit's rows put or deleted by key, and a load handing every row back in the keys' binary order. A session opens a fake moon of ~zod, reads a page nobody answers, runs 45 virtual seconds and closes.
+
+1. From empty, both send, commit and answer the same, byte for byte, and save the same 9 rows.
+2. Today's module on the 9 rows the Rust one saved, and the Rust one on today's: the same again.
+3. Crossed once more, on the 12 rows each saved in 2: the same again.
+
+Sessions 2 and 3 send what a start from empty would not, so the rows loaded were used. Off the fake network, both refuse a moon that ran from an empty store, word for word. Dropping one row from the Rust side's load fails seven checks. Trace 2 (rows the JS saved, loaded by the core) and urb-check's worker restart (rows the Rust saved in IndexedDB, read again by a new worker as the same comet) cover the same from the two other sides.
+
+**Every WASI import, supplied.** These are all the WASI imports the two modules ask for, and what `shim/wasi.js` answers. Each answer is what WASI says for the case, with no stub. `instantiate` refuses a module that asks for one wasi.js lacks (`unanswered`), rather than let the browser fail on a missing import or a host stub it.
+
+| Import | Who asks | The answer | Called in the ten traces |
+|---|---|---|---|
+| `random_get` | the standard library's hash seeds (HashMap's RandomState in the core, serde_json's maps) | real random bytes, from crypto.getRandomValues | once per module |
+| `environ_sizes_get`, `environ_get` | libmesa's getenv of MESA_TRACE, through wasi-libc | open()'s `env`, as before | the sizes once; the entries only when env has some |
+| `fd_write` | stdout and stderr: libmesa's packet log, a panic's message | lines to `log`, EBADF for any other descriptor | no |
+| `fd_close`, `fd_seek` | wasi-libc's stdio | stdio: success and ESPIPE; EBADF for any other | no |
+| `fd_prestat_get`, `fd_prestat_dir_name` | wasi-libc's scan for preopened directories | EBADF: there are none | no |
+| `proc_exit` | an exit or abort | thrown as an error | no |
+
+mesa.wasm also imports `host.entropy`, the engine's entropy, which the shim takes from open()'s `entropy`. render.wasm asks for the same WASI set and nothing else. Today's module asked for `environ_*`, `fd_close`, `fd_seek`, `fd_write` and `proc_exit`, and seven host hooks; `random_get` and the two `fd_prestat` calls are new. Neither module asks for `clock_time_get` or `args_*`: the core reads no clock, and a cdylib has no arguments. The risk the plan listed ("clock, random, args") comes down to random, which never reaches an output: the replay passes with fresh seeds each run.
+
+**The order with a store that waits.** The core emits outputs as if the store committed at once, which is how the traces were recorded. A real store answers with a promise, so the shim holds every datagram, the transport's start and close, and anything after an unsettled commit or saveKey, in order, until it settles, as mesa.mjs's `saved` chain did. With a store that answers at once, nothing waits. open() waits for its saveKey and the transport's start, and fails as they fail, so an unreachable relay still fails open() with `can't reach the relay at …`. One real timer is set for the core's earliest deadline and ticks each timer due by name, the earliest first, the first set on a tie. The roller's lookups are given up after 30 s with the JS's DOMException, the bound M3 said the host must keep.
+
+**The harnesses.** Run in /tmp/m6-ext, a clone of nisfeb-extension at e9e5401 (its main), with `shim/build.sh /tmp/m6-ext/lib`. Brave was `/opt/brave.com/brave/brave` (the scripts' default path is not on this machine), and the relay was this branch's Go binary.
+
+- `npm test`: 135 of 135, as with the JS lib/. 78c30bb's suite also passes on the shims, and `node conformance/run.mjs --ext` passes render-ext (334), render-ext-random (3,000) and hostile-render (224) through the shims, hostile bodies within their 2,000 ms.
+- `npm run today`: all passed.
+- `npm run urb`: run as `npm run urb:fleet` (FLEET=1), all passed (25 checks, the worker restart included, and 30 with the furum part below). The plain script reads `~ricsul-bilwyt`, which this milestone may not touch.
+- The furum harness: `FLEET=1 FURUM=~rup/m1c`, all passed: list, post, comment, upvote, and furum's refusal. The script's comment names a snapshot `urb-board` that doesn't exist, and hus-lattice has no board on ~rup, so it ran on m1c-traces, which has board m1c.
+- `npm run pub`: all passed, with READER ~hus and the moon's parent ~rup.
+- All on the fleet set furum, claimed as lattice-loop-m6 and released after. The last runs were with the final build.
+
+**What the shims can't carry.** Each is loud, not silent, and nothing in the extension uses any of them.
+
+- grub.peek takes a converter by name (`'cord'`, `'text'`, `'exists'`, `'files'`) or as `urb.nouns.cord` and the rest. A converter of the host's own would have to read a noun inside the module, and is refused with a TypeError.
+- grub.serve, grub.changed and scry.serve throw: publish() serves, inside the core, through publish.rs.
+- grub.onInbox's f is handed `{from, to, mark, jam}`, the noun as its jam, since no noun leaves the module. `nouns` has sham, mug and the converters, not the raw noun readers.
+- mesa.mjs's internal exports (the decoders, messages, path, cass, waveOf, snapOf), pub.mjs's markOf and forum.mjs's exact, ids, idOf and actions are not exported. None is in the contract. furum() reads furum at FURUM_BASE only.
+- A call the JS threw synchronously (furum's check of a board name) now rejects its promise. An awaiting caller sees the same error.
+- uv and da take whole numbers (da whole milliseconds, not negative). The JS took any number.
+- Text crosses into render.wasm as UTF-8, so a lone surrogate becomes U+FFFD before the renderer sees it. A body comes through TextDecoder and cannot hold one.
+- mdNodes asks hrefFor of every link before it makes any node, in the JS's order and once each, where the JS interleaved the two.
+- A panic stops the module (wasm32-wasip1 aborts). The shim then rejects every waiting call with `mesa.wasm stopped: …` and refuses later ones. The reopen from the store that the plan's risks name is not built. It belongs with the soak.
+
+**Not done, and left as it was:**
+
+- No replay of the traces through the shims themselves: trace.mjs's world names each JS timer by its id and records microtask hops the shims don't make. The wasm replay checks the core in the module, and the harnesses drive the shims end to end.
+- nisfeb-extension PR #8 (itemText and isPatp) is still a draft. On the shims markdown.js is the Rust, which is linear, so ITEM's quadratic case is gone there, and linkTarget keeps the extension's isShip, as M5b's item 3 left it. PR #10 is untouched.
+- lib/ is not swapped anywhere: the gates and the soak come first.
+
 ## Testing beyond the traces
 
 - **The fake fleet, automated.** One script resets the furum set to `hus-lattice` and runs the stage 3, furum and lattice forum checks against the JS engine and then the Rust engine, with the same assertions. Run it for every milestone from M3 on.
