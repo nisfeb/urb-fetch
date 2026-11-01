@@ -17,7 +17,8 @@
 //   - cli-diff, gateway-diff, migrate: the gate 2 and 3 scripts;
 //   - harness: on two throwaway clones of nisfeb-extension (EXT_SRC,
 //     cloned, origin removed; the source is only read), one with the
-//     Rust lib/ staged by shim/build.sh and one with its own JS lib/,
+//     Rust lib/ staged by shim/build.sh and one with urb-fetch main's JS
+//     core vendored into its lib/ (summary.json's urbFetchMain),
 //     runs npm test, npm run today, urb:fleet, the furum harness, pub
 //     and marks, each fleet harness after a reset and settle, and
 //     compares the two check lists word for word with ship names and
@@ -40,7 +41,7 @@
 // the first time.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -264,17 +265,50 @@ async function jar(log) {
   throw new Error(`no login cookie for ~hus (${log})`);
 }
 
+// The JS side's core: urb-fetch main's own, vendored into lib/ as the
+// extension vendors it (its AGENTS.md: wasm/mesa.mjs, furum.mjs and
+// pub.mjs, each under a header naming the commit, and the mesa.wasm
+// wasm/build.sh builds), not the clone's lib/, which may be older than
+// main. Main is built once per commit, in a worktree under SOAK.
+function vendorMain(lib) {
+  const f = spawnSync('git', ['-C', root, 'fetch', '--quiet', 'origin', 'main'], { encoding: 'utf8' });
+  if (f.status !== 0) throw new Error(`git fetch origin main: ${f.stderr}`);
+  const sha = git('rev-parse', '--short', 'origin/main');
+  const dir = join(SOAK, `urb-fetch-main-${sha}`);
+  const log = join(R, 'vendor-main.log');
+  const step = (cmd, args, cwd) => {
+    const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', env: { ...process.env, ...toolEnv } });
+    appendFileSync(log, `$ ${cmd} ${args.join(' ')}\n${r.stdout ?? ''}${r.stderr ?? ''}`);
+    if (r.status !== 0) throw new Error(`${cmd} ${args.join(' ')} failed (${log})`);
+  };
+  if (!existsSync(join(dir, 'wasm/build/mesa.wasm'))) {
+    git('worktree', 'prune');
+    if (!existsSync(dir)) step('git', ['-C', root, 'worktree', 'add', '--detach', dir, sha], root);
+    step('git', ['submodule', 'update', '--init', 'third_party/libmesa'], dir);
+    step('sh', ['wasm/build.sh'], dir);
+  }
+  const head = {
+    mesa: `//  Vendored from github.com/nisfeb/urb-fetch at ${sha}: wasm/mesa.mjs, and\n//  lib/mesa.wasm built there by wasm/build.sh. Change them there, then copy\n//  both here.\n//\n`,
+    furum: `//  Vendored from github.com/nisfeb/urb-fetch at ${sha}: wasm/furum.mjs. Change it\n//  there, then copy it here.\n//\n`,
+    pub: `//  Vendored from github.com/nisfeb/urb-fetch at ${sha}: wasm/pub.mjs. Change it\n//  there, then copy it here.\n//\n`,
+  };
+  for (const [m, h] of Object.entries(head)) writeFileSync(join(lib, `${m}.mjs`), h + readFileSync(join(dir, `wasm/${m}.mjs`), 'utf8'));
+  copyFileSync(join(dir, 'wasm/build/mesa.wasm'), join(lib, 'mesa.wasm'));
+  return sha;
+}
+
 let clones = null;
 function clones2() {
   if (clones) return clones;
   const rust = join(R, 'ext-rust'), js = join(R, 'ext-js');
   const at = clone(rust);
   clone(js);
+  summary.urbFetchMain = vendorMain(join(js, 'lib'));
   const st = spawnSync('sh', [join(root, 'shim/build.sh'), join(rust, 'lib')], { cwd: root, encoding: 'utf8', env: { ...process.env, ...toolEnv } });
   writeFileSync(join(R, 'shim-stage.log'), st.stdout + st.stderr);
   if (st.status !== 0) throw new Error(`shim/build.sh ${rust}/lib failed`);
   summary.extension = at;
-  say(`clones of nisfeb-extension ${at}: ${rust} (Rust lib/), ${js} (JS lib/)`);
+  say(`clones of nisfeb-extension ${at}: ${rust} (Rust lib/), ${js} (JS lib/, urb-fetch main ${summary.urbFetchMain})`);
   return (clones = { rust, js });
 }
 
