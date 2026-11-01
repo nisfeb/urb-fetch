@@ -172,7 +172,11 @@
     },
     {
      "tag": "pre",
-     "kids": []
+     "kids": [
+      {
+       "text": "pre  text"
+      }
+     ]
     }
    ]
   },
@@ -546,28 +550,47 @@
       },
       {
        "tag": "strong",
-       "kids": []
+       "kids": [
+        {
+         "text": "bold"
+        }
+       ]
       },
       {
        "text": " and "
       },
       {
        "tag": "em",
-       "kids": []
+       "kids": [
+        {
+         "text": "em"
+        }
+       ]
       },
       {
        "text": " and "
       },
       {
        "tag": "code",
-       "kids": []
+       "kids": [
+        {
+         "text": "code"
+        }
+       ]
       },
       {
        "text": " and "
       },
       {
        "tag": "a",
-       "kids": []
+       "attrs": {
+        "href": "reader.html?u=urb%3A%2F%2F~zod%2Fx"
+       },
+       "kids": [
+        {
+         "text": "a link"
+        }
+       ]
       },
       {
        "text": " and "
@@ -764,7 +787,14 @@
        "kids": [
         {
          "tag": "a",
-         "kids": []
+         "attrs": {
+          "href": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2Fy"
+         },
+         "kids": [
+          {
+           "text": "x"
+          }
+         ]
         }
        ]
       },
@@ -1060,7 +1090,11 @@
    "out": [
     {
      "tag": "pre",
-     "kids": []
+     "kids": [
+      {
+       "text": "\nfirst blank"
+      }
+     ]
     }
    ]
   },
@@ -1096,7 +1130,11 @@
    "out": [
     {
      "tag": "pre",
-     "kids": []
+     "kids": [
+      {
+       "text": "x"
+      }
+     ]
     }
    ]
   },
@@ -2026,14 +2064,28 @@
      "kids": [
       {
        "tag": "a",
-       "kids": []
+       "attrs": {
+        "href": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2Fb"
+       },
+       "kids": [
+        {
+         "text": "a"
+        }
+       ]
       },
       {
        "text": " "
       },
       {
        "tag": "a",
-       "kids": []
+       "attrs": {
+        "href": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2Fd"
+       },
+       "kids": [
+        {
+         "text": "c"
+        }
+       ]
       }
      ]
     }
@@ -2126,7 +2178,14 @@
      "kids": [
       {
        "tag": "a",
-       "kids": []
+       "attrs": {
+        "href": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2Fb(c"
+       },
+       "kids": [
+        {
+         "text": "a"
+        }
+       ]
       },
       {
        "text": ")"
@@ -2265,11 +2324,19 @@
      "kids": [
       {
        "tag": "em",
-       "kids": []
+       "kids": [
+        {
+         "text": "a"
+        }
+       ]
       },
       {
        "tag": "em",
-       "kids": []
+       "kids": [
+        {
+         "text": "b"
+        }
+       ]
       }
      ]
     }
@@ -2317,11 +2384,19 @@
      "kids": [
       {
        "tag": "code",
-       "kids": []
+       "kids": [
+        {
+         "text": "a"
+        }
+       ]
       },
       {
        "tag": "code",
-       "kids": []
+       "kids": [
+        {
+         "text": "b"
+        }
+       ]
       }
      ]
     }
@@ -2497,7 +2572,14 @@
      "kids": [
       {
        "tag": "a",
-       "kids": []
+       "attrs": {
+        "href": "reader.html?u=urb%3A%2F%2F~zod%2Fa%2Fx"
+       },
+       "kids": [
+        {
+         "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+       ]
       }
      ]
     }
@@ -2587,7 +2669,14 @@
      "kids": [
       {
        "tag": "a",
-       "kids": []
+       "attrs": {
+        "href": "reader.html?u=urb%3A%2F%2F~zod%2Fbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+       },
+       "kids": [
+        {
+         "text": "t"
+        }
+       ]
       }
      ]
     }
@@ -2683,7 +2772,14 @@
       },
       {
        "tag": "a",
-       "kids": []
+       "attrs": {
+        "href": "reader.html?u=urb%3A%2F%2F~zod%2F%25F0%259F%2598%2580"
+       },
+       "kids": [
+        {
+         "text": "😀"
+        }
+       ]
       }
      ]
     }
@@ -3000,14 +3096,25 @@
      "kids": [
       {
        "tag": "a",
-       "kids": []
+       "attrs": {
+        "href": "reader.html?u=urb%3A%2F%2F~zod%2Fx"
+       },
+       "kids": [
+        {
+         "text": "q"
+        }
+       ]
       },
       {
        "text": " "
       },
       {
        "tag": "strong",
-       "kids": []
+       "kids": [
+        {
+         "text": "b"
+        }
+       ]
       }
      ]
     }

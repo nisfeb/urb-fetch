@@ -155,20 +155,24 @@ export async function extLib(dir) {
 }
 
 // mdNodes' nodes, with a document whose elements are plain objects:
-// {tag, text, href, kids}
+// {tag, attrs, kids}, and text nodes {text}
 export function nodesOf(lib, body) {
+  //  accessors defined as accessors: Object.assign would call each
+  //  getter once and copy its value, so text set by textContent and an
+  //  a's href and rel were lost. Setting textContent to '' leaves no
+  //  child, as in a DOM.
   const el = tag => {
     const e = { tag, kids: [], attrs: {} };
-    return Object.assign(e, {
+    return Object.defineProperties(e, Object.getOwnPropertyDescriptors({
       appendChild(k) { e.kids.push(k); return k; },
       append(...ks) { for (const k of ks) e.kids.push(typeof k === 'string' ? { text: k } : k); },
       setAttribute(k, v) { e.attrs[k] = String(v); },
-      set textContent(t) { e.kids = [{ text: String(t) }]; },
+      set textContent(t) { e.kids = String(t) === '' ? [] : [{ text: String(t) }]; },
       get textContent() { return e.kids.map(k => k.text ?? '').join(''); },
       set href(v) { e.attrs.href = String(v); },
       set className(v) { e.attrs.class = String(v); },
       set rel(v) { e.attrs.rel = String(v); },
-    });
+    }));
   };
   const doc = { createElement: el, createTextNode: t => ({ text: String(t) }), createDocumentFragment: () => el('#fragment') };
   const strip = n => (n.text !== undefined && !n.tag ? { text: n.text }
