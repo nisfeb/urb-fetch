@@ -69,6 +69,12 @@ pub fn fake_keyfile(s: Ship) -> String {
 /// glue.c's mine_comet: a comet mined under one of the stars in [jam]
 /// (comet-stars.jam), from 64 random bytes; its keyfile, or None
 pub fn mine_comet(jam: &[u8], eny: &[u8; 64]) -> Option<String> {
+    mine_comet_under(&comet_stars(jam)?, eny)
+}
+
+/// the stars comet-stars.jam lists, read as the Go binding's
+/// cometStars reads them, or None if it doesn't cue
+pub fn comet_stars(jam: &[u8]) -> Option<Vec<u64>> {
     let one = [0u8; 1];
     let p = if jam.is_empty() {
         one.as_ptr()
@@ -85,10 +91,22 @@ pub fn mine_comet(jam: &[u8], eny: &[u8; 64]) -> Option<String> {
         while sys::mesa_is_cell(t) {
             let mut s = 0u64;
             sys::mesa_atom_get_u64(sys::mesa_head(t), &mut s);
-            stars.push(sys::mesa_ship { lo: s, hi: 0 });
+            stars.push(s);
             t = sys::mesa_tail(t);
         }
         sys::mesa_unref(lis);
+    }
+    Some(stars)
+}
+
+/// a comet mined under one of stars (+come:dawn), from 64 random bytes:
+/// its keyfile, or None if mining fails
+pub fn mine_comet_under(stars: &[u64], eny: &[u8; 64]) -> Option<String> {
+    let stars: Vec<sys::mesa_ship> = stars
+        .iter()
+        .map(|&lo| sys::mesa_ship { lo, hi: 0 })
+        .collect();
+    unsafe {
         let mut ide: sys::mesa_ident = std::mem::zeroed();
         if sys::mesa_comet_mine(
             stars.len(),

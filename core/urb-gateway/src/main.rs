@@ -154,6 +154,20 @@ mod run {
         (lns, port)
     }
 
+    /// The exit code once the host's thread has ended on its own: every
+    /// read would fail, so the gateway ends, as the Go gateway ends when
+    /// its node does, and whatever runs it starts it again. A panic
+    /// (printed already) is Go's exit code for one, 2.
+    pub fn ended(host: thread::JoinHandle<()>) -> i32 {
+        match host.join() {
+            Err(_) => 2,
+            Ok(()) => {
+                golog::line("node: the host stopped");
+                0
+            }
+        }
+    }
+
     /// what the HTTP threads ask of the host's thread
     enum Job {
         Read(String, Sender<Result<Page, Fail>>),
@@ -215,7 +229,6 @@ mod run {
                 }
             };
             let udp = GatewayUdp {
-                state: st.clone(),
                 fake: !fake.is_empty(),
                 port: found.port,
                 log: hlog.clone(),
@@ -307,6 +320,9 @@ mod run {
         }
         golog::line(&format!("serving http://urb.localhost:{port}/"));
         while !STOP.load(Ordering::Relaxed) {
+            if host_thread.is_finished() {
+                return ended(host_thread);
+            }
             thread::sleep(Duration::from_millis(100));
         }
         let (done_tx, done_rx) = channel();
@@ -321,6 +337,19 @@ mod run {
 #[cfg(not(target_family = "wasm"))]
 fn main() {
     std::process::exit(run::main());
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+mod tests {
+    #[test]
+    fn a_host_that_panics_ends_the_gateway_with_gos_code() {
+        let h = std::thread::spawn(|| panic!("the host broke"));
+        while !h.is_finished() {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!(super::run::ended(h), 2);
+        assert_eq!(super::run::ended(std::thread::spawn(|| {})), 0);
+    }
 }
 
 #[cfg(target_family = "wasm")]

@@ -14,6 +14,8 @@ path = "src/main.rs"
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 urb = { path = "../urb", features = ["native"] }
 urb-render = { path = "../urb-render" }
+# the comet-stars list, read as the Go binding reads it
+ureq = { version = "2.12", default-features = false, features = ["tls"] }
 
 [dev-dependencies]
 serde_json = { version = "1", features = ["preserve_order"] }

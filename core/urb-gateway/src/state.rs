@@ -13,7 +13,7 @@
 
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::mpsc::Sender;
 use urb::core::Lane;
 use urb::host::Event;
@@ -119,6 +119,41 @@ pub fn open_db(db: &Path, key_path: &Path, given: Option<Given>) -> Result<Sqlit
     })
 }
 
+/// `mesa.LoadComet(path)` for a comet not yet mined: the comet-stars
+/// list read (as the binding reads it, with a 30 s timeout and whatever
+/// status), a comet mined under one of them, and its keyfile saved at
+/// path (created, never overwritten, 0600), in the binding's words when
+/// any of it fails
+pub fn mine_comet(path: &Path) -> Result<(String, String), String> {
+    use std::io::Read;
+    let url = urb::core::STARS;
+    let agent = ureq::AgentBuilder::new()
+        .timeout(std::time::Duration::from_secs(30))
+        .build();
+    let res = match agent.get(url).set("user-agent", "urb-fetch").call() {
+        Ok(r) | Err(ureq::Error::Status(_, r)) => r,
+        // url.Error's words, then the transport's own
+        Err(e) => return Err(format!("Get {url:?}: {e}")),
+    };
+    let mut jam = Vec::new();
+    match res.into_reader().read_to_end(&mut jam) {
+        Err(e) => return Err(format!("mesa: comet-stars: {e}")),
+        Ok(_) if jam.is_empty() => return Err("mesa: comet-stars: <nil>".into()),
+        Ok(_) => {}
+    }
+    let stars = urb::engine::comet_stars(&jam).ok_or("mesa: bad comet-stars.jam")?;
+    if stars.is_empty() {
+        return Err("mesa: no stars to mine a comet under".into());
+    }
+    let eny: [u8; 64] = random(64).try_into().expect("64 bytes");
+    let keyfile = urb::engine::mine_comet_under(&stars, &eny).ok_or("mesa: comet mining failed")?;
+    write_new(path, format!("{keyfile}\n").as_bytes(), true)?;
+    let ship = urb::engine::keyfile_ship(&keyfile)
+        .ok_or("mesa: not a keyfile")?
+        .0;
+    Ok((keyfile, urb::engine::ship_text(ship)))
+}
+
 /// the base of an identity's files: its name, `fake-` before a fake
 /// ship's
 pub fn base_name(ship: &str, fake: bool) -> String {
@@ -130,66 +165,42 @@ pub fn base_name(ship: &str, fake: bool) -> String {
     }
 }
 
-/// The store: `<name>.db`, opened at once for an identity known now, or
-/// once a new comet is mined and its keyfile saved (as LoadComet saves
-/// it: created, never overwritten, mode 0600).
+/// The store: `<name>.db`, through libmesa's SQLite store.
 pub struct GatewayStore {
-    pub state: PathBuf,
-    pub db: Option<SqliteStore>,
+    pub db: SqliteStore,
 }
 
 impl Store for GatewayStore {
     fn load(&mut self) -> Result<Loaded, String> {
-        match &mut self.db {
-            Some(db) => db.load(),
-            None => Ok(Loaded::default()),
-        }
+        self.db.load()
     }
 
-    fn save_key(&mut self, keyfile: &str) -> Result<(), String> {
-        let key_path = self.state.join("comet.key");
-        write_new(&key_path, format!("{keyfile}\n").as_bytes(), true)?;
-        let Some((ship, _, _)) = urb::engine::keyfile_ship(keyfile) else {
-            return Err("mesa: not a keyfile".into());
-        };
-        let name = base_name(&urb::engine::ship_text(ship), false);
-        let db = open_db(&self.state.join(format!("{name}.db")), &key_path, None)?;
-        self.db = Some(db);
-        Ok(())
+    /// never asked: the gateway opens the core with a keyfile always
+    /// (a new comet is mined by [`mine_comet`] first, as LoadComet does)
+    fn save_key(&mut self, _: &str) -> Result<(), String> {
+        Err("the gateway saves its own comet.key".into())
     }
 
     fn commit(&mut self, rows: &[u8]) -> Result<(), String> {
-        match &mut self.db {
-            Some(db) => db.commit(rows),
-            None => Err("no store open".into()),
-        }
+        self.db.commit(rows)
     }
 }
 
-/// UDP from the identity's kept port: known now, or read (or chosen)
-/// from `<name>.db.port` once a new comet's name is known.
+/// UDP from the identity's kept port, in Go's words when it can't bind.
 pub struct GatewayUdp {
-    pub state: PathBuf,
     pub fake: bool,
-    pub port: Option<u16>,
+    pub port: u16,
     pub log: Log,
     pub udp: Option<Udp>,
 }
 
 impl Transport for GatewayUdp {
     fn start(&mut self, ship: &str, tx: Sender<Event>) -> Result<(), String> {
-        if self.udp.is_none() {
-            let port = match self.port {
-                Some(p) => p,
-                None => udp_port(
-                    &self
-                        .state
-                        .join(format!("{}.db.port", base_name(ship, self.fake))),
-                )?,
-            };
-            self.udp = Some(Udp::with_port(port, self.fake, self.log.clone()));
-        }
-        self.udp.as_mut().expect("a socket").start(ship, tx)
+        let (port, fake, log) = (self.port, self.fake, self.log.clone());
+        self.udp
+            .get_or_insert_with(|| Udp::with_port(port, fake, log))
+            .start(ship, tx)
+            .map_err(|e| go_udp_error(&e))
     }
 
     fn send(&mut self, lane: Lane, bytes: &[u8]) {
@@ -205,13 +216,27 @@ impl Transport for GatewayUdp {
     }
 }
 
-/// What open found: the identity's keyfile (none for a comet not yet
-/// mined), and its store and port where they are known now.
+/// a UDP socket the host couldn't bind (`bind <code> <ip>:<port>`, in
+/// node's words, as the core's transport says it), as Go's
+/// net.ListenUDP says it
+pub fn go_udp_error(e: &str) -> String {
+    let Some((code, addr)) = e.strip_prefix("bind ").and_then(|r| r.split_once(' ')) else {
+        return e.to_string();
+    };
+    let why = match code {
+        "EADDRINUSE" => "address already in use",
+        "EACCES" => "permission denied",
+        _ => "invalid argument",
+    };
+    format!("listen udp4 {addr}: bind: {why}")
+}
+
+/// What open found: the identity's keyfile, its store and its port.
 pub struct Found {
-    pub keyfile: Option<String>,
+    pub keyfile: String,
     pub fresh: bool,
     pub store: GatewayStore,
-    pub port: Option<u16>,
+    pub port: u16,
 }
 
 /// main.go's `open`, up to `mesa.Open`: the identity, its store and its
@@ -220,30 +245,17 @@ pub fn find(state: &Path, moon: &str, new_moon: bool, fake: &str) -> Result<Foun
     let (keyfile, ship) = if !fake.is_empty() {
         let ship = parse_ship(fake)?;
         let who = urb::engine::ship_parse(&ship).expect("parsed");
-        (Some(urb::engine::fake_keyfile(who)), Some(ship))
+        (urb::engine::fake_keyfile(who), ship)
     } else if !moon.is_empty() {
-        let (k, s) = load_keyfile(Path::new(moon))?;
-        (Some(k), Some(s))
+        load_keyfile(Path::new(moon))?
     } else {
+        // os.Stat: anything there is loaded, as a keyfile
         let p = state.join("comet.key");
-        if p.exists() {
-            let (k, s) = load_keyfile(&p)?;
-            (Some(k), Some(s))
+        if fs::metadata(&p).is_ok() {
+            load_keyfile(&p)?
         } else {
-            // mined by the core, then saved by GatewayStore
-            (None, None)
+            mine_comet(&p)?
         }
-    };
-    let Some(ship) = ship else {
-        return Ok(Found {
-            keyfile: None,
-            fresh: false,
-            store: GatewayStore {
-                state: state.to_path_buf(),
-                db: None,
-            },
-            port: None,
-        });
     };
     let name = base_name(&ship, !fake.is_empty());
     let db = state.join(format!("{name}.db"));
@@ -259,7 +271,7 @@ pub fn find(state: &Path, moon: &str, new_moon: bool, fake: &str) -> Result<Foun
         None
     } else {
         Some(Given {
-            keyfile: keyfile.clone().expect("a keyfile"),
+            keyfile: keyfile.clone(),
             // Config.Breached: a moon whose state is new here
             fresh: !moon.is_empty() && fresh,
         })
@@ -269,10 +281,7 @@ pub fn find(state: &Path, moon: &str, new_moon: bool, fake: &str) -> Result<Foun
     Ok(Found {
         keyfile,
         fresh: !moon.is_empty() && fresh,
-        store: GatewayStore {
-            state: state.to_path_buf(),
-            db: Some(store),
-        },
-        port: Some(port),
+        store: GatewayStore { db: store },
+        port,
     })
 }
