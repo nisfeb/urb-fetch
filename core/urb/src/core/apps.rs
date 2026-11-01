@@ -102,6 +102,15 @@ fn some_text(v: Option<String>) -> Value<'static> {
     }
 }
 
+/// newComment's parent: none only when absent, as comment ids start
+/// at 0 (`parent == null ? null : [null, parent]`)
+fn some_parent(parent: Option<f64>) -> Result<Value<'static>, Failure> {
+    match parent {
+        Some(p) => number(p).map(|p| Value::Array(vec![Value::Null, p])),
+        None => Ok(Value::Null),
+    }
+}
+
 impl World {
     /// trace.mjs's forumOf(host)
     fn forum_of(&self, host: &str) -> Rc<ForumSt> {
@@ -263,13 +272,7 @@ impl World {
                     Ok("new-comment".into()),
                     Ok(name.into()),
                     number(post),
-                    // some(parent): a truthy one
-                    match parent {
-                        Some(p) if p != 0.0 && !p.is_nan() => {
-                            number(p).map(|p| Value::Array(vec![Value::Null, p]))
-                        }
-                        _ => Ok(Value::Null),
-                    },
+                    some_parent(parent),
                     Ok(body.into()),
                 ],
             ),
@@ -623,4 +626,31 @@ fn grubs_try(
         }
         grubs_try(w, i, host, dir, acc, k + 1)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// the parent some_parent gives: None for none, Some(n) for [~ n]
+    fn parent_of(p: Option<f64>) -> Option<crate::Int> {
+        match some_parent(p).unwrap() {
+            Value::Null => None,
+            Value::Array(v) => match v.as_slice() {
+                [Value::Null, Value::Int(n)] => Some(n.clone()),
+                _ => panic!("not [~ n]"),
+            },
+            _ => panic!("not a unit"),
+        }
+    }
+
+    #[test]
+    fn a_parent_of_0_is_the_first_comment_not_none() {
+        let int = |n: f64| js::bigint_of_number(n).unwrap();
+        assert_eq!(parent_of(None), None);
+        assert_eq!(parent_of(Some(0.0)), Some(int(0.0)));
+        assert_eq!(parent_of(Some(1.0)), Some(int(1.0)));
+        // as BigInt(NaN) is a RangeError
+        assert!(some_parent(Some(f64::NAN)).is_err());
+    }
 }
