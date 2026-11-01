@@ -66,6 +66,8 @@ const GONE = 0xffffffff;     // a deleted row's vlen
 // ponytail: a cap on the keeps we answer, so a ship can't grow our state
 // without bound; past it a keep gets its first wave and no news
 const MAX_KEEPERS = 256;
+// and each ship's share of them
+const PER_SHIP = 64;
 
 // wasm hands 64-bit integers to JS as signed BigInts: read them unsigned
 const u64 = x => BigInt.asUintN(64, x);
@@ -1062,6 +1064,13 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   // A %peek, %keep or %drop of one of our files, in a hook: answer it on
   // our flow to the asker's %grubbery, as grubbery's +process-peek and
   // +keep do. Only files the host serves are ever answered with content.
+  // how many keeps [ship] holds
+  const keptBy = ship => {
+    let n = 0;
+    for (const k of keepers.values()) if (k.ship === ship) n++;
+    return n;
+  };
+
   function serveLoad(her, wire, dest, tag) {
     const at = dest.head.int() ? null : [pathOf(dest.tail.head), dest.tail.tail.text()];
     const f = at && files(...at);
@@ -1076,12 +1085,13 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       poke(her, flowTo(her), 'grubbery', 'grubbery-transfer', messages.snap(wire, dest, id, snap, data));
       return;
     }
-    //  Only a file with something in it is kept, so one ship can't fill
-    //  every slot with names we never published: a keep of one that isn't
-    //  there (not yet, or no longer) gets its first wave and no news. A
-    //  keep held already and unchanged isn't saved again, so a repeated
-    //  keep costs no write.
-    if (f && f.value !== undefined && (keepers.has(k) || keepers.size < MAX_KEEPERS)) {
+    //  A keep may wait for a page not yet published, or one taken down
+    //  and put up again, as lattice's reader keeps it. So that one ship
+    //  can't fill every slot, each ship has PER_SHIP of them, inside
+    //  MAX_KEEPERS; a keep held already is never evicted. A keep held
+    //  already and unchanged isn't saved again, so a repeated keep costs
+    //  no write.
+    if (f && (keepers.has(k) || (keepers.size < MAX_KEEPERS && keptBy(ship) < PER_SHIP))) {
       const kept = { ship, wire: segments(wire), folder: at[0], name: at[1] };
       if (JSON.stringify(keepers.get(k)) !== JSON.stringify(kept)) {
         keepers.set(k, kept);
@@ -1257,9 +1267,8 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       // Serve our files to other ships' grubbery: file(folder, name) gives
       // {mark: [path, name], value, rev, at} (at in ms; no value while there
       // is nothing there, not yet or no longer), or null for a file we don't
-      // serve. Each keep of a file with something in it is kept until its
-      // ship drops it: saved, the keeps the last run handed onKeepers,
-      // which hears every change.
+      // serve. Each keep is kept until its ship drops it: saved, the keeps
+      // the last run handed onKeepers, which hears every change.
       serve(file, saved = [], onKeepers = () => {}) {
         files = file;
         keepers = new Map(saved.map(k => [`${k.ship} ${k.folder} ${k.name}`, k]));
