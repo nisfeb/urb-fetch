@@ -1,0 +1,1040 @@
+{
+ "about": "urb_test.go's and reader_test.go's cases, each test's own inputs, as the Go gives them (gateway_vectors_test.go): pages for urb://~zod/p on port 8475 titled \"t\" (whole, as strings); gatewayRender's {csp, body}; errorPage(url, status, msg)'s {status, headers, body}; isPage(mark, body, ok); lateAnswer: a revision list's answer after its caller gave up, {kept, waiting}; onTimeAnswer: an answer in time, {caller, late}; an error as \"\u003cstatus\u003e \u003cmessage\u003e\" where urb.go's fail() gives one",
+ "cases": [
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod"
+   ],
+   "out": {
+    "rel": [
+     "index"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/"
+   ],
+   "out": {
+    "rel": [
+     "index"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/site/"
+   ],
+   "out": {
+    "rel": [
+     "site"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/notes/2026/intro"
+   ],
+   "out": {
+    "rel": [
+     "notes",
+     "2026",
+     "intro"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/n/notes"
+   ],
+   "out": {
+    "rel": [
+     "notes"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum"
+   ],
+   "out": {
+    "rel": [
+     "forum"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/b/1000"
+   ],
+   "out": {
+    "rel": [
+     "forum",
+     "b",
+     "1000"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/b/1/x"
+   ],
+   "out": {
+    "rel": [
+     "forum",
+     "b",
+     "1",
+     "x"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/n/forum/b"
+   ],
+   "out": {
+    "rel": [
+     "forum",
+     "b"
+    ],
+    "ship": "~zod"
+   }
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "https://example.com"
+   ],
+   "error": "400 not an urb:// url: https://example.com"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://notaship/x"
+   ],
+   "error": "400 no ship in urb://notaship/x"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~notaship/x"
+   ],
+   "error": "400 no ship in urb://~notaship/x"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/x/foo"
+   ],
+   "error": "404 /x/ is not an urb:// mount"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/p/counter"
+   ],
+   "error": "501 /p/ addresses read the publisher's tree, which this gateway does not do"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/t/apps/x"
+   ],
+   "error": "501 /t/ addresses read the publisher's tree, which this gateway does not do"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/k/user/prefs"
+   ],
+   "error": "501 /k/ addresses read the publisher's tree, which this gateway does not do"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/Caps"
+   ],
+   "error": "400 bad path in urb://~zod/Caps"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/a//b"
+   ],
+   "error": "400 bad path in urb://~zod/a//b"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/b"
+   ],
+   "error": "501 urb://~zod/forum/b is a lattice forum board, which this gateway does not read"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/b/12"
+   ],
+   "error": "501 urb://~zod/forum/b/12 is a lattice forum board, which this gateway does not read"
+  },
+  {
+   "fn": "deUrb",
+   "in": [
+    "urb://~zod/forum/b/1.000"
+   ],
+   "error": "501 urb://~zod/forum/b/1.000 is a lattice forum board, which this gateway does not read"
+  },
+  {
+   "fn": "gatewayURL",
+   "in": [
+    "urb://~sampel-palnet/n/notes",
+    "8475"
+   ],
+   "out": "http://sampel-palnet.urb.localhost:8475/n/notes"
+  },
+  {
+   "fn": "gatewayURL",
+   "in": [
+    "urb://~notaship/x",
+    "8475"
+   ],
+   "error": "400 no ship in urb://~notaship/x"
+  },
+  {
+   "fn": "urbOfHost",
+   "in": [
+    "sampel-palnet.urb.localhost",
+    "/site/"
+   ],
+   "out": "urb://~sampel-palnet/site/"
+  },
+  {
+   "fn": "urbOfHost",
+   "in": [
+    "evil.example",
+    "/"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "urbOfHost",
+   "in": [
+    "zod.urb.localhost.evil.example",
+    "/"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "urbOfHost",
+   "in": [
+    "a.zod.urb.localhost",
+    "/"
+   ],
+   "out": ""
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "  \n\u003c!doctype html\u003e"
+   ],
+   "out": true
+  },
+  {
+   "fn": "looksHtml",
+   "in": [
+    "# heading\n\u003cb\u003e"
+   ],
+   "out": false
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "\u003ca href=\"urb://~zod/x\"\u003eurb://~zod/x\u003c/a\u003e"
+   ],
+   "out": "\u003ca href=\"http://zod.urb.localhost:8475/x\"\u003eurb://~zod/x\u003c/a\u003e"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "# Hi \u003cthere\u003e\n=\u003e urb://~zod/a A link\n* one\n* two\n```\n\u003cpre\u003e\n```\n\u003e quote"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003eHi \u0026lt;there\u0026gt;\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003ch1\u003eHi \u0026lt;there\u0026gt;\u003c/h1\u003e\n\u003cp class=\"link\"\u003e\u003ca href=\"http://zod.urb.localhost:8475/a\"\u003eA link\u003c/a\u003e\u003c/p\u003e\n\u003cul\u003e\n\u003cli\u003eone\u003c/li\u003e\n\u003cli\u003etwo\u003c/li\u003e\n\u003c/ul\u003e\n\u003cpre\u003e\n\u0026lt;pre\u0026gt;\u003c/pre\u003e\n\u003cblockquote\u003equote\u003c/blockquote\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "# heading"
+   ],
+   "out": "gmi"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "gmi",
+    "  \u003c!doctype html\u003e\u003cp\u003ehi"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "\u003cp\u003ehi"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "html",
+    "no tag first"
+   ],
+   "out": "html"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "# heading"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "md",
+    "\u003cdiv\u003eraw\u003c/div\u003e"
+   ],
+   "out": "md"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "text",
+    "\u003cb\u003enot html\u003c/b\u003e"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "js",
+    "alert(1)"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "css",
+    "body{}"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "renderAs",
+   "in": [
+    "noun",
+    "x"
+   ],
+   "out": "text"
+  },
+  {
+   "fn": "pageMark",
+   "in": [
+    "text"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageMark",
+   "in": [
+    "html"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageMark",
+   "in": [
+    "gmi"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageMark",
+   "in": [
+    "md"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageMark",
+   "in": [
+    "js"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageMark",
+   "in": [
+    "css"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageMark",
+   "in": [
+    "noun"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageMark",
+   "in": [
+    "del"
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageMark",
+   "in": [
+    ""
+   ],
+   "out": false
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "# Title \u003cx\u003e\n\nSome *em* and **strong** and `\u003ccode\u003e`,\nwrapped.\n\n- one\n- [two](urb://~zod/b)\n\n1. first\n2. second\n\n\u003e quoted\n\n---\n\n```\n\u003cscript\u003ealert(1)\u003c/script\u003e\n```\n\n\u003cscript\u003ealert(2)\u003c/script\u003e\n\n[bad](javascript:alert(3)) [web](https://example.com/a?b=1\u0026c=2) [rel](notes/intro)"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003eTitle \u0026lt;x\u0026gt;\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003ch1\u003eTitle \u0026lt;x\u0026gt;\u003c/h1\u003e\n\u003cp\u003eSome \u003cem\u003eem\u003c/em\u003e and \u003cstrong\u003estrong\u003c/strong\u003e and \u003ccode\u003e\u0026lt;code\u0026gt;\u003c/code\u003e, wrapped.\u003c/p\u003e\n\u003cul\u003e\n\u003cli\u003eone\u003c/li\u003e\n\u003cli\u003e\u003ca href=\"http://zod.urb.localhost:8475/b\"\u003etwo\u003c/a\u003e\u003c/li\u003e\n\u003c/ul\u003e\n\u003col\u003e\n\u003cli\u003efirst\u003c/li\u003e\n\u003cli\u003esecond\u003c/li\u003e\n\u003c/ol\u003e\n\u003cblockquote\u003equoted\u003c/blockquote\u003e\n\u003chr\u003e\n\u003cpre\u003e\n\u0026lt;script\u0026gt;alert(1)\u0026lt;/script\u0026gt;\u003c/pre\u003e\n\u003cp\u003e\u0026lt;script\u0026gt;alert(2)\u0026lt;/script\u0026gt;\u003c/p\u003e\n\u003cp\u003ebad) \u003ca href=\"https://example.com/a?b=1\u0026amp;c=2\" rel=\"noopener noreferrer\"\u003eweb\u003c/a\u003e \u003ca href=\"http://zod.urb.localhost:8475/notes/intro\"\u003erel\u003c/a\u003e\u003c/p\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[bad](javascript:alert(3)) [web](https://example.com/a?b=1\u0026c=2) [rel](notes/intro)"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003et\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cp\u003ebad) \u003ca href=\"https://example.com/a?b=1\u0026amp;c=2\" rel=\"noopener noreferrer\"\u003eweb\u003c/a\u003e \u003ca href=\"http://zod.urb.localhost:8475/notes/intro\"\u003erel\u003c/a\u003e\u003c/p\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "\u003cb\u003ea\u003c/b\u003e\n  b"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003et\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cpre\u003e\n\u0026lt;b\u0026gt;a\u0026lt;/b\u0026gt;\n  b\u003c/pre\u003e\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  },
+  {
+   "fn": "gatewayRender",
+   "in": [
+    "html",
+    "\u003ca href=\"urb://~zod/x\"\u003ex\u003c/a\u003e"
+   ],
+   "out": {
+    "body": "\u003ca href=\"http://zod.urb.localhost:8475/x\"\u003ex\u003c/a\u003e",
+    "csp": "sandbox allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation"
+   }
+  },
+  {
+   "fn": "gatewayRender",
+   "in": [
+    "gmi",
+    "\u003c!doctype html\u003e\u003cp\u003eold"
+   ],
+   "out": {
+    "body": "\u003c!doctype html\u003e\u003cp\u003eold",
+    "csp": "sandbox allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation"
+   }
+  },
+  {
+   "fn": "gatewayRender",
+   "in": [
+    "gmi",
+    "# old gemtext\n=\u003e urb://~zod/y y"
+   ],
+   "out": {
+    "body": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003eold gemtext\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003ch1\u003eold gemtext\u003c/h1\u003e\n\u003cp class=\"link\"\u003e\u003ca href=\"http://zod.urb.localhost:8475/y\"\u003ey\u003c/a\u003e\u003c/p\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e",
+    "csp": "default-src 'none'; style-src 'unsafe-inline'"
+   }
+  },
+  {
+   "fn": "gatewayRender",
+   "in": [
+    "md",
+    "# md\n[z](urb://~zod/z)\n\u003cscript\u003ex\u003c/script\u003e"
+   ],
+   "out": {
+    "body": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003emd\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003ch1\u003emd\u003c/h1\u003e\n\u003cp\u003e\u003ca href=\"http://zod.urb.localhost:8475/z\"\u003ez\u003c/a\u003e \u0026lt;script\u0026gt;x\u0026lt;/script\u0026gt;\u003c/p\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e",
+    "csp": "default-src 'none'; style-src 'unsafe-inline'"
+   }
+  },
+  {
+   "fn": "gatewayRender",
+   "in": [
+    "text",
+    "# not a heading"
+   ],
+   "out": {
+    "body": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003eurb://~zod/p\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cpre\u003e\n# not a heading\u003c/pre\u003e\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e",
+    "csp": "default-src 'none'; style-src 'unsafe-inline'"
+   }
+  },
+  {
+   "fn": "gatewayRender",
+   "in": [
+    "css",
+    "a{color:red}"
+   ],
+   "out": {
+    "body": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003eurb://~zod/p\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cpre\u003e\na{color:red}\u003c/pre\u003e\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e",
+    "csp": "default-src 'none'; style-src 'unsafe-inline'"
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.example/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "http://a"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~zod/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "gemini://g"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "mailto:a@b"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "notes/intro"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "/notes"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "#top"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    ""
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "javascript:alert(1)"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "data:text/html,x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\\\\evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "/\\evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\\/evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    " //evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "=\u003e //evil.example evil\n=\u003e javascript:alert(1) js\n=\u003e /ok fine"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003et\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cp class=\"link\"\u003eevil (//evil.example)\u003c/p\u003e\n\u003cp class=\"link\"\u003ejs (javascript:alert(1))\u003c/p\u003e\n\u003cp class=\"link\"\u003e\u003ca href=\"http://zod.urb.localhost:8475/ok\"\u003efine\u003c/a\u003e\u003c/p\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[evil](//evil.example) [back](\\\\evil.example)"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003et\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cp\u003eevil back\u003c/p\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  },
+  {
+   "fn": "errorPage",
+   "in": [
+    "urb://~zod/x",
+    404,
+    "\u003cb\u003egone\u003c/b\u003e"
+   ],
+   "out": {
+    "body": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003eurb://~zod/x\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003ch1\u003e404\u003c/h1\u003e\u003cp\u003e\u0026lt;b\u0026gt;gone\u0026lt;/b\u0026gt;\u003c/p\u003e\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e",
+    "headers": {
+     "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+     "Content-Type": "text/html; charset=utf-8",
+     "X-Content-Type-Options": "nosniff"
+    },
+    "status": 404
+   }
+  },
+  {
+   "fn": "oneIdentity",
+   "in": [
+    "~zod",
+    "moon.key"
+   ],
+   "error": "-fake and -moon each name who the gateway runs as: pass one or the other"
+  },
+  {
+   "fn": "oneIdentity",
+   "in": [
+    "~zod",
+    ""
+   ],
+   "out": true
+  },
+  {
+   "fn": "oneIdentity",
+   "in": [
+    "",
+    "moon.key"
+   ],
+   "out": true
+  },
+  {
+   "fn": "oneIdentity",
+   "in": [
+    "",
+    ""
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0001//evil.com"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u001f//evil.com"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0000//evil.com"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "//evil.com"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    " //evil.com"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "/\t/evil.com"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "java\tscript:alert(1)"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "java\u0000script:alert(1)"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0001javascript:alert(1)"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a.b/\nx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~zod/x\u0001"
+   ],
+   "out": false
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[x](\u0001//evil.com)"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003et\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cp\u003ex\u003c/p\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "HTTPS://a.b"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "Http://a.b"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "HTTP://a.b"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "URB://~zod/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "Mailto:a@b.c"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "GEMINI://a.b"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "javascript\u0026#58;alert(1)"
+   ],
+   "out": true
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "javascript:alert(1)"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "JaVaScRiPt:alert(1)"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "data:text/html,\u003cscript\u003e"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "DATA:text/html,x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "vbscript:x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\\\\evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "/\\evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "file:///etc/passwd"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "chrome-extension://x/y"
+   ],
+   "out": false
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[s](HTTPS://a.b) [click](javascript:alert(1)) [data](data:text/html;base64,PHNjcmlwdD4=) [off](//evil.example/x)"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003et\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cp\u003e\u003ca href=\"https://a.b\" rel=\"noopener noreferrer\"\u003es\u003c/a\u003e click) data off\u003c/p\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003et\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cp\u003e\u003ca href=\"http://zod.urb.localhost:8475/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\u003eaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u003c/a\u003e\u003c/p\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[a](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003et\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cp\u003e[a](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)\u003c/p\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](/x)"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003et\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cp\u003e[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](/x)\u003c/p\u003e\n\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  },
+  {
+   "fn": "isPage",
+   "in": [
+    "gmi",
+    "x",
+    true
+   ],
+   "out": true
+  },
+  {
+   "fn": "isPage",
+   "in": [
+    "md",
+    "x",
+    true
+   ],
+   "out": true
+  },
+  {
+   "fn": "isPage",
+   "in": [
+    "html",
+    "x",
+    true
+   ],
+   "out": true
+  },
+  {
+   "fn": "isPage",
+   "in": [
+    "text",
+    "x",
+    true
+   ],
+   "out": true
+  },
+  {
+   "fn": "isPage",
+   "in": [
+    "js",
+    "x",
+    true
+   ],
+   "out": true
+  },
+  {
+   "fn": "isPage",
+   "in": [
+    "css",
+    "x",
+    true
+   ],
+   "out": true
+  },
+  {
+   "fn": "isPage",
+   "in": [
+    "noun",
+    "x",
+    true
+   ],
+   "out": true
+  },
+  {
+   "fn": "isPage",
+   "in": [
+    "del",
+    "",
+    true
+   ],
+   "out": false
+  },
+  {
+   "fn": "isPage",
+   "in": [
+    "md",
+    "",
+    false
+   ],
+   "out": false
+  },
+  {
+   "fn": "isPage",
+   "in": [
+    "",
+    "",
+    false
+   ],
+   "out": false
+  },
+  {
+   "fn": "isPage",
+   "in": [
+    "json",
+    "",
+    true
+   ],
+   "out": false
+  },
+  {
+   "fn": "lateAnswer",
+   "in": [
+    {
+     "/a": "0v1"
+    }
+   ],
+   "out": {
+    "kept": {
+     "/a": "0v1"
+    },
+    "waiting": false
+   }
+  },
+  {
+   "fn": "onTimeAnswer",
+   "in": [
+    "body"
+   ],
+   "out": {
+    "caller": "body",
+    "late": null
+   }
+  }
+ ]
+}
