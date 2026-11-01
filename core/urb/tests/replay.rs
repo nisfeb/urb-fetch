@@ -8,9 +8,8 @@
 //! deadline their earliest; the rest is compared output by output. Each step
 //! must also draw the entropy the trace says it drew, and all of it.
 //!
-//! Every trace up to M4 must replay: 1, 2, 3, 5 (serving), 6, 7 (the
-//! %want leg), 9 and 10 (the roller). The others (furum and lattice
-//! forums) are reported, and wait for M5.
+//! Every trace must replay: 1, 2, 3, 4 (furum), 5 (serving), 6, 7 (the
+//! %want leg), 8 (a lattice forum), 9 and 10 (the roller).
 
 mod common;
 
@@ -19,12 +18,13 @@ use serde_json::{Map, Value as J, json};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use urb::core::{Conv, Lane, Peeked};
+use urb::core::{Conv, ForumCall, FurumCall, Lane, Peeked};
 use urb::js::{Json, Object};
+use urb::msg::{Id, Target};
 use urb::noun::Value;
 use urb::{Core, Failure, Input, Output, Reply, Request, alive};
 
-const MUST: &[u32] = &[1, 2, 3, 5, 6, 7, 9, 10];
+const MUST: &[u32] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 /// the entropy a step may draw: the trace's, in order
 #[derive(Default)]
@@ -100,7 +100,7 @@ fn unjson(j: &Json) -> J {
     }
 }
 
-/// a trace's call as a request, or None for one M4 has no port of
+/// a trace's call as a request, or None for one the core has no port of
 fn request(op: &str, a: &[J]) -> Option<Request> {
     Some(match op {
         "open" => {
@@ -153,6 +153,92 @@ fn request(op: &str, a: &[J]) -> Option<Request> {
         },
         "pub.remove" => Request::PubRemove(text(&a[0])),
         "pub.pages" => Request::PubPages,
+        "furum" => Request::Furum {
+            host: text(&a[0]),
+            call: furum_call(&text(&a[1]), &a[2..])?,
+        },
+        "forum" => Request::Forum {
+            host: text(&a[0]),
+            call: forum_call(&text(&a[1]), &a[2..])?,
+        },
+        _ => return None,
+    })
+}
+
+fn opt(j: Option<&J>) -> Option<String> {
+    j.and_then(J::as_str).map(String::from)
+}
+
+/// furum(urb, host)[method](...a)
+fn furum_call(method: &str, a: &[J]) -> Option<FurumCall> {
+    let num = |j: &J| j.as_f64().expect("a number");
+    Some(match method {
+        "nextPost" => FurumCall::NextPost(text(&a[0])),
+        "posts" => FurumCall::Posts(text(&a[0])),
+        "comments" => FurumCall::Comments(text(&a[0]), num(&a[1])),
+        "votes" => FurumCall::Votes(text(&a[0]), num(&a[1])),
+        "newPost" => FurumCall::NewPost {
+            name: text(&a[0]),
+            title: text(&a[1]["title"]),
+            url: opt(a[1].get("url")),
+            body: opt(a[1].get("body")),
+        },
+        "newComment" => FurumCall::NewComment {
+            name: text(&a[0]),
+            post: num(&a[1]),
+            body: text(&a[2]),
+            parent: a.get(3).and_then(J::as_f64),
+        },
+        "upvote" => FurumCall::Upvote(text(&a[0]), num(&a[1])),
+        "onNote" => FurumCall::OnNote,
+        _ => return None,
+    })
+}
+
+/// an id, as forum.mjs's idOf is given it
+fn id(j: &J) -> Id {
+    match j {
+        J::Number(n) => Id::Num(n.as_f64().unwrap()),
+        J::String(s) => Id::Text(s.clone()),
+        J::Object(o) if o.contains_key("$big") => {
+            let d = o["$big"].as_str().unwrap();
+            match d.strip_prefix('-') {
+                Some(m) => Id::Big(true, big(m)),
+                None => Id::Big(false, big(d)),
+            }
+        }
+        _ => panic!("no id {j}"),
+    }
+}
+
+fn target(j: &J) -> Target {
+    Target {
+        post: id(&j["post"]),
+        comment: j.get("comment").filter(|c| !c.is_null()).map(id),
+    }
+}
+
+/// forum(urb, host)[method](...a)
+fn forum_call(method: &str, a: &[J]) -> Option<ForumCall> {
+    Some(match method {
+        "board" => ForumCall::Board(text(&a[0])),
+        "thread" => ForumCall::Thread(text(&a[0]), id(&a[1])),
+        "newPost" => ForumCall::NewPost {
+            name: text(&a[0]),
+            title: opt(a[1].get("title")),
+            url: opt(a[1].get("url")),
+            body: opt(a[1].get("body")),
+        },
+        "newComment" => ForumCall::NewComment {
+            name: text(&a[0]),
+            post: id(&a[1]),
+            body: opt(a.get(2)),
+            parent: a.get(3).filter(|p| !p.is_null()).map(id),
+        },
+        "upvote" => ForumCall::Upvote(text(&a[0]), target(&a[1])),
+        "downvote" => ForumCall::Downvote(text(&a[0]), target(&a[1])),
+        "unvote" => ForumCall::Unvote(text(&a[0]), target(&a[1])),
+        "onNote" => ForumCall::OnNote,
         _ => return None,
     })
 }
@@ -201,6 +287,7 @@ fn reply(r: &Reply) -> J {
         Reply::Peek(Peeked::True) => J::Bool(true),
         Reply::Peek(Peeked::Files(f)) => J::Array(f.iter().map(|(p, t)| json!([p, t])).collect()),
         Reply::Json(j) => unjson(j),
+        Reply::Js(j) => common::js_enc(j),
     }
 }
 
@@ -232,12 +319,15 @@ fn out(o: &Output) -> J {
         },
         Output::Inbox(m) => json!({ "inbox": m.from }),
         Output::Event { name, value } => json!({ "event": name, "value": unjson(value) }),
+        Output::Note { name, value } => {
+            json!({ "event": name, "value": common::js_enc(value) })
+        }
     }
 }
 
 enum Replayed {
     Ok(usize),
-    /// a call M3 has no port of, at this step
+    /// a call the core has no port of, at this step
     Unported(usize, String),
     Fail(usize, String),
 }
@@ -465,7 +555,7 @@ fn traces_replay_byte_for_byte() {
         match r {
             Replayed::Ok(s) => eprintln!("ok    {name}: {s} steps"),
             Replayed::Unported(k, op) => {
-                eprintln!("wait  {name}: step {k} calls {op}, which M4 does not port");
+                eprintln!("wait  {name}: step {k} calls {op}, which the core does not port");
                 if must {
                     bad.push(n);
                 }

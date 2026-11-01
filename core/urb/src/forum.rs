@@ -268,7 +268,7 @@ pub mod furum {
 
 /// lattice's forum boards, as its reader reads them (forum.mjs, lattice
 /// release 81, load:fb): a board's pub/ and content/ grubs into an
-/// [`Acc`], and then the board.
+/// `Acc`, and then the board.
 pub mod board {
     use super::*;
 

@@ -11,20 +11,25 @@
 //! once it is due. [`Core::deadline`] is the earliest.
 //!
 //! The JS is the specification (docs/rust-core.md, rule 1). The requests
-//! are trace.mjs's calls (open, read, close, peek, poke), with their
+//! are trace.mjs's calls (open, read, close, peek, poke, pub.mjs's, and
+//! furum.mjs's and forum.mjs's in apps), with their
 //! results and errors, word for word; the timeouts are the JS's (keen
 //! 10 s then %yawn, peek and poke 30 s, the revision list kept 60 s), and
 //! the outputs of each input come in the JS's order (see [`crate::rt`]).
 
 use crate::codec::{self, Budget, MAX_NUMBER, Measured};
 use crate::engine::{self, Engine, Journal, Ship, ship_text};
-use crate::js::{self, Json, Object};
+use crate::js::{self, Js, Json, Object};
 use crate::msg::{self, File};
 use crate::noun::{self, Noun, NounRef, Value};
 use crate::publish::{self, PubState};
 use crate::rt::{self, Promise, Settled, Step, on_err, on_ok, resolve, spawn, then, wait, wait_ok};
 use crate::url::{self, APP_BASE, DESK_BASE, Mount, PAGE_MARKS};
 use crate::{Int, UrbError};
+
+mod apps;
+pub use apps::{ForumCall, FurumCall};
+use apps::{ForumSt, Listener};
 use mesa_sys as sys;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -227,6 +232,16 @@ pub enum Request {
     PubRemove(String),
     /// pub.pages()
     PubPages,
+    /// furum(urb, host)'s calls
+    Furum {
+        host: String,
+        call: FurumCall,
+    },
+    /// forum(urb, host)'s calls
+    Forum {
+        host: String,
+        call: ForumCall,
+    },
 }
 
 /// a page read: where it was found, its body, how it was read (keen or
@@ -270,6 +285,8 @@ pub enum Reply {
     /// a JS value: pub.put's record (or null), pub.remove's boolean,
     /// pub.pages()
     Json(Json),
+    /// what a furum or forum call gives
+    Js(Js),
 }
 
 /// A grubbery poke to us, while the inbox is on
@@ -316,6 +333,12 @@ pub enum Output {
     Event {
         name: String,
         value: Json,
+    },
+    /// an app's note: `furum.note` hands {from, title, body}, and
+    /// `forum.note` {host, board, reason, at}
+    Note {
+        name: String,
+        value: Js,
     },
 }
 
@@ -365,6 +388,7 @@ impl Core {
                 inst: RefCell::new(None),
                 urb: RefCell::new(None),
                 publ: RefCell::new(None),
+                forums: RefCell::new(HashMap::new()),
             }),
         }
     }
@@ -535,6 +559,10 @@ pub(crate) enum Val {
     Bytes(Rc<Vec<u8>>),
     Files(Rc<Vec<(Vec<String>, Option<String>)>>),
     Inst(Rc<Inst>),
+    /// an app's result
+    Js(Rc<Js>),
+    /// what an app's conv read
+    Any(Rc<dyn std::any::Any>),
 }
 
 impl Val {
@@ -574,6 +602,8 @@ pub(crate) struct World {
     urb: RefCell<Option<Rc<Inst>>>,
     /// trace.mjs's app.pub: what publish() gave
     publ: RefCell<Option<Rc<Pub>>>,
+    /// trace.mjs's app.forums: forum(urb, host) for each host
+    forums: RefCell<HashMap<String, Rc<ForumSt>>>,
 }
 
 impl Drop for World {
@@ -583,6 +613,7 @@ impl Drop for World {
         self.jobs.clear();
         self.timers.borrow_mut().clear();
         self.publ.take();
+        self.forums.borrow_mut().clear();
         for i in [self.inst.take(), self.urb.take()].into_iter().flatten() {
             i.shutdown();
         }
@@ -686,6 +717,12 @@ impl World {
                             Ok(Val::Bool(true)) => Ok(Reply::Peek(Peeked::True)),
                             Ok(Val::Files(f)) => Ok(Reply::Peek(Peeked::Files((*f).clone()))),
                             Ok(Val::Null) => Ok(Reply::Peek(Peeked::Null)),
+                            Ok(Val::Js(j)) => Ok(Reply::Js((*j).clone())),
+                            Ok(Val::Any(a)) => match a.downcast_ref::<crate::forum::board::Board>()
+                            {
+                                Some(b) => Ok(Reply::Js(b.js())),
+                                None => Err(Failure::error("a call gave no result")),
+                            },
                             Ok(_) => Err(Failure::error("a call gave no result")),
                             Err(e) => Err(e.failure()),
                         };
@@ -733,6 +770,7 @@ impl World {
             }))),
             Request::Close => Ok(Val::Promise(spawn(self, |w| {
                 w.publ.take();
+                w.forums.borrow_mut().clear();
                 let Some(i) = w.urb.take() else {
                     return Step::Throw(Val::Err(Failure::type_error(
                         "Cannot read properties of null (reading 'close')",
@@ -787,15 +825,23 @@ impl World {
             } => {
                 let i = self.urb("grub")?;
                 let her = ship_of(&ship)?;
-                Ok(Val::Promise(grub_poke(
-                    self, &i, her, &folder, &name, mark, value,
+                Ok(Val::Promise(grub_poke_with(
+                    self,
+                    &i,
+                    her,
+                    &folder,
+                    &name,
+                    mark,
+                    Ok(value),
                 )))
             }
             Request::Inbox(on) => {
                 let i = self.urb("grub")?;
-                i.inbox.set(on);
+                *i.inbox.borrow_mut() = on.then_some(Listener::Emit);
                 Ok(Val::Reply(Reply::True))
             }
+            Request::Furum { host, call } => self.furum(host, call),
+            Request::Forum { host, call } => self.forum(host, call),
             Request::Pub { pages, keepers } => {
                 let i = self.urb("grub")?;
                 *self.publ.borrow_mut() = Some(Pub::publish(&i, PubState::new(pages, keepers)));
@@ -952,7 +998,7 @@ impl World {
         let n = noun.ok_or_else(none)?;
         if mark == "grubbery-load" {
             // nobody waits on it: one we can't read is logged
-            codec::measure(n)?;
+            let m = codec::measure(n)?;
             // [[wire dest] %poke [blot noun]], dest a rail [%& [path name]]
             let dest = n.head()?.tail()?;
             let act = n.tail()?;
@@ -964,7 +1010,10 @@ impl World {
             if tag != "poke" {
                 return Ok(ACK);
             }
-            if i.inbox.get() && dest.head()?.int(MAX_NUMBER)?.is_zero() {
+            let listener = i.inbox.borrow().clone();
+            if let Some(l) = listener
+                && dest.head()?.int(MAX_NUMBER)?.is_zero()
+            {
                 let blot = act.tail()?.head()?;
                 let msg = Inbox {
                     from: ship_text(her),
@@ -975,7 +1024,7 @@ impl World {
                     mark: (codec::path_of(blot.head()?)?, blot.tail()?.text()?),
                     noun: act.tail()?.tail()?.to_noun(),
                 };
-                self.emit(Output::Inbox(msg));
+                self.hear_inbox(&l, msg, m.tail()?.tail()?.tail()?);
             }
             // say it was taken in: the sender waits for this %pack
             let bone = i.flow_to(her)?;
@@ -1081,7 +1130,8 @@ impl World {
                 } else {
                     Val::Null
                 };
-                if !v.is_null() {
+                // v !== null: an app's undefined finishes it
+                if !matches!(v, Val::Null) {
                     st.finish(self, i, v);
                 }
             }
@@ -1508,7 +1558,7 @@ pub(crate) struct Inst {
     // each ship's revision list, and when it was asked for
     revs: RefCell<HashMap<String, (u64, Rc<Object>)>>,
     asking: RefCell<HashSet<Ship>>,
-    inbox: Cell<bool>,
+    inbox: RefCell<Option<Listener>>,
     // what we publish, as grub.serve and scry.serve set it
     server: RefCell<Server>,
 }
@@ -1926,7 +1976,7 @@ fn open(
                 bases: RefCell::new(HashMap::new()),
                 revs: RefCell::new(HashMap::new()),
                 asking: RefCell::new(HashSet::new()),
-                inbox: Cell::new(false),
+                inbox: RefCell::new(None),
                 server: RefCell::new(Server::default()),
             });
             if let Some(old) = w.inst.replace(Some(i.clone()))
@@ -2101,14 +2151,17 @@ fn peek(
 
 /// grubbery's cross-ship poke, on a flow of its own: {ok} once the grub
 /// took it in, or {ok: false, error}: refused, or no answer in time
-fn grub_poke(
+///
+/// value is what noun() is handed: one it throws on (furum's BigInt() of
+/// a fraction) fails the poke where noun() runs, inside its transaction.
+fn grub_poke_with(
     w: &World,
     i: &Rc<Inst>,
     her: Ship,
     folder: &str,
     name: &str,
     mark: (String, String),
-    value: Value<'static>,
+    value: Result<Value<'static>, Failure>,
 ) -> Promise {
     let wire = format!("/grub-poke/{}/{}", i.nonce, i.next_wire());
     let p = Promise::new();
@@ -2141,6 +2194,7 @@ fn grub_poke(
             return Err(Failure::error("flow_open failed"));
         }
         i.poking.borrow_mut().insert(bone, st.clone());
+        let value = value?;
         i.poke(
             her,
             bone,
