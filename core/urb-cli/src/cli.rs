@@ -4,12 +4,12 @@ use crate::args::{self, Kind, Parsed};
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use urb::core::{ForumCall, FurumCall, Kind as Ek, Output};
 use urb::host::Host;
 use urb::host::net::{Log, NetIo, Relay, Tap, Traced, Transport, Udp, libmesa_log, now_ms, random};
-use urb::host::store::{FileStore, Given, node_error};
+use urb::host::store::{FileStore, Given, node_error, node_read_error, node_rename_error};
 use urb::js::{self, Js, Json, Object};
 use urb::msg::{Id, Target};
 use urb::{Failure, Reply, Request};
@@ -134,15 +134,7 @@ fn connect(opt: &Parsed, log: &Log, tap: Option<Tap>) -> R<Cli> {
     } else if let Some(m) = opt.str("moon") {
         let path = Path::new(&m);
         let keyfile = std::fs::read(path)
-            // readFileSync's open of a directory succeeds and its read
-            // fails, so Node names the syscall `read` for EISDIR
-            .map_err(|e| {
-                let call = match e.kind() {
-                    std::io::ErrorKind::IsADirectory => "read",
-                    _ => "open",
-                };
-                Failure::error(node_error(&e, call, path))
-            })
+            .map_err(|e| Failure::error(node_read_error(&e, path)))
             .map(|b| String::from_utf8_lossy(&b).trim().to_string())?;
         let info = urb::engine::keyfile_ship(&keyfile);
         let Some(((lo, hi), rift, life)) = info.filter(|((lo, hi), ..)| *hi == 0 && *lo >= 1 << 32)
@@ -470,8 +462,9 @@ fn mark_of(file: &str) -> &'static str {
     }
 }
 
-/// write a file through a `.new` and a rename, mode 0600
-fn save_file(path: &Path, data: &[u8]) -> std::io::Result<()> {
+/// write a file through a `.new` and a rename, mode 0600, failing in
+/// writeFileSync's and renameSync's words
+fn save_file(path: &Path, data: &[u8]) -> Result<(), String> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
     let new = PathBuf::from(format!("{}.new", path.display()));
@@ -480,10 +473,12 @@ fn save_file(path: &Path, data: &[u8]) -> std::io::Result<()> {
         .create(true)
         .truncate(true)
         .mode(0o600)
-        .open(&new)?;
-    f.write_all(data)?;
+        .open(&new)
+        .map_err(|e| node_error(&e, "open", &new))?;
+    f.write_all(data)
+        .map_err(|e| node_error(&e, "write", &new))?;
     drop(f);
-    std::fs::rename(&new, path)
+    std::fs::rename(&new, path).map_err(|e| node_rename_error(&e, &new, path))
 }
 
 /// pub-cli.mjs: publish pages and serve them until Ctrl-C
@@ -492,19 +487,35 @@ fn serve(a: &[String]) -> i32 {
         Ok(o) => o,
         Err(c) => return c,
     };
-    let log = logger();
     // where publishing's saves go, once the folder is known
     let file: Rc<RefCell<Option<PathBuf>>> = Rc::default();
     let f2 = file.clone();
+    // a save that fails: writeFileSync throws inside put or remove, which
+    // pub-cli catches (exit 1); while serving, it is uncaught (exit 1).
+    // Either way nothing after the throw runs, so what the core logs
+    // after a failed save, until it is reported, is not printed.
+    let failed: Arc<Mutex<Option<String>>> = Arc::default();
+    let failed2 = failed.clone();
+    let quiet = failed.clone();
+    let stamped = logger();
+    let log: Log = Arc::new(move |line: &str| {
+        if quiet.lock().unwrap().is_none() {
+            stamped(line)
+        }
+    });
     let tap: Tap = Box::new(move |o| {
         if let Output::Event { name, value } = o
             && name == "pub.save"
             && let Some(p) = &*f2.borrow()
+            && let Err(e) = save_file(p, js::stringify(value).as_bytes())
         {
-            // a save that fails throws inside put, as writeFileSync does
-            let _ = save_file(p, js::stringify(value).as_bytes());
+            failed2.lock().unwrap().get_or_insert(e);
         }
     });
+    let save_failed = || match failed.lock().unwrap().take() {
+        Some(e) => Err(Failure::error(e)),
+        None => Ok(()),
+    };
     let mut cli = None;
     let r = (|| -> R<()> {
         let c = cli.insert(connect(&opt, &log, Some(tap))?);
@@ -526,13 +537,14 @@ fn serve(a: &[String]) -> i32 {
         };
         *file.borrow_mut() = Some(path);
         c.call(Request::Pub { pages, keepers })?;
+        save_failed()?;
         for p in opt.many("put") {
             let at = p.find('=').filter(|&i| i > 0);
             let rec = match at {
                 Some(i) => {
                     let f = &p[i + 1..];
                     let body = std::fs::read(f)
-                        .map_err(|e| Failure::error(node_error(&e, "open", Path::new(f))))?;
+                        .map_err(|e| Failure::error(node_read_error(&e, Path::new(f))))?;
                     c.call(Request::PubPut {
                         name: p[..i].to_string(),
                         body: String::from_utf8_lossy(&body).into_owned(),
@@ -541,6 +553,7 @@ fn serve(a: &[String]) -> i32 {
                 }
                 None => Reply::Json(Json::Bool(false)),
             };
+            save_failed()?;
             if matches!(rec, Reply::Json(Json::Null | Json::Bool(false))) {
                 return Err(Failure::error(format!(
                     "--put {p}: NAME=FILE, NAME as lattice names pages (notes/intro)"
@@ -548,10 +561,9 @@ fn serve(a: &[String]) -> i32 {
             }
         }
         for name in opt.many("remove") {
-            if !matches!(
-                c.call(Request::PubRemove(name.clone()))?,
-                Reply::Json(Json::Bool(true))
-            ) {
+            let gone = c.call(Request::PubRemove(name.clone()))?;
+            save_failed()?;
+            if !matches!(gone, Reply::Json(Json::Bool(true))) {
                 log(&format!("--remove {name}: no such page"));
             }
         }
@@ -597,6 +609,12 @@ fn serve(a: &[String]) -> i32 {
     unsafe { signal(SIGINT, on_int) };
     while !STOP.load(Ordering::Relaxed) {
         c.host.turn();
+        if let Err(e) = save_failed() {
+            // uncaught in Node: its error's line, as main prints one
+            eprintln!("Error: {}", e.message);
+            c.close();
+            return 1;
+        }
     }
     c.close();
     0

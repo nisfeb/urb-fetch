@@ -106,11 +106,35 @@ pub fn node_error(e: &io::Error, syscall: &str, path: &Path) -> String {
         io::ErrorKind::PermissionDenied => {
             format!("EACCES: permission denied, {syscall} '{p}'")
         }
-        io::ErrorKind::IsADirectory => {
+        // a read has no path in Node's words: readFileSync's read of
+        // what it opened
+        io::ErrorKind::IsADirectory if syscall == "read" => {
             format!("EISDIR: illegal operation on a directory, {syscall}")
+        }
+        io::ErrorKind::IsADirectory => {
+            format!("EISDIR: illegal operation on a directory, {syscall} '{p}'")
         }
         _ => format!("{e}, {syscall} '{p}'"),
     }
+}
+
+/// readFileSync's words: its open of a directory succeeds and its read
+/// fails, so EISDIR names the syscall `read`
+pub fn node_read_error(e: &io::Error, path: &Path) -> String {
+    let call = match e.kind() {
+        io::ErrorKind::IsADirectory => "read",
+        _ => "open",
+    };
+    node_error(e, call, path)
+}
+
+/// renameSync's words, which name both paths
+pub fn node_rename_error(e: &io::Error, from: &Path, to: &Path) -> String {
+    let m = node_error(e, "rename", from);
+    let m = m
+        .strip_suffix(&format!(" '{}'", from.display()))
+        .unwrap_or(&m);
+    format!("{m} '{}' -> '{}'", from.display(), to.display())
 }
 
 /// write a file through a `.new` beside it and a rename, as node.mjs's
@@ -128,7 +152,7 @@ fn save(path: &Path, data: &[u8]) -> Result<(), String> {
         .map_err(|e| node_error(&e, "open", &new))?;
     f.write_all(data).map_err(|e| e.to_string())?;
     drop(f);
-    fs::rename(&new, path).map_err(|e| node_error(&e, "rename", &new))
+    fs::rename(&new, path).map_err(|e| node_rename_error(&e, &new, path))
 }
 
 /// the keyfile a folder keeps, or none
