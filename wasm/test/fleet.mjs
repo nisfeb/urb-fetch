@@ -57,7 +57,8 @@ export function fixed(start = 1_761_600_000_000) {
 
 // An engine whose hooks the test can call as libmesa would, with nouns it
 // builds: what a hostile ship's message is once libmesa has cued it.
-export async function victim() {
+// opts go to open(), after the fixed clock and entropy.
+export async function victim(opts = {}) {
   const f = fleet(), clock = fixed(), logs = [];
   const real = WebAssembly.instantiate;
   let got;
@@ -68,7 +69,7 @@ export async function victim() {
   };
   let urb;
   try {
-    urb = await f.engine('~zod', 0, { now: clock.now, entropy: clock.entropy, log: e => logs.push(e) });
+    urb = await f.engine('~zod', 0, { now: clock.now, entropy: clock.entropy, log: e => logs.push(e), ...opts });
   } finally {
     WebAssembly.instantiate = real;
   }
@@ -109,8 +110,21 @@ export async function victim() {
       X.unref(n);
     }
   };
+  // libmesa hands the answer to a keen of path from [from]: [mark body],
+  // or null for none
+  const sage = (spath, gage, from = 1n) => {
+    const b = new TextEncoder().encode(spath + '\0'), p = X.alloc(b.length);
+    new Uint8Array(X.memory.buffer).set(b, p);
+    const n = gage === null ? null : build(gage);
+    try {
+      return host.on_sage(from, 0n, p, n === null ? 2n ** 64n - 1n : n);
+    } finally {
+      X.free(p);
+      if (n !== null) X.unref(n);
+    }
+  };
   const trapped = () => logs.filter(e => e instanceof WebAssembly.RuntimeError);
-  return { f, urb, nonce, deliver, build, share, path, trapped, logs, X };
+  return { f, urb, nonce, deliver, sage, build, share, path, trapped, logs, X };
 }
 
 // p, or an error if it takes over 5 seconds (a peek gives up at 30)
