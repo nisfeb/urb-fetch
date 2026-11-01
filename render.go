@@ -54,13 +54,17 @@ var (
 	mdItem    = regexp.MustCompile(`^` + jsS + `*(?:[-*+]|[0-9]+[.)])` + jsS + `+(` + jsDot + `*)$`)
 	mdOrdered = regexp.MustCompile(`^` + jsS + `*[0-9]+[.)]` + jsS)
 	mdRule    = regexp.MustCompile(`^` + jsS + `*(?:(?:-` + jsS + `*){3,}|(?:\*` + jsS + `*){3,}|(?:_` + jsS + `*){3,})$`)
-	safeHref  = regexp.MustCompile(`(?i)^(?:(?:https?|urb|gemini|mailto):|[^:]*$)`)
-	ctlLink   = regexp.MustCompile(`[\x00-\x20\x7f]`)
-	hostLink  = regexp.MustCompile(`^\s*[/\\]{2}`)
-	scheme    = regexp.MustCompile(`(?i)^[a-z][a-z0-9+.-]*:`)
-	urbLink   = regexp.MustCompile(`^urb://~[a-z-]+(/|$)`)
-	webLink   = regexp.MustCompile(`(?i)^https?://[^/]`)
-	pageURL   = regexp.MustCompile(`^urb://(~[a-z-]+)(/[^?#]*)?`)
+	// Schemes match in any case, but in ASCII only, as JavaScript's
+	// /i does: Go's (?i) also folds U+017F (ſ) into s and U+212A (the
+	// Kelvin sign) into k, so httpſ://x would be a link here and text
+	// in the extension.
+	safeHref = regexp.MustCompile(`^(?:(?:[hH][tT][tT][pP][sS]?|[uU][rR][bB]|[gG][eE][mM][iI][nN][iI]|[mM][aA][iI][lL][tT][oO]):|[^:]*$)`)
+	ctlLink  = regexp.MustCompile(`[\x00-\x20\x7f]`)
+	hostLink = regexp.MustCompile(`^` + jsS + `*[/\\]{2}`)
+	scheme   = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
+	urbLink  = regexp.MustCompile(`^urb://~[a-z-]+(/|$)`)
+	webLink  = regexp.MustCompile(`^[hH][tT][tT][pP][sS]?://[^/]`)
+	pageURL  = regexp.MustCompile(`^urb://(~[a-z-]+)(/[^?#]*)?`)
 )
 
 // mdMax: a Markdown page longer than this, in UTF-16 code units as the
@@ -69,9 +73,10 @@ const mdMax = 256 * 1024
 
 // safeLink is whether a page's link target may be a link: the web,
 // urb://, gemini, mail, or a path on this ship. A protocol-relative //
-// (or \\, which browsers read as //) would leave the ship's origin. A
-// control character (C0, space, DEL) anywhere makes it text, since a
-// browser strips them; schemes match in any case.
+// (or \\, which browsers read as //, after JavaScript's whitespace)
+// would leave the ship's origin. A control character (C0, space, DEL)
+// anywhere makes it text, since a browser strips them; schemes match
+// in any case, in ASCII.
 func safeLink(t string) bool {
 	return !ctlLink.MatchString(t) && safeHref.MatchString(t) && !hostLink.MatchString(t)
 }
