@@ -134,7 +134,15 @@ fn connect(opt: &Parsed, log: &Log, tap: Option<Tap>) -> R<Cli> {
     } else if let Some(m) = opt.str("moon") {
         let path = Path::new(&m);
         let keyfile = std::fs::read(path)
-            .map_err(|e| Failure::error(node_error(&e, "open", path)))
+            // readFileSync's open of a directory succeeds and its read
+            // fails, so Node names the syscall `read` for EISDIR
+            .map_err(|e| {
+                let call = match e.kind() {
+                    std::io::ErrorKind::IsADirectory => "read",
+                    _ => "open",
+                };
+                Failure::error(node_error(&e, call, path))
+            })
             .map(|b| String::from_utf8_lossy(&b).trim().to_string())?;
         let info = urb::engine::keyfile_ship(&keyfile);
         let Some(((lo, hi), rift, life)) = info.filter(|((lo, hi), ..)| *hi == 0 && *lo >= 1 << 32)
