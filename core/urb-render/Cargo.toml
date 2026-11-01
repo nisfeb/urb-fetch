@@ -1,0 +1,15 @@
+[package]
+name = "urb-render"
+version = "0.0.1"
+description = "urb:// rendering: gemtext, Markdown, text and HTML, as the extension parses them and the gateway writes them"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# counts the renderers' steps (cost::steps), so a fuzzer can assert
+# that time is linear in the body's size
+cost = []
+
+[dev-dependencies]
+serde_json = { version = "1", features = ["preserve_order"] }

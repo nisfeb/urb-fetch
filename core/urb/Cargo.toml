@@ -10,5 +10,6 @@ publish.workspace = true
 mesa-sys = { path = "../mesa-sys" }
 
 [dev-dependencies]
+urb-render = { path = "../urb-render" }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 proptest = { version = "1", default-features = false, features = ["std"] }
