@@ -7,7 +7,10 @@
 # conformance vectors in the JS, the extension's renderers and the Go;
 # the wasm build and its shims (M6): every trace through it, the saved
 # rows across it and today's mesa.wasm, and the extension's tests and
-# renderer vectors on the shims. rerecord.yml records the traces again.
+# renderer vectors on the shims; the native host (M7): every trace
+# through it, its relay transport against the Go relay, and the native
+# command line against the Node ones in the cases that need no ship.
+# rerecord.yml records the traces again.
 name: core
 
 on:
@@ -30,6 +33,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 26
+      # go: the native host's relay transport is tested against the Go
+      # relay (core/urb/tests/relay.rs builds it)
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
       # the extension, whose tests and renderer vectors run on the shims
       - uses: actions/checkout@v4
         with:
@@ -65,6 +73,9 @@ jobs:
       - name: the traces, replayed into the Rust core
         working-directory: core
         run: cargo test -p urb --test replay -- --nocapture
+      - name: the traces, replayed through the native host
+        working-directory: core
+        run: cargo test -p urb --features native --test host -- --nocapture
       - name: cargo test
         working-directory: core
         run: |
@@ -87,6 +98,12 @@ jobs:
         run: node shim/rows.mjs
       - name: the shims' failure paths
         run: node shim/fail.mjs
+      # the native command line (M7) against the Node ones, in the cases
+      # that need no ship; the fleet's cases run by hand (cli-diff.mjs)
+      - name: the native command line, against the Node ones
+        run: |
+          (cd core && cargo build --release -p urb-cli)
+          node core/ci/cli-diff.mjs --offline
       - name: the extension's tests and renderer vectors, on the shims
         run: |
           (cd "$RUNNER_TEMP/ext-shim" && npm test)
