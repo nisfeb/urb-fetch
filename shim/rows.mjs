@@ -22,12 +22,23 @@
 // each of 2 and 3 sending what a start from empty would not,
 //
 // and, off the fake network, each refuses a moon that ran from an empty
-// store, with the same words.
+// store, with the same words. Then the edges:
+//
+//   - readRows and writeRows, each module's, on rows with deleted ones,
+//     empty keys and values and an 8 MB value: the same bytes, and each
+//     reads back what the other wrote, a deleted row as null
+//   - every commit of trace 1, deletes included, read into a store by
+//     each module's readRows: the same rows kept, and fewer than were put
+//   - a session on each of a set of raw loads (empty, torn by 1 and 3
+//     bytes, a torn header, a torn key, PR #7's near-2^32 lengths, an
+//     empty key and value, a deleted row, an 8 MB row): the same results,
+//     datagrams and commits, the torn and over-bound ones refused
 //
 //   node shim/rows.mjs
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { fromLines } from '../wasm/trace.mjs';
 import * as OLD from '../wasm/mesa.mjs';
 import * as NEW from './mesa.mjs';
 
@@ -169,6 +180,71 @@ const refusedOld = await session(OLD, oldWasm, keyfile, idb(), { fake: false });
 const refusedNew = await session(NEW, newWasm, keyfile, idb(), { fake: false });
 check('both refuse a moon that ran from an empty store, word for word',
   refusedOld.results[0] === refusedNew.results[0] && /has run before/.test(refusedOld.results[0]), `${refusedOld.results[0]}\n     ${refusedNew.results[0]}`);
+
+// readRows and writeRows across the modules, deleted rows included
+const B = (...x) => Uint8Array.from(x);
+const rowSets = {
+  'a deleted row': [{ key: B(1, 2), val: B(3) }, { key: B(4), val: null }, { key: B(5), val: B(6, 7) }],
+  'only deleted rows': [{ key: B(9), val: null }, { key: B(8, 8), val: null }],
+  'an empty key and value': [{ key: B(), val: B() }, { key: B(), val: null }],
+  'an 8 MB value': [{ key: B(1), val: new Uint8Array(8 << 20).fill(7) }, { key: B(2), val: null }],
+};
+const sameRowList = (a, b) => a.length === b.length && a.every((r, i) =>
+  hex(r.key) === hex(b[i].key) && (r.val === null ? b[i].val === null : b[i].val !== null && hex(r.val) === hex(b[i].val)));
+for (const [what, rows] of Object.entries(rowSets)) {
+  const o = OLD.writeRows(rows), n = NEW.writeRows(rows);
+  check(`rows, ${what}: both write the same bytes`, hex(o) === hex(n));
+  check(`rows, ${what}: each reads back what the other wrote`,
+    sameRowList(NEW.readRows(o), rows) && sameRowList(OLD.readRows(n), rows));
+}
+
+// trace 1's commits, deletes included, into a store by each module
+{
+  const t = fromLines(readFileSync(new URL('../traces/1-cold-comet.jsonl', import.meta.url), 'utf8'));
+  const commits = t.steps.flatMap(s => s.out.filter(o => 'commit' in o).map(o => Buffer.from(o.commit, 'hex')));
+  const [o, n] = [idb(), idb()];
+  let gone = 0;
+  for (const c of commits) {
+    gone += OLD.readRows(c).filter(r => r.val === null).length;
+    o.commit(OLD, c);
+    n.commit(NEW, c);
+  }
+  check(`trace 1's ${commits.length} commits (${gone} deletes): the same rows kept`, gone > 0 && sameRows(o, n), `today's ${o.rows.size}, Rust's ${n.rows.size}`);
+  const put = new Set(commits.flatMap(c => OLD.readRows(c).filter(r => r.val).map(r => hex(r.key))));
+  check(`trace 1's commits: the deletes removed rows (${put.size} put, ${n.rows.size} kept)`, n.rows.size < put.size);
+}
+
+// a session on each raw load: both modules alike
+{
+  const raw = buf => ({ load: () => buf, commit() {} });
+  const good = idb(a.rows).load(OLD);
+  const u32 = n => {
+    const b = Buffer.alloc(4);
+    b.writeUInt32LE(n >>> 0);
+    return b;
+  };
+  const row = (k, v) => Buffer.concat([u32(k.length), k, u32(v === null ? 0xffffffff : v.length), v ?? Buffer.alloc(0)]);
+  const loads = {
+    'an empty load': [new Uint8Array(0), true],
+    'a load torn by 1 byte': [good.subarray(0, good.length - 1), false],
+    'a load torn by 3 bytes': [good.subarray(0, good.length - 3), false],
+    'a torn header': [Buffer.concat([good, Buffer.from([1, 0])]), false],
+    'a torn key': [Buffer.concat([good, u32(10), Buffer.from('abc')]), false],
+    'a key length near 2^32': [Buffer.concat([good, u32(0xfffffff0), Buffer.alloc(8)]), false],
+    'a value length near 2^32': [Buffer.concat([good, u32(2), Buffer.from('zz'), u32(0xfffffffe), Buffer.alloc(8)]), false],
+    'an empty key and value': [Buffer.concat([good, row(Buffer.alloc(0), Buffer.alloc(0))]), true],
+    'a deleted row': [Buffer.concat([good, row(Buffer.from('zz'), null)]), true],
+    'an 8 MB row': [Buffer.concat([good, row(Buffer.from('zzhuge'), Buffer.alloc(8 << 20, 7))]), true],
+  };
+  for (const [what, [buf, opens]] of Object.entries(loads)) {
+    const fresh = buf.length === 0;
+    const o = await session(OLD, oldWasm, keyfile, raw(buf), { fresh });
+    const n = await session(NEW, newWasm, keyfile, raw(buf), { fresh });
+    same(`load ${what}`, o, n);
+    check(`load ${what}: ${opens ? 'opens' : 'refused'}`,
+      opens ? n.results[0] === `open: ${MOON}` : /store_load failed/.test(n.results[0]), n.results[0]);
+  }
+}
 
 console.log(failed ? `\n${failed} failed` : '\nall passed');
 process.exit(failed ? 1 : 0);
