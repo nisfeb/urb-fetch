@@ -3,7 +3,8 @@
 // and for file_of and ball_of each fileOf and ballOf case's two nouns.
 // hooks gets each noun twice, with each of its picks (the last byte);
 // serve gets each noun with each of its picks and tags (the last two
-// bytes); de_urb the urls deurb.json is made from.
+// bytes); forum and apps each furum and forum vector's nouns, two at a
+// time, with their picks; de_urb the urls deurb.json is made from.
 //
 //   node core/urb/fuzz/seed.mjs   (writes core/urb/fuzz/corpus/<target>/)
 
@@ -52,6 +53,33 @@ const put = (target, i, bytes) => {
   for (let pick = 0; pick < 5; pick++) {
     for (let tag = 0; tag < 3; tag++) put('serve', `${i}-${pick}-${tag}`, Buffer.concat([Buffer.from([0]), x, Buffer.from([tag, pick])]));
   }
+});
+//  forum and apps: each noun of a furum or forum vector, paired with
+//  each other's, with each of their picks (the last bytes)
+const board = [];
+for (const name of ['decoders', 'hostile-nouns']) {
+  for (const c of vec(name)) {
+    if (!/^(furum|forum)\./.test(c.fn)) continue;
+    const here = new Set();
+    const w = x => {
+      if (x && typeof x === 'object') {
+        if (typeof x.$noun === 'string') here.add(x.$noun);
+        else Object.values(x).forEach(w);
+      }
+    };
+    w(c.in);
+    board.push(...here);
+  }
+}
+const two = (a, b, tail) => {
+  const [x, y] = [Buffer.from(a, 'hex'), Buffer.from(b, 'hex')];
+  return Buffer.concat([Buffer.from([0, x.length & 0xff, x.length >> 8]), x, y, Buffer.from(tail)]);
+};
+const uniq = [...new Set(board)];
+uniq.forEach((a, i) => {
+  const b = uniq[(i + 1) % uniq.length];
+  for (let p = 0; p < 12; p++) put('forum', `${i}-${p}`, two(a, b, [p, p + 1, p % 2 ? p : 2 * p]));
+  for (let p = 0; p < 7; p++) put('apps', `${i}-${p}`, two(a, b, [i % 16, p]));
 });
 //  serve's pick 5: saved page keys pageKey never makes, whole and not
 ['', 'éx', '😀x', '/ok', 'a/é/😀'].forEach((k, i) => {

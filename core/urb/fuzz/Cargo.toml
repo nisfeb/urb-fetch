@@ -118,3 +118,17 @@ path = "fuzz_targets/serve.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "forum"
+path = "fuzz_targets/forum.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "apps"
+path = "fuzz_targets/apps.rs"
+test = false
+doc = false
+bench = false

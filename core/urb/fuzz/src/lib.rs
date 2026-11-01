@@ -49,6 +49,52 @@ pub fn json_len(j: &Json) -> usize {
     n
 }
 
+/// the bytes a JS value an app gives holds: its text and 8 for each
+/// value
+pub fn js_len(j: &urb::js::Js) -> usize {
+    use urb::js::Js;
+    let mut n = 0;
+    let mut todo = vec![j];
+    while let Some(j) = todo.pop() {
+        n += 8;
+        match j {
+            Js::Str(s) => n += s.len(),
+            Js::Big(i) => n += i.le().len(),
+            Js::Arr(a) => todo.extend(a),
+            Js::Obj(o) => {
+                for (k, v) in o.entries() {
+                    n += k.len();
+                    todo.push(v);
+                }
+            }
+            _ => {}
+        }
+    }
+    n
+}
+
+/// an error from furum's or forum's reading of a board: a hostile-noun
+/// error, or one of forum.mjs's own, maybe naming the grub
+pub fn board_error<T>(r: &Result<T, UrbError>) {
+    let Err(e) = r else { return };
+    let mut m = e.message.as_str();
+    if let Some(rest) = m.strip_prefix("~zod's board grub is unreadable: /") {
+        let at = rest.find(" (").expect("the grub's error");
+        m = &rest[at + 2..rest.len() - 1];
+    }
+    let own = ["a cell where an atom goes", "not a flag", "not a unit", "not version 1"];
+    assert!(
+        m.starts_with("another ship's noun ")
+            || own.contains(&m)
+            || m.starts_with("no role ")
+            || m.starts_with("no vote target %")
+            || m == "~zod's board has no card"
+            || (m.starts_with("no post ") && m.ends_with(" on ~zod's board b")),
+        "not a board error: {}",
+        e.message
+    );
+}
+
 /// tags and texts the decoders look for
 const WORDS: &[&[u8]] = &[
     b"o",
@@ -67,6 +113,12 @@ const WORDS: &[&[u8]] = &[
     b"0x1f",
     b"-Infinity",
     b"\xff",
+    b"post",
+    b"comment",
+    b"note",
+    b"mod",
+    b"poster",
+    b"reader",
 ];
 
 /// `want` nouns from the input, or None if it holds none
