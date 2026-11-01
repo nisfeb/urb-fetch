@@ -1176,16 +1176,20 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   const our = shipText(...us);
 
   //  the transport is up before the engine opens: opening can send
+  //  and any failure after it closes it again (torn rows, a refused open)
   await transport.start(our, onPacket);
-  if (rows?.length) check(withBytes(rows, (p, n) => X.store_load(p, n)), 'store_load');
-  //  a fake ship is rebooted fresh, so it may always start from empty state
-  const breached = fake || (fresh && !rows?.length);
-  const err = call(() => withStr(keyfile, p => X.open(p, BigInt(now()), breached ? 1 : 0, fake ? 1 : 0)));
-  if (err === -2) {
+  try {
+    if (rows?.length) check(withBytes(rows, (p, n) => X.store_load(p, n)), 'store_load');
+    //  a fake ship is rebooted fresh, so it may always start from empty state
+    const breached = fake || (fresh && !rows?.length);
+    const err = call(() => withStr(keyfile, p => X.open(p, BigInt(now()), breached ? 1 : 0, fake ? 1 : 0)));
+    if (err === -2) throw new Error(`${our} has run before, and its state here is empty. Starting it from nothing would replay old messages, so breach it on its parent (|moon-breach) and add its new key.`);
+    check(err, 'open');
+  } catch (e) {
+    clearTimeout(timer);
     transport.close();
-    throw new Error(`${our} has run before, and its state here is empty. Starting it from nothing would replay old messages, so breach it on its parent (|moon-breach) and add its new key.`);
+    throw e;
   }
-  check(err, 'open');
 
   // the noun readers an app's own reading needs, valid during the call
   // that hands a noun out
