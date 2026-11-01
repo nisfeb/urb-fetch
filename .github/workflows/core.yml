@@ -77,8 +77,9 @@ jobs:
             for m in debug release; do core/mesa-sys/suites.sh zig $w $m; done
           done
 
-  # a minute of every fuzz target (the decoders, deUrb and the core's
-  # hooks), from the vectors' nouns and urls; a long run
+  # a minute of every fuzz target (the decoders, deUrb, the core's
+  # hooks and the renderers), from the vectors' nouns, urls and bodies;
+  # a long run
   # is by hand (core/urb/fuzz/Cargo.toml says how)
   fuzz:
     runs-on: ubuntu-24.04
@@ -103,6 +104,15 @@ jobs:
             echo "== $t"
             cargo +nightly-2026-10-30 fuzz run "$t" -- \
               -max_total_time=60 -timeout=30 -rss_limit_mb=2048
+          done
+      - name: fuzz every renderer
+        working-directory: core/urb-render
+        run: |
+          node fuzz/seed.mjs
+          for t in $(cargo +nightly-2026-10-30 fuzz list); do
+            echo "== $t"
+            cargo +nightly-2026-10-30 fuzz run "$t" -- \
+              -max_total_time=60 -timeout=30 -rss_limit_mb=2048 -max_len=20000
           done
 
   check:

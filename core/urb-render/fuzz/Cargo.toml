@@ -1,0 +1,45 @@
+# cargo fuzz's crate for the renderers: the extension's, the gateway's,
+# and the two held together. Its own workspace, built by the nightly
+# cargo fuzz needs:
+#
+#   node core/urb-render/fuzz/seed.mjs
+#   cd core/urb-render/fuzz && cargo +nightly-2026-10-30 fuzz run ext
+[package]
+name = "urb-render-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+urb-render = { path = "..", features = ["cost"] }
+
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "ext"
+path = "fuzz_targets/ext.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gateway"
+path = "fuzz_targets/gateway.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "two"
+path = "fuzz_targets/two.rs"
+test = false
+doc = false
+bench = false
