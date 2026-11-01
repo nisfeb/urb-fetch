@@ -3,6 +3,8 @@
 
 #![allow(dead_code)]
 
+pub mod trace;
+
 use serde_json::Value as J;
 use std::collections::HashSet;
 use urb::Int;
