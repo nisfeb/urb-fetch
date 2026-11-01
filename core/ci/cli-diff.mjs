@@ -23,14 +23,16 @@
 // (a post, a comment, a vote, a page served) resets the set before each
 // side, which then runs as the same moon. Exit code, stdout and stderr
 // are compared byte for byte once masked; mask() and normErr() list each
-// mask and why. A read-only case is retried only for ~hus's flake (no
-// answer at all), and every retry is printed and counted.
+// mask and why. reset() waits out ~hus's boot burst (settle.mjs). A
+// read-only case is retried only when a side got no answer at all, and
+// every retry is printed and counted.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { settle } from './settle.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const FLEET = process.env.FLEET ?? `${process.env.HOME}/software/personal/hoon-development/fleet/fleet`;
@@ -130,6 +132,8 @@ function reset() {
   const line = readFileSync(jar, 'utf8').split('\n').find(l => l.includes('urbauth-'));
   const f = line.split('\t');
   cookie = `${f[5]}=${f[6]}`;
+  // ~hus's boot burst (settle.mjs): no case may start inside it
+  settle();
 }
 
 // What differs from run to run, masked, the same on both sides. Each
@@ -296,11 +300,12 @@ if (reads.some(r => want(r[0]))) {
   reset();
   for (const [name, cmd, args, what] of reads) {
     if (!want(name)) continue;
-    // ~hus now and then answers no new moon for a few seconds, Node's
-    // and ours alike (docs/rust-core.md, M7's findings): a case where
-    // one side got no answer at all is run once more, both sides as new
-    // moons, the side that went first now second. Any other difference
-    // is reported as it is. Each try keeps its own files.
+    // ~hus answers no new moon while its boot burst runs, Node's and
+    // ours alike (settle.mjs; reset() now waits it out): a case where
+    // either side got no answer at all is run once more, both sides as
+    // new moons, the side that went first now second, and fails if both
+    // get none again. Any other difference is reported as it is. Each
+    // try keeps its own files.
     for (let tries = 1; ; tries++) {
       const [a, b] = [moon(), moon()];
       const go = side => {
@@ -313,12 +318,15 @@ if (reads.some(r => want(r[0]))) {
       if (tries % 2) { n = go('node'); r = go('rust'); } else { r = go('rust'); n = go('node'); }
       const label = tries > 1 ? `${name}-try${tries}` : name;
       const c = compare(label, n, r, [a, b]);
-      if (!c[0] && tries < 2 && (flaked(n) || flaked(r))) {
+      // both sides with no answer compare the same, and read nothing:
+      // that is retried too, and a failure if it happens again
+      if (tries < 2 && (flaked(n) || flaked(r))) {
         const who = [flaked(n) && `node as ${a}`, flaked(r) && `rust as ${b}`].filter(Boolean).join(', ');
         retries.push(`${name}: no answer for ${who} (first ${tries % 2 ? 'node' : 'rust'})`);
         console.log(`retry ${name}: ~hus answered no lattice peek for ${who}`);
         continue;
       }
+      if (flaked(n) && flaked(r)) c[0] = false;
       report(name, c);
       break;
     }

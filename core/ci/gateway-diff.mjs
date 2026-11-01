@@ -36,6 +36,7 @@ import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { settle } from './settle.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const FLEET = process.env.FLEET ?? `${process.env.HOME}/software/personal/hoon-development/fleet/fleet`;
@@ -281,6 +282,8 @@ const shown = (p, raw) => raw
 function reset() {
   const r = spawnSync(FLEET, ['--as', WHO, 'reset', 'furum', SNAP], { encoding: 'utf8' });
   if (r.status !== 0) throw new Error(`fleet reset: ${r.stderr}`);
+  // ~hus's boot burst (settle.mjs): no request may land inside it
+  settle();
 }
 
 // a gateway running until stopped: its log, and stop() (Ctrl-C)
