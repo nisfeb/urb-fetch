@@ -1,0 +1,17 @@
+[package]
+name = "urb-cli"
+version = "0.0.1"
+description = "the native command line: read a page, serve pages, use furum and lattice forums (M7)"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "urb"
+path = "src/main.rs"
+
+# the native host only: on wasm32-wasip1 the binary says so and stops
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+urb = { path = "../urb", features = ["native"] }
+urb-render = { path = "../urb-render" }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
