@@ -4,8 +4,10 @@
 # of the core's hooks, libmesa's own suites against mesa-sys's build
 # and against its zig build; check.mjs
 # against vere, the JS tests, every trace replayed into the JS, and the
-# conformance vectors in the JS, the extension's renderers and the Go.
-# rerecord.yml records the traces again.
+# conformance vectors in the JS, the extension's renderers and the Go;
+# the wasm build and its shims (M6): every trace through it, the saved
+# rows across it and today's mesa.wasm, and the extension's tests and
+# renderer vectors on the shims. rerecord.yml records the traces again.
 name: core
 
 on:
@@ -28,6 +30,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 26
+      # the extension, whose tests and renderer vectors run on the shims
+      - uses: actions/checkout@v4
+        with:
+          repository: nisfeb/nisfeb-extension
+          ref: 78c30bb6fdbb1e32588fd05b3ac9922e1dac786e
+          path: ext
       - name: tools
         run: core/ci/tools.sh "$RUNNER_TEMP/tools"
       - name: urcrypt and SQLite
@@ -67,6 +75,20 @@ jobs:
         run: |
           cargo test --target wasm32-wasip1
           cargo test --release --target wasm32-wasip1
+      # the wasm build (M6): built and staged into a copy of the
+      # extension's lib/, within its size budget
+      - name: the shims' modules, within their size budget
+        run: |
+          cp -r ext "$RUNNER_TEMP/ext-shim"
+          shim/build.sh "$RUNNER_TEMP/ext-shim/lib"
+      - name: every trace, replayed through the wasm build
+        run: node shim/replay.mjs
+      - name: saved rows, across today's mesa.wasm and the Rust one
+        run: node shim/rows.mjs
+      - name: the extension's tests and renderer vectors, on the shims
+        run: |
+          (cd "$RUNNER_TEMP/ext-shim" && npm test)
+          node conformance/run.mjs --ext "$RUNNER_TEMP/ext-shim"
       - name: libmesa's suites, our build
         run: |
           for m in debug release ubsan; do core/mesa-sys/suites.sh cargo native $m; done
