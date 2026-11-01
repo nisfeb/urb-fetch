@@ -22,3 +22,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 [[test]]
 name = "host"
 required-features = ["native"]
+
+[[test]]
+name = "relay"
+required-features = ["native"]
