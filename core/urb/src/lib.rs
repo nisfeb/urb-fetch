@@ -10,6 +10,8 @@ pub mod codec;
 pub mod core;
 pub mod engine;
 pub mod forum;
+#[cfg(feature = "native")]
+pub mod host;
 pub mod js;
 pub mod msg;
 pub mod noun;

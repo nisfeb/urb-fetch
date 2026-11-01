@@ -8,6 +8,11 @@ publish.workspace = true
 
 [dependencies]
 mesa-sys = { path = "../mesa-sys" }
+ureq = { version = "2.12", default-features = false, features = ["tls"], optional = true }
+
+[features]
+# the native host (src/host): UDP, the relay, HTTPS, the stores
+native = ["dep:ureq"]
 
 [dev-dependencies]
 urb-render = { path = "../urb-render" }
