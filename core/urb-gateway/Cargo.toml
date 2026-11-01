@@ -1,0 +1,19 @@
+[package]
+name = "urb-gateway"
+version = "0.0.1"
+description = "the HTTP gateway (M8): the Go gateway's routes, headers and errors, on the native host and urb-render"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "urb-gateway"
+path = "src/main.rs"
+
+# the native host only: on wasm32-wasip1 the binary says so and stops
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+urb = { path = "../urb", features = ["native"] }
+urb-render = { path = "../urb-render" }
+
+[dev-dependencies]
+serde_json = { version = "1", features = ["preserve_order"] }

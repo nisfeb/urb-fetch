@@ -70,6 +70,8 @@ jobs:
         run: |
           cargo test -p urb --test vectors -- --nocapture
           cargo test -p urb-render --test vectors -- --nocapture
+          cargo test -p urb --test gateway -- --nocapture
+          cargo test -p urb-gateway --test vectors -- --nocapture
       - name: the traces, replayed into the Rust core
         working-directory: core
         run: cargo test -p urb --test replay -- --nocapture

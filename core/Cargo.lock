@@ -698,6 +698,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "urb-gateway"
+version = "0.0.1"
+dependencies = [
+ "serde_json",
+ "urb",
+ "urb-render",
+]
+
+[[package]]
 name = "urb-render"
 version = "0.0.1"
 dependencies = [
