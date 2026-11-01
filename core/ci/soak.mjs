@@ -315,12 +315,14 @@ async function phaseBrowse() {
   const { rust, js } = clones2();
   const dir = join(R, 'browse');
   mkdirSync(dir, { recursive: true });
-  const rec = {};
+  const rec = {}, minutes = {};
   for (const [side, ext] of [['js', js], ['rust', rust]]) {
     await reset(join(dir, 'reset.log'));
     const j = await jar(join(dir, 'reset.log'));
+    const t0 = Date.now();
     const code = await run('node', [join(root, 'core/ci/soak-browse.mjs'), ext, join(dir, side)],
       { log: join(dir, `${side}.log`), env: { BROWSER, SOAK_BROWSER: BROWSER, URB_FETCH: GO, READER_JAR: j }, timeout: 2_400_000 });
+    minutes[side] = +((Date.now() - t0) / 60000).toFixed(1);
     rec[side] = existsSync(join(dir, side, 'steps.json')) ? JSON.parse(readFileSync(join(dir, side, 'steps.json'), 'utf8')) : [];
     say(`browse on the ${side} lib/: exit ${code}, ${rec[side].length} steps, ${rec[side].reduce((n, s) => n + s.errors.length, 0)} errors`);
     if (code !== 0) fail('browse', `the ${side} pass did not run to the end (exit ${code})`, tail(join(dir, `${side}.log`), 20));
@@ -336,7 +338,7 @@ async function phaseBrowse() {
     else differ('browse', `step ${name}: page or errors differ`, diffStrings(x, y, 'js', 'rust', dir, name));
   }
   for (const s of rec.rust) if (s.errors.length) summary.notes.push(`browse ${s.name}: ${s.errors.length} errors on the Rust side (and ${rec.js.find(x => x.name === s.name)?.errors.length ?? '?'} on the JS)`);
-  summary.browse = { steps: names.length, same, minutes: { js: +(rec.js.reduce((n, s) => n + s.ms, 0) / 60000).toFixed(1), rust: +(rec.rust.reduce((n, s) => n + s.ms, 0) / 60000).toFixed(1) } };
+  summary.browse = { steps: names.length, same, minutes };
 }
 
 async function phaseGateway() {

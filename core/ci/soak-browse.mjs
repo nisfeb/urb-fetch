@@ -15,7 +15,7 @@
 // follow the urb:// links those pages hold; then as a fake moon of ~rup
 // publish a page and an edit of it, each read back by Lattice on ~hus;
 // then as a fake moon of ~hus read the furum board ~rup/m1c and a post
-// on it, and comment on that post. DWELL seconds (default 20) of
+// on it, and comment on that post. DWELL seconds (default 25) of
 // reading time pass between steps. SOAK_BROWSER names the binary; the
 // profile is a new temporary folder, removed at the end, never anyone's
 // own.
@@ -32,7 +32,7 @@ import { join } from 'node:path';
 const [EXT, OUT] = process.argv.slice(2);
 const { URB_FETCH, READER_JAR } = process.env;
 const BROWSER = process.env.SOAK_BROWSER || '/opt/brave.com/brave/brave';
-const DWELL = Number(process.env.DWELL ?? 20) * 1000;
+const DWELL = Number(process.env.DWELL ?? 25) * 1000;
 const READER = process.env.READER || 'http://localhost:8134';
 const BOARD = process.env.BOARD || '~rup/m1c';
 if (!EXT || !OUT || !URB_FETCH || !READER_JAR) {
