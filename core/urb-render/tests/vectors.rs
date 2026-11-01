@@ -2,7 +2,8 @@
 //! hostile-render.json, made by the JS, the Go and by hand), run from
 //! Rust: every case's output must be the vector's. render-ext.json is
 //! the extension's ([`urb_render::ext`]), render-go.json the gateway's
-//! ([`urb_render::gateway`]), and render-as.json and hostile-render.json
+//! ([`urb_render::gateway`]), each with its -random.json on the bodies
+//! and links of conformance/random.mjs, and render-as.json and hostile-render.json
 //! both's, so each of those cases runs on each, and a hostile case must
 //! finish within the file's `quick` ms. Each file's count is checked,
 //! so no case can be skipped.
@@ -37,7 +38,17 @@ const FILES: &[(&str, &str, usize)] = &[
     (
         "hostile-render",
         include_str!("../../../conformance/hostile-render.json"),
-        219,
+        224,
+    ),
+    (
+        "render-ext-random",
+        include_str!("../../../conformance/render-ext-random.json"),
+        3000,
+    ),
+    (
+        "render-go-random",
+        include_str!("../../../conformance/render-go-random.json"),
+        2000,
     ),
 ];
 

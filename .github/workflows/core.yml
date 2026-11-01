@@ -51,7 +51,9 @@ jobs:
           cargo clippy --all-targets --target wasm32-wasip1 -- -D warnings
       - name: the conformance vectors, in Rust
         working-directory: core
-        run: cargo test -p urb --test vectors -- --nocapture
+        run: |
+          cargo test -p urb --test vectors -- --nocapture
+          cargo test -p urb-render --test vectors -- --nocapture
       - name: the traces, replayed into the Rust core
         working-directory: core
         run: cargo test -p urb --test replay -- --nocapture

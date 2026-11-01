@@ -263,7 +263,20 @@ func writeGoVectors(t *testing.T) {
 		rc = append(rc, vcase{Fn: "safeLink", In: []json.RawMessage{str(l)}}, vcase{Fn: "pageLink", In: []json.RawMessage{str(l)}})
 	}
 	rc = append(rc, vcase{Fn: "page", In: []json.RawMessage{str("a <title>"), str("<p>x</p>")}})
+	var random struct{ Bodies, Links []string }
+	b, _ = os.ReadFile("conformance/inputs/random.json")
+	if err := json.Unmarshal(b, &random); err != nil {
+		t.Fatal(err)
+	}
+	var rr []vcase
+	for _, b := range random.Bodies {
+		rr = append(rr, vcase{Fn: "renderGemtext", In: []json.RawMessage{str(b)}}, vcase{Fn: "renderMarkdown", In: []json.RawMessage{str(b)}})
+	}
+	for _, l := range random.Links {
+		rr = append(rr, vcase{Fn: "safeLink", In: []json.RawMessage{str(l)}}, vcase{Fn: "pageLink", In: []json.RawMessage{str(l)}})
+	}
 	save("render-go", fmt.Sprintf("urb.go's and render.go's HTML: renderGemtext, renderMarkdown and renderText(body, \"t\", pageLink(%q, %q)) as the page's {title, main} (page() wraps each alike), rewriteHTML(body, %q), safeLink, pageLink's {href, own}, and page(title, body) whole", vectorPage, vectorPort, vectorPort), rc)
+	save("render-go-random", fmt.Sprintf("the same, on random bodies and links (conformance/random.mjs, inputs/random.json): renderGemtext and renderMarkdown(body, \"t\", pageLink(%q, %q)) as {title, main}, safeLink, and pageLink's {href, own}", vectorPage, vectorPort), rr)
 }
 
 func TestConformance(t *testing.T) {
@@ -272,6 +285,7 @@ func TestConformance(t *testing.T) {
 	}
 	checkVectors(t, "deurb-go", nil)
 	checkVectors(t, "render-go", nil)
+	checkVectors(t, "render-go-random", nil)
 	checkVectors(t, "render-as", nil)
 	checkVectors(t, "hostile-render", nil)
 }

@@ -21,6 +21,7 @@ import { DESK_BASE, da, path } from '../wasm/mesa.mjs';
 import { enc } from '../wasm/trace.mjs';
 import { engine, evaluate, extLib, fakeUrb, PAGE } from './lib.mjs';
 import { hostileNouns, hostileRender, quick } from './hostile.mjs';
+import { randomRender } from './random.mjs';
 
 const { values: opt } = parseArgs({ options: { ext: { type: 'string' } } });
 const here = new URL('.', import.meta.url).pathname;
@@ -236,6 +237,12 @@ if (opt.ext) {
     ...r.lines.map(l => C('spans', l)),
     ...r.links.flatMap(t => [C('safeLink', t), C('linkTarget', PAGE, t), C('linkHref', PAGE, t)]),
     C('readerPath', 'urb://~zod'), C('readerPath', 'urb://~zod/a b?c#d'),
+  ], { extension: commit }, lib);
+  const rr = randomRender();
+  writeFileSync(`${here}inputs/random.json`, JSON.stringify(rr, null, 1) + '\n');
+  await write('render-ext-random', `nisfeb-extension's renderers on random bodies and links (random.mjs, inputs/random.json): gemtext and markdown's blocks and mdNodes' nodes as in render-ext, safeLink, linkTarget and linkHref on ${PAGE}`, [
+    ...rr.bodies.flatMap(b => [C('gemtext', b), C('markdown', b), C('mdNodes', b)]),
+    ...rr.links.flatMap(t => [C('safeLink', t), C('linkTarget', PAGE, t), C('linkHref', PAGE, t)]),
   ], { extension: commit }, lib);
   const hr = hostileRender();
   for (const c of hr) {

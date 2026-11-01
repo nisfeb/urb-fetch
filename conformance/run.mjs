@@ -14,7 +14,7 @@ import { engine, evaluate, extLib } from './lib.mjs';
 const { values: opt } = parseArgs({ options: { ext: { type: 'string' } } });
 const here = new URL('.', import.meta.url).pathname;
 const JS = ['deurb', 'render-as', 'nouns', 'hash', 'messages', 'decoders', 'hostile-nouns'];
-const EXT = ['render-ext', 'hostile-render'];
+const EXT = ['render-ext', 'render-ext-random', 'hostile-render'];
 const urb = await engine();
 let lib = null, bad = 0;
 if (opt.ext) {

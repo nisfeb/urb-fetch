@@ -118,6 +118,41 @@
   {
    "fn": "safeLink",
    "in": [
+    "httpſ://evil.example/x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "HTTPſ://evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    " //evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "　\\\\evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "﻿//evil.example"
+   ],
+   "out": false
+  },
+  {
+   "fn": "safeLink",
+   "in": [
     "\u0000https://a.example/x"
    ],
    "out": false

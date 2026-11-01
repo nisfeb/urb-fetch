@@ -144,7 +144,10 @@ export function hostileRender() {
   const out = [];
   const refused = ['javascript:alert(1)', 'JAVASCRIPT:alert(1)', 'JaVaScRiPt:x', ' javascript:x', 'data:text/html,<b>x', 'DATA:x',
     'vbscript:x', 'VBScript:x', 'file:///etc/passwd', 'chrome://settings', '//evil.example/x', '\\\\evil.example/x', '/\\evil.example',
-    '\\/evil.example', ' //evil.example', 'urb:x\x00'];
+    '\\/evil.example', ' //evil.example', 'urb:x\x00',
+    //  schemes match in ASCII only (Go's (?i) folds ſ into s), and a
+    //  link is protocol-relative after any of JavaScript's whitespace
+    'httpſ://evil.example/x', 'HTTPſ://evil.example', '\u00a0//evil.example', '\u3000\\\\evil.example', '\ufeff//evil.example'];
   for (let c = 0; c <= 0x20; c++) {
     const ch = String.fromCharCode(c);
     refused.push(`${ch}https://a.example/x`, `https://a.example/${ch}x`, `https://a.example/x${ch}`, `${ch}//evil.example`);
