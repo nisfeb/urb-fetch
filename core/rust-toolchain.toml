@@ -1,0 +1,6 @@
+# One rustc for every build of the core, so a toolchain update is a
+# reviewed change. wasm32-wasip1 is the wasm host's target.
+[toolchain]
+channel = "1.99.1"
+targets = ["wasm32-wasip1"]
+components = ["rustfmt", "clippy"]

@@ -1,0 +1,239 @@
+# The Rust core (docs/rust-core.md): cargo test natively and under
+# WASI, the conformance vectors and the traces in Rust, the property
+# tests against vere and the JS, a short fuzz run of every decoder and
+# of the core's hooks, libmesa's own suites against mesa-sys's build
+# and against its zig build; check.mjs
+# against vere, the JS tests, every trace replayed into the JS, and the
+# conformance vectors in the JS, the extension's renderers and the Go;
+# the wasm build and its shims (M6): every trace through it, the saved
+# rows across it and today's mesa.wasm, and the extension's tests and
+# renderer vectors on the shims; the native host (M7): every trace
+# through it, its relay transport against the Go relay, and the native
+# command line against the Node ones in the cases that need no ship.
+# rerecord.yml records the traces again.
+name: core
+
+on:
+  push:
+  pull_request:
+
+# A test that would skip for want of a checkout or a tool fails instead
+env:
+  REQUIRE_ALL: 1
+
+jobs:
+  core:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      # node and mesa.wasm: the property tests check the Rust against
+      # the JS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      # go: the native host's relay transport is tested against the Go
+      # relay (core/urb/tests/relay.rs builds it). Go 1.27, not go.mod's
+      # 1.26.0: urb-gateway's HTTP server ports 1.27's net/http, which
+      # added the 500 header line limit (gateway-diff's raw-many-headers)
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.0'
+      # the extension, whose tests and renderer vectors run on the shims
+      - uses: actions/checkout@v4
+        with:
+          repository: nisfeb/nisfeb-extension
+          ref: 78c30bb6fdbb1e32588fd05b3ac9922e1dac786e
+          path: ext
+      - name: tools
+        run: core/ci/tools.sh "$RUNNER_TEMP/tools"
+      - name: urcrypt and SQLite
+        run: core/mesa-sys/fetch-deps.sh
+      # libmesa's zig archives, which the Go relay links: relay.rs and
+      # the gateway diff build it with go build
+      - name: libmesa, for the Go relay
+        run: make urb-fetch
+      - name: mesa.wasm
+        run: wasm/build.sh
+      - name: the toolchain
+        working-directory: core
+        # rust-toolchain.toml names the version, targets and components;
+        # the checks stop the job if cargo is any other toolchain's
+        run: |
+          rustup toolchain install
+          want=$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)
+          rustc --version | grep -q "^rustc $want " || { rustc --version; exit 1; }
+          rustup target list --installed | grep -qx wasm32-wasip1
+      - name: fmt and clippy
+        working-directory: core
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo clippy --all-targets --target wasm32-wasip1 -- -D warnings
+      - name: the conformance vectors, in Rust
+        working-directory: core
+        run: |
+          cargo test -p urb --test vectors -- --nocapture
+          cargo test -p urb-render --test vectors -- --nocapture
+          cargo test -p urb --test gateway -- --nocapture
+          cargo test -p urb-gateway --test vectors -- --nocapture
+      - name: the traces, replayed into the Rust core
+        working-directory: core
+        run: cargo test -p urb --test replay -- --nocapture
+      - name: the traces, replayed through the native host
+        working-directory: core
+        run: cargo test -p urb --features native --test host -- --nocapture
+      - name: cargo test
+        working-directory: core
+        run: |
+          cargo test
+          cargo test --release
+      - name: cargo test under WASI
+        working-directory: core
+        run: |
+          cargo test --target wasm32-wasip1
+          cargo test --release --target wasm32-wasip1
+      # the wasm build (M6): built and staged into a copy of the
+      # extension's lib/, within its size budget
+      - name: the shims' modules, within their size budget
+        run: |
+          cp -r ext "$RUNNER_TEMP/ext-shim"
+          shim/build.sh "$RUNNER_TEMP/ext-shim/lib"
+      - name: every trace, replayed through the wasm build
+        run: node shim/replay.mjs
+      - name: saved rows, across today's mesa.wasm and the Rust one
+        run: node shim/rows.mjs
+      - name: the shims' failure paths
+        run: node shim/fail.mjs
+      # the native command line (M7) against the Node ones, in the cases
+      # that need no ship; the fleet's cases run by hand (cli-diff.mjs)
+      - name: the native command line, against the Node ones
+        run: |
+          (cd core && cargo build --release -p urb-cli)
+          node core/ci/cli-diff.mjs --offline
+      # the Rust gateway (M8) against the Go one, in the cases that need
+      # no ship; the fleet's cases run by hand (gateway-diff.mjs)
+      # (its net cases run in a user and network namespace, which
+      # Ubuntu 24.04's AppArmor refuses unprivileged users by default)
+      - name: the Rust gateway against the Go one, at startup and over HTTP
+        run: |
+          (cd core && cargo build --release -p urb-gateway)
+          go build -o urb-fetch .
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          node core/ci/gateway-diff.mjs --offline
+      - name: the extension's tests and renderer vectors, on the shims
+        run: |
+          (cd "$RUNNER_TEMP/ext-shim" && npm test)
+          node conformance/run.mjs --ext "$RUNNER_TEMP/ext-shim"
+      - name: libmesa's suites, our build
+        run: |
+          for m in debug release ubsan; do core/mesa-sys/suites.sh cargo native $m; done
+          for m in debug release; do core/mesa-sys/suites.sh cargo wasi $m; done
+      - name: libmesa's suites, its zig build
+        run: |
+          for w in native wasi; do
+            for m in debug release; do core/mesa-sys/suites.sh zig $w $m; done
+          done
+
+  # a minute of every fuzz target (the decoders, deUrb, the core's
+  # hooks and the renderers), from the vectors' nouns, urls and bodies;
+  # a long run
+  # is by hand (core/urb/fuzz/Cargo.toml says how)
+  fuzz:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - name: urcrypt and SQLite
+        run: core/mesa-sys/fetch-deps.sh
+      - name: nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly-2026-10-30 --profile minimal
+          cargo +nightly-2026-10-30 install cargo-fuzz --version 0.13.2 --locked
+      - name: fuzz every decoder
+        working-directory: core/urb
+        run: |
+          node fuzz/seed.mjs
+          for t in $(cargo +nightly-2026-10-30 fuzz list); do
+            echo "== $t"
+            cargo +nightly-2026-10-30 fuzz run "$t" -- \
+              -max_total_time=60 -timeout=30 -rss_limit_mb=2048
+          done
+      - name: fuzz every renderer
+        working-directory: core/urb-render
+        run: |
+          node fuzz/seed.mjs
+          for t in $(cargo +nightly-2026-10-30 fuzz list); do
+            echo "== $t"
+            cargo +nightly-2026-10-30 fuzz run "$t" -- \
+              -max_total_time=60 -timeout=30 -rss_limit_mb=2048 -max_len=20000
+          done
+
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - name: tools
+        run: core/ci/tools.sh "$RUNNER_TEMP/tools"
+      # the extension whose renderers the vectors are of, and grubbery,
+      # whose molds check.mjs's copies are checked against
+      - uses: actions/checkout@v4
+        with:
+          repository: nisfeb/nisfeb-extension
+          ref: 78c30bb6fdbb1e32588fd05b3ac9922e1dac786e
+          path: ext
+      - uses: actions/checkout@v4
+        with:
+          repository: nisfeb/grubbery
+          fetch-depth: 0
+          path: grubbery
+      - name: mesa.wasm
+        run: wasm/build.sh
+      - name: check.mjs
+        working-directory: wasm
+        run: node check.mjs
+      - name: the JS tests
+        env:
+          GRUBBERY: ${{ github.workspace }}/grubbery
+        run: node --test wasm/test/*.test.mjs
+      - name: every trace, replayed into the JS
+        run: node wasm/replay.mjs
+      - name: the conformance vectors, in the JS and the extension
+        run: node conformance/run.mjs --ext ext
+
+  go:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/checkout@v4
+        with:
+          repository: nisfeb/nisfeb-extension
+          ref: 78c30bb6fdbb1e32588fd05b3ac9922e1dac786e
+          path: ext
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - name: tools
+        run: core/ci/tools.sh "$RUNNER_TEMP/tools"
+      # the conformance vectors the Go implements, its own tests, and its
+      # renderers against the extension's (TestExtensionParity)
+      - name: go test
+        env:
+          NISFEB_EXTENSION: ${{ github.workspace }}/ext
+          GOFLAGS: -v   # so a skip shows
+        run: make test

@@ -32,6 +32,14 @@
 //              the ids of the %snaps we answer and a mined comet's seed;
 //              pub.mjs takes its page ids from it. With both fixed, a
 //              session's inputs decide its outputs.
+//   timers     optional: {setTimeout(f, ms, what) -> id, clearTimeout(id)},
+//              every timer the engine sets, the globals by default. what
+//              names it: 'wake', 'point <ship>' (a fake ship's keys),
+//              'roller <ship>' (a key lookup's 30 s), 'peek <wire>',
+//              'poke <wire>', 'keen <path>' or 'close'
+//   fetch      optional: fetch(url, opts) for the roller's key lookups and
+//              the comet stars, the global by default. trace.mjs gives all
+//              four to record a session and replay it.
 //
 //   const urb = await open({ wasm, transport, store })
 //   const { key, body, how, mark } = await urb.read('urb://~sampel-palnet/page')
@@ -412,6 +420,61 @@ function ballOf(snap, silo, conv) {
 // with isCell, head, tail, size, bytes(), text() and int()
 export const decoders = { measure, list, entries, unit, cord, segments, pathOf, json, tang, tangText, fileOf, ballOf };
 
+// ------------------------------------------------------------- messages
+
+// a path noun from "/a/b/c", keeping empty segments as stab does
+export function path(text) {
+  const t = text.replace(/^\//, '');
+  return t ? [...t.split('/'), null] : null;
+}
+
+// A file's version, as grubbery's cass:clay: [ud=rev da=at]
+export const cass = f => [BigInt(f.rev), da(f.at)];
+
+// A file's wave, the version news grubbery sends whoever keeps it: here
+// its folder's [fold-cass {name: cass}] with the one file in it, which is
+// all lattice's page subscription reads (+sub-apply-wave). Empty for a
+// file that never was.
+export const waveOf = (f, name) => (f?.rev ? [[null, cass(f), new Map([[name, cass(f)]])], null] : [null, null]);
+
+// A file as grubbery's %snap: its version, and the content-addressed
+// silo that holds it, sent inline. The reader checks that each noun and
+// ject hashes (+sham) to its name, then reads the noun and its mark.
+// sham is the engine's (nouns.sham).
+// ponytail: always inline, never the %want leg grubbery uses past 8 KB,
+// so a file rides whole in one message.
+export function snapOf(f, sham) {
+  const nobe = sham(f.value);
+  const ject = ['leaf', nobe, [[path(f.mark[0]), f.mark[1]], 0, null], true, null];
+  const jobe = sham(ject);
+  return [
+    [cass(f), ['firm', null, jobe], [new Set([jobe]), new Set([nobe])]],
+    [new Map([[nobe, [0, f.value]]]), new Map([[jobe, [0, ject]]])],
+  ];
+}
+
+// The messages we send other ships' grubbery, as values for noun() (the
+// molds are grubbery's load:remo, transfer:remo and intake:remo, which
+// check.mjs clams them against). A wire given as text is a path; one
+// that came in a message we answer goes back as it came, a noun.
+export const messages = {
+  // %grubbery-load: a peek of [folder name], or with name null of the
+  // directory folder and all under it
+  peek: (wire, folder, name) =>
+    [[path(wire), name === null ? [false, path(folder)] : [true, path(folder), name]], ['peek', null, true]],
+  // %grubbery-load: [mark value] to the grub [folder name], mark a blot
+  poke: (wire, folder, name, mark, value) =>
+    [[path(wire), [true, path(folder), name]], ['poke', [path(mark[0]), mark[1]], value]],
+  // %grubbery-transfer: a poke taken in
+  pack: wire => [wire, 'pack', null],
+  // %grubbery-transfer: the content of a %snap that came without it
+  want: (wire, dest, id) => [wire, 'want', dest, id],
+  // %grubbery-transfer: our answer to a peek, snap and data null for none
+  snap: (wire, dest, id, snap, data) => [wire, 'snap', dest, id, snap && [null, snap], data && [null, data]],
+  // %grubbery-intake: a keep's wave
+  intake: (wire, dest, wave) => [wire, dest, wave],
+};
+
 // ------------------------------------------------------------- the relay
 
 // Datagrams over a WebSocket to `urb-fetch -relay`, which sends and
@@ -483,9 +546,13 @@ export function relayTransport(url, log = console.error) {
 // ------------------------------------------------------------- the engine
 
 const randomBytes = n => crypto.getRandomValues(new Uint8Array(n));
+const globalTimers = { setTimeout: (f, ms) => globalThis.setTimeout(f, ms), clearTimeout: t => globalThis.clearTimeout(t) };
+const globalFetch = (...a) => globalThis.fetch(...a);
 
 export async function open({ wasm, transport, store, log = console.error, env = {}, fake = false,
-                             now = Date.now, entropy = randomBytes }) {
+                             now = Date.now, entropy = randomBytes,
+                             timers = globalTimers, fetch = globalFetch }) {
+  const { setTimeout, clearTimeout } = timers;
   let X;
   const mem = () => new Uint8Array(X.memory.buffer);   // replaced when memory grows
   const imports = {
@@ -666,12 +733,6 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     }
   }
 
-  // a path noun from "/a/b/c", keeping empty segments as stab does
-  function path(text) {
-    const t = text.replace(/^\//, '');
-    return t ? [...t.split('/'), null] : null;
-  }
-
   // ----------------------------------------------------------- the loop
 
   let timer = null;
@@ -686,7 +747,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     timer = setTimeout(() => {
       if (now() >= Number(u64(X.deadline()))) call(() => X.wake(BigInt(now())));
       else arm();
-    }, wait);
+    }, wait, 'wake');
   }
 
   function call(f) {
@@ -741,14 +802,18 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     [lo, hi] = [u64(lo), u64(hi)];
     //  a fake network's keys come from names: answer once the engine call
     //  that asked has returned
-    if (fake) return void setTimeout(() => call(() => X.point_fake(lo, hi)));
+    if (fake) return void setTimeout(() => call(() => X.point_fake(lo, hi)), undefined, `point ${shipText(lo, hi)}`);
     const k = `${lo}:${hi}`;
     if (asking.has(k)) return;
     asking.add(k);
     const body = take(X.point_request(lo, hi));
-    fetch(ROLLER, { method: 'POST', headers: { 'content-type': 'application/json' }, body,
-                    signal: AbortSignal.timeout(30_000) })
+    //  given up on after 30 s, by a timer of the engine's (so a trace has it)
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(new DOMException('The operation was aborted due to timeout', 'TimeoutError')),
+                         30_000, `roller ${shipText(lo, hi)}`);
+    fetch(ROLLER, { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: ac.signal })
       .then(r => r.text())
+      .finally(() => clearTimeout(t))
       .catch(e => (log(`azimuth lookup of ${shipText(lo, hi)} failed: ${e.message}`), null))
       .then(js => {
         asking.delete(k);
@@ -806,7 +871,6 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       }
     }
     const wire = `/urb-fetch/${nonce}/${++wires}`;
-    const lane = name === null ? [false, path(folder)] : [true, path(folder), name];
     return new Promise((resolve, reject) => {
       const st = { read: name === null ? (snap, silo) => ballOf(snap, silo, conv) : (snap, silo) => fileOf(snap, silo, conv),
                    snap: null, done: false, her: `${her[0]}:${her[1]}` };
@@ -832,11 +896,11 @@ export async function open({ wasm, transport, store, log = console.error, env = 
         if (!late) return st.finish(null);
         st.gone = now();   // it waits on for a late answer
         resolve(undefined);
-      }, wait);
+      }, wait, `peek ${wire}`);
       peeks.set(wire, st);
       txn(() => {
         st.bone = flowTo(her);
-        poke(her, st.bone, 'grubbery', 'grubbery-load', [[path(wire), lane], ['peek', null, true]]);
+        poke(her, st.bone, 'grubbery', 'grubbery-load', messages.peek(wire, folder, name));
       });
     });
   }
@@ -857,15 +921,14 @@ export async function open({ wasm, transport, store, log = console.error, env = 
         pokes.delete(wire);
         resolve(r);
       };
-      st.timer = setTimeout(() => st.finish({ ok: false, error: `${shipText(...her)} did not answer`, later: true }), PEEK_TIMEOUT);
+      st.timer = setTimeout(() => st.finish({ ok: false, error: `${shipText(...her)} did not answer`, later: true }), PEEK_TIMEOUT, `poke ${wire}`);
       pokes.set(wire, st);
       txn(() => {
         const bone = u64(X.flow_open(her[0], her[1]));
         if (bone === NONE) throw new Error('flow_open failed');
         st.bone = bone;
         poking.set(bone, st);
-        poke(her, bone, 'grubbery', 'grubbery-load',
-             [[path(wire), [true, path(folder), name]], ['poke', [path(mark[0]), mark[1]], value]]);
+        poke(her, bone, 'grubbery', 'grubbery-load', messages.poke(wire, folder, name, mark, value));
       });
     });
   }
@@ -899,7 +962,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
         try { inbox(msg); } catch (e) { log(e); }
       }
       //  say it was taken in: the sender waits for this %pack, on its wire
-      poke([lo, hi], flowTo([lo, hi]), 'grubbery', 'grubbery-transfer', [n.head.head, 'pack', null]);
+      poke([lo, hi], flowTo([lo, hi]), 'grubbery', 'grubbery-transfer', messages.pack(n.head.head));
       return ACK;
     }
     if (mark !== 'grubbery-transfer') return ACK;
@@ -956,7 +1019,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
         //  too big to inline: ask for the content, pinned for 5 minutes
         const id = r.tail.head.int(64);   // an @uvJ, (shaz eny): 512 bits
         st.snap = new Noun(X.ref(snap.n));
-        poke(her, st.bone, 'grubbery', 'grubbery-transfer', [wireN, 'want', r.head, id]);
+        poke(her, st.bone, 'grubbery', 'grubbery-transfer', messages.want(wireN, r.head, id));
         return;
       }
       st.finish(snap ? st.read(snap, data) : null);
@@ -991,7 +1054,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
         keens.delete(spath);
         txn(() => withStr(spath, p => X.yawn(her[0], her[1], p)));
         resolve(null);
-      }, KEEN_TIMEOUT);
+      }, KEEN_TIMEOUT, `keen ${spath}`);
       k.done = v => {
         clearTimeout(t);
         keens.delete(spath);
@@ -1030,29 +1093,6 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   let keepers = new Map();   // `${ship} ${folder} ${name}` -> {ship, wire, folder, name}
   let keepersChanged = () => {};
 
-  const cass = f => [BigInt(f.rev), da(f.at)];
-
-  // A file's wave, the version news grubbery sends whoever keeps it: here
-  // its folder's [fold-cass {name: cass}] with the one file in it, which is
-  // all lattice's page subscription reads (+sub-apply-wave). Empty for a
-  // file that never was.
-  const waveOf = (f, name) => (f?.rev ? [[null, cass(f), new Map([[name, cass(f)]])], null] : [null, null]);
-
-  // A file as grubbery's %snap: its version, and the content-addressed
-  // silo that holds it, sent inline. The reader checks that each noun and
-  // ject hashes (+sham) to its name, then reads the noun and its mark.
-  // ponytail: always inline, never the %want leg grubbery uses past 8 KB,
-  // so a file rides whole in one message.
-  function snapOf(f) {
-    const nobe = sham(f.value);
-    const ject = ['leaf', nobe, [[path(f.mark[0]), f.mark[1]], 0, null], true, null];
-    const jobe = sham(ject);
-    return [
-      [cass(f), ['firm', null, jobe], [new Set([jobe]), new Set([nobe])]],
-      [new Map([[nobe, [0, f.value]]]), new Map([[jobe, [0, ject]]])],
-    ];
-  }
-
   // A %peek, %keep or %drop of one of our files, in a hook: answer it on
   // our flow to the asker's %grubbery, as grubbery's +process-peek and
   // +keep do. Only files the host serves are ever answered with content.
@@ -1072,10 +1112,9 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       return;
     }
     if (tag === 'peek') {
-      const [snap, data] = f && f.value !== undefined ? snapOf(f) : [null, null];
+      const [snap, data] = f && f.value !== undefined ? snapOf(f, sham) : [null, null];
       const id = bigOf(entropy(16));
-      poke(her, flowTo(her), 'grubbery', 'grubbery-transfer',
-           [wire, 'snap', dest, id, snap && [null, snap], data && [null, data]]);
+      poke(her, flowTo(her), 'grubbery', 'grubbery-transfer', messages.snap(wire, dest, id, snap, data));
       return;
     }
     //  A keep may wait for a page not yet published, or one taken down
@@ -1092,7 +1131,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
       }
     }
     //  the first wave answers the keep, even for nothing
-    poke(her, flowTo(her), 'grubbery', 'grubbery-intake', [wire, dest, waveOf(f, at?.[1])]);
+    poke(her, flowTo(her), 'grubbery', 'grubbery-intake', messages.intake(wire, dest, waveOf(f, at?.[1])));
   }
 
   // hook: a read of our namespace, a %keen from another ship
@@ -1245,8 +1284,20 @@ export async function open({ wasm, transport, store, log = console.error, env = 
 
   // the noun readers an app's own reading needs, valid during the call
   // that hands a noun out
+  // a value as noun() builds it, as a plain tree: an atom a BigInt, a
+  // cell [head, tail] (jam.mjs serializes it), for the conformance vectors
+  function tree(x) {
+    const walk = n => (X.is_cell(n) ? [walk(X.head(n)), walk(X.tail(n))] : new Noun(n).int(Infinity));
+    const n = noun(x);
+    try { return walk(n); } finally { X.unref(n); }
+  }
+
   const nouns = {
-    entries, list, unit, cord, json, sham,
+    entries, list, unit, cord, json, sham, tree,
+    mug: x => {
+      const n = noun(x);
+      try { return mug(n); } finally { X.unref(n); }
+    },
     ship: n => {
       if (n.size > 16) throw hostile('has a ship over 128 bits');
       const b = n.bytes(), at = i => b.slice(i, i + 8).reduceRight((v, x) => (v << 8n) | BigInt(x), 0n);
@@ -1287,7 +1338,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
             if (k.folder !== folder || k.name !== name) continue;
             const her = shipOf(k.ship);
             poke(her, flowTo(her), 'grubbery', 'grubbery-intake',
-                 [k.wire.length ? [...k.wire, null] : null, [0, path(folder), name], waveOf(f, name)]);
+                 messages.intake(k.wire.length ? [...k.wire, null] : null, [0, path(folder), name], waveOf(f, name)));
           }
         });
       },
@@ -1302,7 +1353,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     async close() {
       clearTimeout(timer);
       await saved;
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 500, 'close'));
       transport.close();
       X.close();
     },

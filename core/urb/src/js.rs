@@ -1,0 +1,722 @@
+//! What the JS does for free that the port has to spell out: how a
+//! TextDecoder reads bytes, how Number() reads text, and the order a JS
+//! object keeps its keys in.
+
+use std::collections::HashMap;
+
+/// Bytes as `new TextDecoder().decode()` reads them: UTF-8, each maximal
+/// invalid subpart one U+FFFD (as Rust's lossy decoding does too), and a
+/// leading byte-order mark dropped.
+pub fn utf8(bytes: &[u8]) -> String {
+    let b = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
+    String::from_utf8_lossy(b).into_owned()
+}
+
+/// JS's StrWhiteSpaceChar: WhiteSpace and LineTerminator (not Rust's
+/// White_Space, which has U+0085 and lacks U+FEFF)
+fn js_space(c: char) -> bool {
+    matches!(
+        c,
+        '\u{9}' | '\u{a}' | '\u{b}' | '\u{c}' | '\u{d}' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'
+            ..='\u{200a}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{202f}'
+                | '\u{205f}'
+                | '\u{3000}'
+                | '\u{feff}'
+    )
+}
+
+/// `Number(text)`: JS's StringToNumber. Blank is 0; anything that isn't
+/// a StringNumericLiteral is NaN.
+pub fn number(text: &str) -> f64 {
+    let t = text.trim_matches(js_space);
+    if t.is_empty() {
+        return 0.0;
+    }
+    let b = t.as_bytes();
+    if b.len() > 2 && b[0] == b'0' {
+        let radix = match b[1] {
+            b'x' | b'X' => 16,
+            b'o' | b'O' => 8,
+            b'b' | b'B' => 2,
+            _ => 0,
+        };
+        if radix != 0 {
+            return radix_number(&t[2..], radix);
+        }
+    }
+    let (sign, rest) = match b[0] {
+        b'-' => (-1.0, &t[1..]),
+        b'+' => (1.0, &t[1..]),
+        _ => (1.0, t),
+    };
+    if rest == "Infinity" {
+        return sign * f64::INFINITY;
+    }
+    if !decimal_literal(rest) {
+        return f64::NAN;
+    }
+    // Rust's parse is correctly rounded, as JS's is
+    rest.parse::<f64>().map_or(f64::NAN, |v| sign * v)
+}
+
+/// StrUnsignedDecimalLiteral, less Infinity: digits, an optional point
+/// and fraction (at least one digit in all), and an optional exponent
+fn decimal_literal(s: &str) -> bool {
+    let b = s.as_bytes();
+    let mut i = 0;
+    let digits = |i: &mut usize| {
+        let at = *i;
+        while *i < b.len() && b[*i].is_ascii_digit() {
+            *i += 1;
+        }
+        *i - at
+    };
+    let mut n = digits(&mut i);
+    if i < b.len() && b[i] == b'.' {
+        i += 1;
+        n += digits(&mut i);
+    }
+    if n == 0 {
+        return false;
+    }
+    if i < b.len() && (b[i] == b'e' || b[i] == b'E') {
+        i += 1;
+        if i < b.len() && (b[i] == b'+' || b[i] == b'-') {
+            i += 1;
+        }
+        if digits(&mut i) == 0 {
+            return false;
+        }
+    }
+    i == b.len()
+}
+
+/// a 0x, 0o or 0b literal's digits, rounded to the nearest double, ties
+/// to even, as JS rounds them
+fn radix_number(digits: &str, radix: u32) -> f64 {
+    // folded as they come: the first 53 significant bits, the next (half)
+    // and whether any after it is set (sticky), so a long literal costs no
+    // memory
+    let per = radix.trailing_zeros();
+    let (mut len, mut mant, mut half, mut sticky) = (0usize, 0u64, false, false);
+    for c in digits.chars() {
+        let Some(d) = c.to_digit(radix) else {
+            return f64::NAN;
+        };
+        for k in (0..per).rev() {
+            let x = d >> k & 1 == 1;
+            match len {
+                0 if !x => continue,
+                0..53 => mant = mant << 1 | u64::from(x),
+                53 => half = x,
+                _ => sticky |= x,
+            }
+            len += 1;
+        }
+    }
+    if len <= 53 {
+        // exact: mant is under 2^53
+        return mant as f64;
+    }
+    if half && (sticky || mant & 1 == 1) {
+        mant += 1;
+    }
+    let exp = i32::try_from(len - 53).unwrap_or(i32::MAX);
+    if exp > 1023 {
+        return f64::INFINITY;
+    }
+    // mant is at most 2^53, so this is exact until it overflows
+    mant as f64 * 2f64.powi(exp)
+}
+
+/// A number as JS's Number.prototype.toString writes it: the shortest
+/// digits that read back as it, in JS's choice of plain or exponent form.
+pub fn number_text(x: f64) -> String {
+    if x.is_nan() {
+        return "NaN".into();
+    }
+    if x == 0.0 {
+        return "0".into();
+    }
+    if x < 0.0 {
+        return format!("-{}", number_text(-x));
+    }
+    if x.is_infinite() {
+        return "Infinity".into();
+    }
+    // Rust's {:e} gives the shortest round-trip digits too
+    let e = format!("{x:e}");
+    let (mant, exp) = e.split_once('e').expect("{:e} has an e");
+    let digits: String = mant.chars().filter(|c| *c != '.').collect();
+    let k = digits.len() as i64;
+    let n = exp.parse::<i64>().expect("an exponent") + 1;
+    if k <= n && n <= 21 {
+        format!("{digits}{}", "0".repeat((n - k) as usize))
+    } else if 0 < n && n <= 21 {
+        format!("{}.{}", &digits[..n as usize], &digits[n as usize..])
+    } else if -6 < n && n <= 0 {
+        format!("0.{}{digits}", "0".repeat((-n) as usize))
+    } else {
+        let e = n - 1;
+        let sign = if e < 0 { '-' } else { '+' };
+        if k == 1 {
+            format!("{digits}e{sign}{}", e.abs())
+        } else {
+            format!("{}.{}e{sign}{}", &digits[..1], &digits[1..], e.abs())
+        }
+    }
+}
+
+/// A JS value as mesa.mjs's json() returns it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Json {
+    Null,
+    Bool(bool),
+    Num(f64),
+    Str(String),
+    Arr(Vec<Json>),
+    Obj(Object),
+}
+
+/// A JS object made by Object.fromEntries: a key set twice keeps its
+/// first place and its last value, and the keys come out as JS orders
+/// them, array indices first, in numeric order, then the rest in the
+/// order they were first set.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Object<V = Json> {
+    keys: Vec<(String, V)>,
+    at: HashMap<String, usize>,
+}
+
+impl<V> Default for Object<V> {
+    fn default() -> Self {
+        Object {
+            keys: Vec::new(),
+            at: HashMap::new(),
+        }
+    }
+}
+
+impl<V> Object<V> {
+    pub fn set(&mut self, key: String, value: V) {
+        match self.at.get(&key) {
+            Some(&i) => self.keys[i].1 = value,
+            None => {
+                self.at.insert(key.clone(), self.keys.len());
+                self.keys.push((key, value));
+            }
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.keys.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.keys.is_empty()
+    }
+
+    pub fn get(&self, key: &str) -> Option<&V> {
+        self.at.get(key).map(|&i| &self.keys[i].1)
+    }
+
+    /// the entries, in the order Object.entries gives them
+    pub fn entries(&self) -> Vec<(&str, &V)> {
+        let mut idx: Vec<(u32, &str, &V)> = Vec::new();
+        let mut rest = Vec::new();
+        for (k, v) in &self.keys {
+            match array_index(k) {
+                Some(n) => idx.push((n, k, v)),
+                None => rest.push((k.as_str(), v)),
+            }
+        }
+        idx.sort_by_key(|e| e.0);
+        idx.into_iter()
+            .map(|(_, k, v)| (k, v))
+            .chain(rest)
+            .collect()
+    }
+}
+
+/// a key that is an array index: the canonical text of 0 to 2^32 - 2
+fn array_index(k: &str) -> Option<u32> {
+    let b = k.as_bytes();
+    if b.is_empty()
+        || b.len() > 10
+        || !b.iter().all(u8::is_ascii_digit)
+        || (b[0] == b'0' && b.len() > 1)
+    {
+        return None;
+    }
+    k.parse::<u64>()
+        .ok()
+        .filter(|&n| n < u64::from(u32::MAX))
+        .map(|n| n as u32)
+}
+
+/// a JS value's truthiness
+pub fn truthy(j: Option<&Json>) -> bool {
+    match j {
+        None | Some(Json::Null) => false,
+        Some(Json::Bool(b)) => *b,
+        Some(Json::Num(n)) => *n != 0.0 && !n.is_nan(),
+        Some(Json::Str(s)) => !s.is_empty(),
+        Some(Json::Arr(_) | Json::Obj(_)) => true,
+    }
+}
+
+/// `String(x)` of a JS value (None is undefined)
+pub fn string(j: Option<&Json>) -> String {
+    match j {
+        None => "undefined".into(),
+        Some(Json::Null) => "null".into(),
+        Some(Json::Bool(b)) => b.to_string(),
+        Some(Json::Num(n)) => number_text(*n),
+        Some(Json::Str(s)) => s.clone(),
+        Some(Json::Arr(a)) => a
+            .iter()
+            .map(|x| match x {
+                Json::Null => String::new(),
+                x => string(Some(x)),
+            })
+            .collect::<Vec<_>>()
+            .join(","),
+        Some(Json::Obj(_)) => "[object Object]".into(),
+    }
+}
+
+/// `Number(x)`, ToNumber of a JS value (None is undefined)
+pub fn to_number(j: Option<&Json>) -> f64 {
+    match j {
+        None => f64::NAN,
+        Some(Json::Null) => 0.0,
+        Some(Json::Bool(b)) => f64::from(u8::from(*b)),
+        Some(Json::Num(n)) => *n,
+        Some(Json::Str(s)) => number(s),
+        Some(Json::Arr(_)) => number(&string(j)),
+        Some(Json::Obj(_)) => f64::NAN,
+    }
+}
+
+/// `a + b` of two JS values: text if either is text (or an array or an
+/// object, which are text to `+`), else their numbers added
+pub fn add(a: Option<&Json>, b: Option<&Json>) -> Json {
+    let texty = |j: Option<&Json>| matches!(j, Some(Json::Str(_) | Json::Arr(_) | Json::Obj(_)));
+    if texty(a) || texty(b) {
+        return Json::Str(format!("{}{}", string(a), string(b)));
+    }
+    Json::Num(to_number(a) + to_number(b))
+}
+
+/// `BigInt(x)` of a JS value, or what it throws, word for word
+pub fn bigint(j: Option<&Json>) -> Result<crate::Int, crate::core::Failure> {
+    use crate::core::Failure;
+    match j {
+        None => Err(Failure::type_error("Cannot convert undefined to a BigInt")),
+        Some(Json::Null) => Err(Failure::type_error("Cannot convert null to a BigInt")),
+        Some(Json::Bool(b)) => Ok(u64::from(*b).into()),
+        Some(Json::Num(n)) => bigint_of_number(*n),
+        Some(Json::Obj(_)) => Err(Failure::syntax_error(
+            "Cannot convert [object Object] to a BigInt",
+        )),
+        Some(j) => {
+            let t = string(Some(j));
+            bigint_of_text(&t)
+                .ok_or_else(|| Failure::syntax_error(format!("Cannot convert {t} to a BigInt")))
+        }
+    }
+}
+
+/// BigInt of a number: a whole one, or a RangeError. A negative one is
+/// what noun() makes of it, 0.
+pub fn bigint_of_number(n: f64) -> Result<crate::Int, crate::core::Failure> {
+    if !n.is_finite() || n.fract() != 0.0 {
+        return Err(crate::core::Failure::range_error(format!(
+            "The number {} cannot be converted to a BigInt because it is not an integer",
+            number_text(n)
+        )));
+    }
+    if n <= 0.0 {
+        return Ok(crate::Int::default());
+    }
+    // a whole f64 is its mantissa shifted: exact
+    let bits = n.to_bits();
+    let exp = ((bits >> 52) & 0x7ff) as i64 - 1075;
+    let mant = (bits & ((1 << 52) - 1)) | (1 << 52);
+    if exp < 0 {
+        return Ok((mant >> (-exp)).into());
+    }
+    let (bytes, sh) = ((exp / 8) as usize, (exp % 8) as u32);
+    let mut le = vec![0u8; bytes];
+    let wide = u128::from(mant) << sh;
+    le.extend_from_slice(&wide.to_le_bytes());
+    Ok(crate::Int::from_le(&le))
+}
+
+/// StringToBigInt: blank is 0n; decimal, or 0x, 0o or 0b digits; a sign
+/// only on decimal (and a negative one is noun()'s 0); else None
+fn bigint_of_text(t: &str) -> Option<crate::Int> {
+    let t = trim(t);
+    if t.is_empty() {
+        return Some(crate::Int::default());
+    }
+    let (radix, digits, neg) = match t.as_bytes() {
+        [b'0', b'x' | b'X', ..] => (16, &t[2..], false),
+        [b'0', b'o' | b'O', ..] => (8, &t[2..], false),
+        [b'0', b'b' | b'B', ..] => (2, &t[2..], false),
+        [b'-', ..] => (10, &t[1..], true),
+        [b'+', ..] => (10, &t[1..], false),
+        _ => (10, t, false),
+    };
+    if digits.is_empty() || !digits.chars().all(|c| c.is_digit(radix)) {
+        return None;
+    }
+    if neg {
+        return Some(crate::Int::default());
+    }
+    // little-endian bytes, times radix plus each digit
+    let mut le: Vec<u8> = Vec::new();
+    for c in digits.chars() {
+        let mut carry = c.to_digit(radix).unwrap_or(0);
+        for b in le.iter_mut() {
+            let v = u32::from(*b) * radix + carry;
+            *b = v as u8;
+            carry = v >> 8;
+        }
+        while carry > 0 {
+            le.push(carry as u8);
+            carry >>= 8;
+        }
+    }
+    Some(crate::Int::from_le(&le))
+}
+
+/// JS's `String.prototype.trim`: JS's white space at both ends, as
+/// StrWhiteSpaceChar has it
+pub fn trim(s: &str) -> &str {
+    s.trim_matches(js_space)
+}
+
+/// `JSON.stringify(j)`: what a host keeps meta.pub as, byte for byte. A
+/// number that isn't finite is `null`, as JSON.stringify writes it.
+pub fn stringify(j: &Json) -> String {
+    let mut out = String::new();
+    write_json(j, &mut out);
+    out
+}
+
+fn write_json(j: &Json, out: &mut String) {
+    match j {
+        Json::Null => out.push_str("null"),
+        Json::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        Json::Num(n) if n.is_finite() => out.push_str(&number_text(*n)),
+        Json::Num(_) => out.push_str("null"),
+        Json::Str(s) => write_str(s, out),
+        Json::Arr(a) => {
+            out.push('[');
+            for (k, x) in a.iter().enumerate() {
+                if k > 0 {
+                    out.push(',');
+                }
+                write_json(x, out);
+            }
+            out.push(']');
+        }
+        Json::Obj(o) => {
+            out.push('{');
+            for (k, (key, x)) in o.entries().into_iter().enumerate() {
+                if k > 0 {
+                    out.push(',');
+                }
+                write_str(key, out);
+                out.push(':');
+                write_json(x, out);
+            }
+            out.push('}');
+        }
+    }
+}
+
+/// JSON.stringify's QuoteJSONString
+fn write_str(s: &str, out: &mut String) {
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\u{8}' => out.push_str("\\b"),
+            '\u{c}' => out.push_str("\\f"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c < ' ' => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+}
+
+/// A JS value as an app's call gives it back: furum's and forum's
+/// records, with their BigInts and Dates (trace.mjs's `$big` and
+/// `$date`). A Date of None is an invalid one.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Js {
+    Null,
+    Bool(bool),
+    Num(f64),
+    Big(crate::Int),
+    Str(String),
+    /// ms since 1970, within where a Date reaches
+    Date(Option<i64>),
+    Arr(Vec<Js>),
+    Obj(Object<Js>),
+}
+
+impl Js {
+    /// an object of these entries, in this order
+    pub fn obj<const N: usize>(kv: [(&str, Js); N]) -> Js {
+        let mut o = Object::default();
+        for (k, v) in kv {
+            o.set(k.into(), v);
+        }
+        Js::Obj(o)
+    }
+
+    /// text, or null
+    pub fn text(s: Option<String>) -> Js {
+        s.map_or(Js::Null, Js::Str)
+    }
+}
+
+/// the furthest a Date reaches either way, in ms
+pub const MAX_MS: i64 = 8_640_000_000_000_000;
+
+/// Number(n) of a BigInt: the nearest f64, ties to even
+pub fn int_number(n: &crate::Int) -> f64 {
+    let b = n.le();
+    if b.len() <= 16 {
+        let mut w = [0u8; 16];
+        w[..b.len()].copy_from_slice(b);
+        return u128::from_le_bytes(w) as f64;
+    }
+    // the top 64 bits, with a sticky bit for any below them, round as
+    // the whole does
+    let bits = b.len() * 8 - b[b.len() - 1].leading_zeros() as usize;
+    let shift = bits - 64;
+    let bit = |i: usize| b[i / 8] >> (i % 8) & 1 == 1;
+    let mut top = 0u64;
+    for i in 0..64 {
+        if bit(shift + i) {
+            top |= 1 << i;
+        }
+    }
+    if (0..shift).any(bit) {
+        top |= 1;
+    }
+    top as f64 * 2f64.powi(shift as i32)
+}
+
+/// Date.prototype.toISOString of ms, a time within [`MAX_MS`]
+pub fn iso(ms: i64) -> String {
+    let days = ms.div_euclid(86_400_000);
+    let t = ms.rem_euclid(86_400_000);
+    // civil_from_days (Howard Hinnant)
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    let year = if (0..=9999).contains(&y) {
+        format!("{y:04}")
+    } else if y < 0 {
+        format!("-{:06}", -y)
+    } else {
+        format!("+{y:06}")
+    };
+    format!(
+        "{year}-{m:02}-{d:02}T{:02}:{:02}:{:02}.{:03}Z",
+        t / 3_600_000,
+        t / 60_000 % 60,
+        t / 1000 % 60,
+        t % 1000
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn numbers_as_js_writes_them() {
+        for (x, t) in [
+            (1.0, "1"),
+            (-1.0, "-1"),
+            (1.5, "1.5"),
+            (0.1, "0.1"),
+            (1e21, "1e+21"),
+            (1e20, "100000000000000000000"),
+            (123456789012345680000.0, "123456789012345680000"),
+            (1e-7, "1e-7"),
+            (1.5e-7, "1.5e-7"),
+            (0.000001, "0.000001"),
+            (2f64.powi(53), "9007199254740992"),
+            (f64::NAN, "NaN"),
+            (-f64::INFINITY, "-Infinity"),
+            (-0.0, "0"),
+        ] {
+            assert_eq!(number_text(x), t, "{x}");
+        }
+    }
+
+    #[test]
+    fn numbers_as_js_reads_them() {
+        let nan = |s: &str| number(s).is_nan();
+        assert_eq!(number(""), 0.0);
+        assert_eq!(number(" \n\u{feff}12\u{3000}"), 12.0);
+        assert!(nan("\u{85}12"));
+        assert_eq!(number("1500"), 1500.0);
+        assert_eq!(number("-1.5e3"), -1500.0);
+        assert_eq!(number(".5"), 0.5);
+        assert_eq!(number("5."), 5.0);
+        assert!(nan("."));
+        assert!(nan("1e"));
+        assert!(nan("1_000"));
+        assert!(nan("inf"));
+        assert!(nan("NaN"));
+        assert!(nan("infinity"));
+        assert_eq!(number("-Infinity"), f64::NEG_INFINITY);
+        assert_eq!(number("0x10"), 16.0);
+        assert_eq!(number("0B101"), 5.0);
+        assert_eq!(number("0o17"), 15.0);
+        assert!(nan("-0x10"));
+        assert!(nan("0x"));
+        assert!(nan("0xg"));
+        assert_eq!(number("0x20000000000001"), 9007199254740992.0);
+        assert_eq!(number("0x20000000000003"), 9007199254740996.0);
+        assert_eq!(number("0x20000000000002"), 9007199254740994.0);
+        assert_eq!(number(&format!("0x1{}", "0".repeat(256))), f64::INFINITY);
+        assert_eq!(number("1e400"), f64::INFINITY);
+        assert!(number("-0").is_sign_negative());
+    }
+
+    #[test]
+    fn objects_keep_js_order() {
+        let mut o = Object::default();
+        for (k, v) in [
+            ("b", 1.0),
+            ("2", 2.0),
+            ("a", 3.0),
+            ("1", 4.0),
+            ("b", 5.0),
+            ("01", 6.0),
+            ("4294967295", 7.0),
+        ] {
+            o.set(k.into(), Json::Num(v));
+        }
+        let keys: Vec<&str> = o.entries().iter().map(|e| e.0).collect();
+        assert_eq!(keys, ["1", "2", "b", "a", "01", "4294967295"]);
+        assert_eq!(o.get("b"), Some(&Json::Num(5.0)));
+    }
+
+    #[test]
+    fn bigint_as_js_makes_it_or_throws() {
+        let n = |x: f64| {
+            bigint(Some(&Json::Num(x)))
+                .map(|i| i.decimal())
+                .map_err(|e| e.message)
+        };
+        assert_eq!(n(1793438787341.0), Ok("1793438787341".into()));
+        assert_eq!(n(2f64.powi(80)), Ok("1208925819614629174706176".into()));
+        assert_eq!(n(1e21), Ok("1000000000000000000000".into()));
+        assert_eq!(n(0.0), Ok("0".into()));
+        assert_eq!(
+            n(1.5),
+            Err(
+                "The number 1.5 cannot be converted to a BigInt because it is not an integer"
+                    .into()
+            )
+        );
+        assert!(n(f64::NAN).unwrap_err().contains("The number NaN"));
+        let t = |x: &str| {
+            bigint(Some(&Json::Str(x.into())))
+                .map(|i| i.decimal())
+                .map_err(|e| e.message)
+        };
+        assert_eq!(t("0xff"), Ok("255".into()));
+        assert_eq!(t(" 12 "), Ok("12".into()));
+        assert_eq!(t(""), Ok("0".into()));
+        assert_eq!(t("0xnull"), Err("Cannot convert 0xnull to a BigInt".into()));
+        assert_eq!(t("1.5"), Err("Cannot convert 1.5 to a BigInt".into()));
+        assert_eq!(
+            bigint(None).unwrap_err().message,
+            "Cannot convert undefined to a BigInt"
+        );
+        assert!(matches!(add(Some(&Json::Num(1.0)), None), Json::Num(n) if n.is_nan()));
+        assert_eq!(
+            add(Some(&Json::Num(0.0)), Some(&Json::Str("3".into()))),
+            Json::Str("03".into())
+        );
+    }
+
+    #[test]
+    fn json_as_json_stringify_writes_it() {
+        let mut o = Object::default();
+        o.set("b".into(), Json::Num(1.5));
+        o.set(
+            "1".into(),
+            Json::Arr(vec![Json::Null, Json::Num(f64::NAN), Json::Bool(true)]),
+        );
+        o.set("q\"\\\n\u{1}\u{7f}é".into(), Json::Num(1793438787341.0));
+        assert_eq!(
+            stringify(&Json::Obj(o)),
+            "{\"1\":[null,null,true],\"b\":1.5,\"q\\\"\\\\\\n\\u0001\u{7f}é\":1793438787341}"
+        );
+    }
+
+    #[test]
+    fn text_as_a_text_decoder_reads_it() {
+        assert_eq!(utf8(b"\xef\xbb\xbfo"), "o");
+        assert_eq!(utf8(b"\xef\xbb\xbf\xef\xbb\xbfo"), "\u{feff}o");
+        assert_eq!(utf8(b"a\xffb"), "a\u{fffd}b");
+        assert_eq!(utf8(b"\xe2\x82"), "\u{fffd}");
+        assert_eq!(utf8(b"\xf0\x80\x80"), "\u{fffd}\u{fffd}\u{fffd}");
+    }
+
+    #[test]
+    fn dates_as_to_iso_string_writes_them() {
+        assert_eq!(iso(0), "1970-01-01T00:00:00.000Z");
+        assert_eq!(iso(1761902958214), "2025-10-31T09:29:18.214Z");
+        assert_eq!(iso(-1), "1969-12-31T23:59:59.999Z");
+        assert_eq!(iso(MAX_MS), "+275760-09-13T00:00:00.000Z");
+        assert_eq!(iso(-MAX_MS), "-271821-04-20T00:00:00.000Z");
+        assert_eq!(iso(-62198755200000), "-000001-01-01T00:00:00.000Z");
+        assert_eq!(iso(-62167219200000), "0000-01-01T00:00:00.000Z");
+        assert_eq!(iso(253402300800000), "+010000-01-01T00:00:00.000Z");
+    }
+
+    #[test]
+    fn big_numbers_round_as_number_does() {
+        let n = |le: &[u8]| int_number(&crate::Int::from_le(le));
+        assert_eq!(n(&[]), 0.0);
+        assert_eq!(n(&u128::MAX.to_le_bytes()), 2f64.powi(128));
+        // 2^200 + 1 rounds down, 2^200 + 2^147 (a tie) to even, and
+        // 2^200 + 2^147 + 1 up
+        let mut b = vec![0u8; 26];
+        b[25] = 1;
+        let mut one = b.clone();
+        one[0] = 1;
+        assert_eq!(n(&one), 2f64.powi(200));
+        let mut tie = b.clone();
+        tie[147 / 8] = 1 << (147 % 8);
+        assert_eq!(n(&tie), 2f64.powi(200));
+        tie[0] = 1;
+        assert_eq!(n(&tie), 2f64.powi(200) + 2f64.powi(148));
+    }
+}

@@ -1,0 +1,3149 @@
+{
+ "about": "urb.go's and render.go's HTML: renderGemtext, renderMarkdown and renderText(body, \"t\", pageLink(\"urb://~zod/a/b\", \"8475\")) as the page's {title, main} (page() wraps each alike), rewriteHTML(body, \"8475\"), safeLink, pageLink's {href, own}, and page(title, body) whole",
+ "cases": [
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "# Title\n\nA paragraph\nthat wraps.\n\n=\u003e /notes/more More notes\n=\u003e https://example.com The web\n=\u003eurb://~nec/x\n* one\n* two\n\u003e a quote\n```alt\npre  text\n```"
+   ],
+   "out": {
+    "main": "\u003ch1\u003eTitle\u003c/h1\u003e\n\u003cp\u003eA paragraph\u003c/p\u003e\n\u003cp\u003ethat wraps.\u003c/p\u003e\n\u003cp class=\"link\"\u003e\u003ca href=\"http://zod.urb.localhost:8475/notes/more\"\u003eMore notes\u003c/a\u003e\u003c/p\u003e\n\u003cp class=\"link\"\u003e\u003ca href=\"https://example.com\" rel=\"noopener noreferrer\"\u003eThe web\u003c/a\u003e\u003c/p\u003e\n\u003cp class=\"link\"\u003e\u003ca href=\"http://nec.urb.localhost:8475/x\"\u003eurb://~nec/x\u003c/a\u003e\u003c/p\u003e\n\u003cul\u003e\n\u003cli\u003eone\u003c/li\u003e\n\u003cli\u003etwo\u003c/li\u003e\n\u003c/ul\u003e\n\u003cblockquote\u003ea quote\u003c/blockquote\u003e\n\u003cpre\u003e\npre  text\u003c/pre\u003e\n",
+    "title": "Title"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "# Title\n\nA paragraph\nthat wraps.\n\n=\u003e /notes/more More notes\n=\u003e https://example.com The web\n=\u003eurb://~nec/x\n* one\n* two\n\u003e a quote\n```alt\npre  text\n```"
+   ],
+   "out": {
+    "main": "\u003ch1\u003eTitle\u003c/h1\u003e\n\u003cp\u003eA paragraph that wraps.\u003c/p\u003e\n\u003cp\u003e=\u0026gt; /notes/more More notes =\u0026gt; https://example.com The web =\u0026gt;urb://~nec/x\u003c/p\u003e\n\u003cul\u003e\n\u003cli\u003eone\u003c/li\u003e\n\u003cli\u003etwo\u003c/li\u003e\n\u003c/ul\u003e\n\u003cblockquote\u003ea quote\u003c/blockquote\u003e\n\u003cpre\u003e\npre  text\u003c/pre\u003e\n",
+    "title": "Title"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "# Title\n\nA paragraph\nthat wraps.\n\n=\u003e /notes/more More notes\n=\u003e https://example.com The web\n=\u003eurb://~nec/x\n* one\n* two\n\u003e a quote\n```alt\npre  text\n```"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n# Title\n\nA paragraph\nthat wraps.\n\n=\u0026gt; /notes/more More notes\n=\u0026gt; https://example.com The web\n=\u0026gt;urb://~nec/x\n* one\n* two\n\u0026gt; a quote\n```alt\npre  text\n```\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "# Title\n\nA paragraph\nthat wraps.\n\n=\u003e /notes/more More notes\n=\u003e https://example.com The web\n=\u003eurb://~nec/x\n* one\n* two\n\u003e a quote\n```alt\npre  text\n```"
+   ],
+   "out": "# Title\n\nA paragraph\nthat wraps.\n\n=\u003e /notes/more More notes\n=\u003e https://example.com The web\n=\u003eurb://~nec/x\n* one\n* two\n\u003e a quote\n```alt\npre  text\n```"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "## Heading ##"
+   ],
+   "out": {
+    "main": "\u003ch2\u003eHeading ##\u003c/h2\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "## Heading ##"
+   ],
+   "out": {
+    "main": "\u003ch2\u003eHeading\u003c/h2\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "## Heading ##"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n## Heading ##\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "## Heading ##"
+   ],
+   "out": "## Heading ##"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "###### six"
+   ],
+   "out": {
+    "main": "\u003ch3\u003esix\u003c/h3\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "###### six"
+   ],
+   "out": {
+    "main": "\u003ch6\u003esix\u003c/h6\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "###### six"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n###### six\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "###### six"
+   ],
+   "out": "###### six"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "####### seven"
+   ],
+   "out": {
+    "main": "\u003ch3\u003eseven\u003c/h3\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "####### seven"
+   ],
+   "out": {
+    "main": "\u003cp\u003e####### seven\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "####### seven"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n####### seven\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "####### seven"
+   ],
+   "out": "####### seven"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "#nospace"
+   ],
+   "out": {
+    "main": "\u003ch1\u003enospace\u003c/h1\u003e\n",
+    "title": "nospace"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "#nospace"
+   ],
+   "out": {
+    "main": "\u003cp\u003e#nospace\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "#nospace"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n#nospace\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "#nospace"
+   ],
+   "out": "#nospace"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "  # indented"
+   ],
+   "out": {
+    "main": "\u003cp\u003e  # indented\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "  # indented"
+   ],
+   "out": {
+    "main": "\u003cp\u003e# indented\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "  # indented"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n  # indented\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "  # indented"
+   ],
+   "out": "  # indented"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "#\tTab"
+   ],
+   "out": {
+    "main": "\u003ch1\u003eTab\u003c/h1\u003e\n",
+    "title": "Tab"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "#\tTab"
+   ],
+   "out": {
+    "main": "\u003ch1\u003eTab\u003c/h1\u003e\n",
+    "title": "Tab"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "#\tTab"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n#\tTab\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "#\tTab"
+   ],
+   "out": "#\tTab"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "# "
+   ],
+   "out": {
+    "main": "\u003ch1\u003e\u003c/h1\u003e\n",
+    "title": ""
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "# "
+   ],
+   "out": {
+    "main": "\u003ch1\u003e\u003c/h1\u003e\n",
+    "title": ""
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "# "
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n# \u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "# "
+   ],
+   "out": "# "
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "Plain **bold** and *em* and `code` and [a link](/x) and [bad](javascript:x)"
+   ],
+   "out": {
+    "main": "\u003cp\u003ePlain **bold** and *em* and `code` and [a link](/x) and [bad](javascript:x)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "Plain **bold** and *em* and `code` and [a link](/x) and [bad](javascript:x)"
+   ],
+   "out": {
+    "main": "\u003cp\u003ePlain \u003cstrong\u003ebold\u003c/strong\u003e and \u003cem\u003eem\u003c/em\u003e and \u003ccode\u003ecode\u003c/code\u003e and \u003ca href=\"http://zod.urb.localhost:8475/x\"\u003ea link\u003c/a\u003e and bad\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "Plain **bold** and *em* and `code` and [a link](/x) and [bad](javascript:x)"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\nPlain **bold** and *em* and `code` and [a link](/x) and [bad](javascript:x)\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "Plain **bold** and *em* and `code` and [a link](/x) and [bad](javascript:x)"
+   ],
+   "out": "Plain **bold** and *em* and `code` and [a link](/x) and [bad](javascript:x)"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "- a\n- b\n\n1. one\n2) two\n10. ten"
+   ],
+   "out": {
+    "main": "\u003cp\u003e- a\u003c/p\u003e\n\u003cp\u003e- b\u003c/p\u003e\n\u003cp\u003e1. one\u003c/p\u003e\n\u003cp\u003e2) two\u003c/p\u003e\n\u003cp\u003e10. ten\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "- a\n- b\n\n1. one\n2) two\n10. ten"
+   ],
+   "out": {
+    "main": "\u003cul\u003e\n\u003cli\u003ea\u003c/li\u003e\n\u003cli\u003eb\u003c/li\u003e\n\u003c/ul\u003e\n\u003col\u003e\n\u003cli\u003eone\u003c/li\u003e\n\u003cli\u003etwo\u003c/li\u003e\n\u003cli\u003eten\u003c/li\u003e\n\u003c/ol\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "- a\n- b\n\n1. one\n2) two\n10. ten"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n- a\n- b\n\n1. one\n2) two\n10. ten\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "- a\n- b\n\n1. one\n2) two\n10. ten"
+   ],
+   "out": "- a\n- b\n\n1. one\n2) two\n10. ten"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "* [x](y)\n+ plus"
+   ],
+   "out": {
+    "main": "\u003cul\u003e\n\u003cli\u003e[x](y)\u003c/li\u003e\n\u003c/ul\u003e\n\u003cp\u003e+ plus\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "* [x](y)\n+ plus"
+   ],
+   "out": {
+    "main": "\u003cul\u003e\n\u003cli\u003e\u003ca href=\"http://zod.urb.localhost:8475/a/y\"\u003ex\u003c/a\u003e\u003c/li\u003e\n\u003cli\u003eplus\u003c/li\u003e\n\u003c/ul\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "* [x](y)\n+ plus"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n* [x](y)\n+ plus\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "* [x](y)\n+ plus"
+   ],
+   "out": "* [x](y)\n+ plus"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "---"
+   ],
+   "out": {
+    "main": "\u003cp\u003e---\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "---"
+   ],
+   "out": {
+    "main": "\u003chr\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "---"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n---\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "---"
+   ],
+   "out": "---"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "***"
+   ],
+   "out": {
+    "main": "\u003cp\u003e***\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "***"
+   ],
+   "out": {
+    "main": "\u003chr\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "***"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n***\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "***"
+   ],
+   "out": "***"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "_ _ _"
+   ],
+   "out": {
+    "main": "\u003cp\u003e_ _ _\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "_ _ _"
+   ],
+   "out": {
+    "main": "\u003chr\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "_ _ _"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n_ _ _\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "_ _ _"
+   ],
+   "out": "_ _ _"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "- - -"
+   ],
+   "out": {
+    "main": "\u003cp\u003e- - -\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "- - -"
+   ],
+   "out": {
+    "main": "\u003chr\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "- - -"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n- - -\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "- - -"
+   ],
+   "out": "- - -"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "--"
+   ],
+   "out": {
+    "main": "\u003cp\u003e--\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "--"
+   ],
+   "out": {
+    "main": "\u003cp\u003e--\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "--"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n--\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "--"
+   ],
+   "out": "--"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "\u003e q\n\u003e\u003e qq"
+   ],
+   "out": {
+    "main": "\u003cblockquote\u003eq\u003c/blockquote\u003e\n\u003cblockquote\u003e\u0026gt; qq\u003c/blockquote\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "\u003e q\n\u003e\u003e qq"
+   ],
+   "out": {
+    "main": "\u003cblockquote\u003eq\u003c/blockquote\u003e\n\u003cblockquote\u003e\u0026gt; qq\u003c/blockquote\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "\u003e q\n\u003e\u003e qq"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\u0026gt; q\n\u0026gt;\u0026gt; qq\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "\u003e q\n\u003e\u003e qq"
+   ],
+   "out": "\u003e q\n\u003e\u003e qq"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "```\n\nfirst blank\n```"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\nfirst blank\u003c/pre\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "```\n\nfirst blank\n```"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\nfirst blank\u003c/pre\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "```\n\nfirst blank\n```"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n```\n\nfirst blank\n```\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "```\n\nfirst blank\n```"
+   ],
+   "out": "```\n\nfirst blank\n```"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "```unclosed\nx"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\nx\u003c/pre\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "```unclosed\nx"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\nx\u003c/pre\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "```unclosed\nx"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n```unclosed\nx\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "```unclosed\nx"
+   ],
+   "out": "```unclosed\nx"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "a\r\nb\r\n\r\nc"
+   ],
+   "out": {
+    "main": "\u003cp\u003ea\u003c/p\u003e\n\u003cp\u003eb\u003c/p\u003e\n\u003cp\u003ec\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "a\r\nb\r\n\r\nc"
+   ],
+   "out": {
+    "main": "\u003cp\u003ea b\u003c/p\u003e\n\u003cp\u003ec\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "a\r\nb\r\n\r\nc"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\na\r\nb\r\n\r\nc\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "a\r\nb\r\n\r\nc"
+   ],
+   "out": "a\r\nb\r\n\r\nc"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "a\rb"
+   ],
+   "out": {
+    "main": "\u003cp\u003ea\rb\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "a\rb"
+   ],
+   "out": {
+    "main": "\u003cp\u003ea\rb\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "a\rb"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\na\rb\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "a\rb"
+   ],
+   "out": "a\rb"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "- a\rb"
+   ],
+   "out": {
+    "main": "\u003cp\u003e- a\rb\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "- a\rb"
+   ],
+   "out": {
+    "main": "\u003cp\u003e- a\rb\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "- a\rb"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n- a\rb\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "- a\rb"
+   ],
+   "out": "- a\rb"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "x\u2028y"
+   ],
+   "out": {
+    "main": "\u003cp\u003ex\u2028y\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "x\u2028y"
+   ],
+   "out": {
+    "main": "\u003cp\u003ex\u2028y\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "x\u2028y"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\nx\u2028y\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "x\u2028y"
+   ],
+   "out": "x\u2028y"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    " # nbsp"
+   ],
+   "out": {
+    "main": "\u003cp\u003e # nbsp\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    " # nbsp"
+   ],
+   "out": {
+    "main": "\u003cp\u003e# nbsp\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    " # nbsp"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n # nbsp\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    " # nbsp"
+   ],
+   "out": " # nbsp"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "=\u003e "
+   ],
+   "out": {
+    "main": "",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "=\u003e "
+   ],
+   "out": {
+    "main": "\u003cp\u003e=\u0026gt;\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "=\u003e "
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n=\u0026gt; \u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "=\u003e "
+   ],
+   "out": "=\u003e "
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "=\u003e"
+   ],
+   "out": {
+    "main": "",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "=\u003e"
+   ],
+   "out": {
+    "main": "\u003cp\u003e=\u0026gt;\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "=\u003e"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n=\u0026gt;\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "=\u003e"
+   ],
+   "out": "=\u003e"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "=\u003e /x"
+   ],
+   "out": {
+    "main": "\u003cp class=\"link\"\u003e\u003ca href=\"http://zod.urb.localhost:8475/x\"\u003e/x\u003c/a\u003e\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "=\u003e /x"
+   ],
+   "out": {
+    "main": "\u003cp\u003e=\u0026gt; /x\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "=\u003e /x"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n=\u0026gt; /x\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "=\u003e /x"
+   ],
+   "out": "=\u003e /x"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "=\u003e\t/x\tlabel"
+   ],
+   "out": {
+    "main": "\u003cp class=\"link\"\u003e\u003ca href=\"http://zod.urb.localhost:8475/x\"\u003elabel\u003c/a\u003e\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "=\u003e\t/x\tlabel"
+   ],
+   "out": {
+    "main": "\u003cp\u003e=\u0026gt;\t/x\tlabel\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "=\u003e\t/x\tlabel"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n=\u0026gt;\t/x\tlabel\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "=\u003e\t/x\tlabel"
+   ],
+   "out": "=\u003e\t/x\tlabel"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "=\u003e \u0001x:-nec/page"
+   ],
+   "out": {
+    "main": "\u003cp class=\"link\"\u003e\u0001x:-nec/page\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "=\u003e \u0001x:-nec/page"
+   ],
+   "out": {
+    "main": "\u003cp\u003e=\u0026gt; \u0001x:-nec/page\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "=\u003e \u0001x:-nec/page"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n=\u0026gt; \u0001x:-nec/page\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "=\u003e \u0001x:-nec/page"
+   ],
+   "out": "=\u003e \u0001x:-nec/page"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "=\u003e //evil.example"
+   ],
+   "out": {
+    "main": "\u003cp class=\"link\"\u003e//evil.example\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "=\u003e //evil.example"
+   ],
+   "out": {
+    "main": "\u003cp\u003e=\u0026gt; //evil.example\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "=\u003e //evil.example"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n=\u0026gt; //evil.example\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "=\u003e //evil.example"
+   ],
+   "out": "=\u003e //evil.example"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "=\u003e \\\\evil.example/x"
+   ],
+   "out": {
+    "main": "\u003cp class=\"link\"\u003e\\\\evil.example/x\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "=\u003e \\\\evil.example/x"
+   ],
+   "out": {
+    "main": "\u003cp\u003e=\u0026gt; \\\\evil.example/x\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "=\u003e \\\\evil.example/x"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n=\u0026gt; \\\\evil.example/x\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "=\u003e \\\\evil.example/x"
+   ],
+   "out": "=\u003e \\\\evil.example/x"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "=\u003e URB://~zod/y Up"
+   ],
+   "out": {
+    "main": "\u003cp class=\"link\"\u003e\u003ca href=\"http://zod.urb.localhost:8475/y\"\u003eUp\u003c/a\u003e\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "=\u003e URB://~zod/y Up"
+   ],
+   "out": {
+    "main": "\u003cp\u003e=\u0026gt; URB://~zod/y Up\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "=\u003e URB://~zod/y Up"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n=\u0026gt; URB://~zod/y Up\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "=\u003e URB://~zod/y Up"
+   ],
+   "out": "=\u003e URB://~zod/y Up"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "=\u003e mailto:a@b.example mail"
+   ],
+   "out": {
+    "main": "\u003cp class=\"link\"\u003e\u003ca href=\"mailto:a@b.example\" rel=\"noopener noreferrer\"\u003email\u003c/a\u003e\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "=\u003e mailto:a@b.example mail"
+   ],
+   "out": {
+    "main": "\u003cp\u003e=\u0026gt; mailto:a@b.example mail\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "=\u003e mailto:a@b.example mail"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n=\u0026gt; mailto:a@b.example mail\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "=\u003e mailto:a@b.example mail"
+   ],
+   "out": "=\u003e mailto:a@b.example mail"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "=\u003e gemini://g.example gem"
+   ],
+   "out": {
+    "main": "\u003cp class=\"link\"\u003e\u003ca href=\"gemini://g.example\" rel=\"noopener noreferrer\"\u003egem\u003c/a\u003e\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "=\u003e gemini://g.example gem"
+   ],
+   "out": {
+    "main": "\u003cp\u003e=\u0026gt; gemini://g.example gem\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "=\u003e gemini://g.example gem"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n=\u0026gt; gemini://g.example gem\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "=\u003e gemini://g.example gem"
+   ],
+   "out": "=\u003e gemini://g.example gem"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "* "
+   ],
+   "out": {
+    "main": "\u003cul\u003e\n\u003cli\u003e\u003c/li\u003e\n\u003c/ul\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "* "
+   ],
+   "out": {
+    "main": "\u003cul\u003e\n\u003cli\u003e\u003c/li\u003e\n\u003c/ul\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "* "
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n* \u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "* "
+   ],
+   "out": "* "
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "*"
+   ],
+   "out": {
+    "main": "\u003cp\u003e*\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "*"
+   ],
+   "out": {
+    "main": "\u003cp\u003e*\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "*"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n*\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "*"
+   ],
+   "out": "*"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "\u003e"
+   ],
+   "out": {
+    "main": "\u003cblockquote\u003e\u003c/blockquote\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "\u003e"
+   ],
+   "out": {
+    "main": "\u003cblockquote\u003e\u003c/blockquote\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "\u003e"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\u0026gt;\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "\u003e"
+   ],
+   "out": "\u003e"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "\u003e "
+   ],
+   "out": {
+    "main": "\u003cblockquote\u003e\u003c/blockquote\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "\u003e "
+   ],
+   "out": {
+    "main": "\u003cblockquote\u003e\u003c/blockquote\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "\u003e "
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\u0026gt; \u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "\u003e "
+   ],
+   "out": "\u003e "
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "```"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\u003c/pre\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "```"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\u003c/pre\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "```"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n```\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "```"
+   ],
+   "out": "```"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "[a](b) [c](d)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[a](b) [c](d)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[a](b) [c](d)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u003ca href=\"http://zod.urb.localhost:8475/a/b\"\u003ea\u003c/a\u003e \u003ca href=\"http://zod.urb.localhost:8475/a/d\"\u003ec\u003c/a\u003e\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "[a](b) [c](d)"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n[a](b) [c](d)\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "[a](b) [c](d)"
+   ],
+   "out": "[a](b) [c](d)"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "[[a]](b)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[[a]](b)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[[a]](b)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[[a]](b)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "[[a]](b)"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n[[a]](b)\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "[[a]](b)"
+   ],
+   "out": "[[a]](b)"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "[a](b(c))"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[a](b(c))\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[a](b(c))"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u003ca href=\"http://zod.urb.localhost:8475/a/b(c\"\u003ea\u003c/a\u003e)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "[a](b(c))"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n[a](b(c))\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "[a](b(c))"
+   ],
+   "out": "[a](b(c))"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "[a] (b)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[a] (b)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[a] (b)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[a] (b)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "[a] (b)"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n[a] (b)\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "[a] (b)"
+   ],
+   "out": "[a] (b)"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "**unclosed"
+   ],
+   "out": {
+    "main": "\u003cp\u003e**unclosed\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "**unclosed"
+   ],
+   "out": {
+    "main": "\u003cp\u003e**unclosed\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "**unclosed"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n**unclosed\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "**unclosed"
+   ],
+   "out": "**unclosed"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "*a**b*"
+   ],
+   "out": {
+    "main": "\u003cp\u003e*a**b*\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "*a**b*"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u003cem\u003ea\u003c/em\u003e\u003cem\u003eb\u003c/em\u003e\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "*a**b*"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n*a**b*\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "*a**b*"
+   ],
+   "out": "*a**b*"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "`a``b`"
+   ],
+   "out": {
+    "main": "\u003cp\u003e`a``b`\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "`a``b`"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u003ccode\u003ea\u003c/code\u003e\u003ccode\u003eb\u003c/code\u003e\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "`a``b`"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n`a``b`\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "`a``b`"
+   ],
+   "out": "`a``b`"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "\u003cb\u003eraw\u003c/b\u003e \u0026 \"quotes\""
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u0026lt;b\u0026gt;raw\u0026lt;/b\u0026gt; \u0026amp; \u0026#34;quotes\u0026#34;\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "\u003cb\u003eraw\u003c/b\u003e \u0026 \"quotes\""
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u0026lt;b\u0026gt;raw\u0026lt;/b\u0026gt; \u0026amp; \u0026#34;quotes\u0026#34;\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "\u003cb\u003eraw\u003c/b\u003e \u0026 \"quotes\""
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\u0026lt;b\u0026gt;raw\u0026lt;/b\u0026gt; \u0026amp; \u0026#34;quotes\u0026#34;\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "\u003cb\u003eraw\u003c/b\u003e \u0026 \"quotes\""
+   ],
+   "out": "\u003cb\u003eraw\u003c/b\u003e \u0026 \"quotes\""
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    ""
+   ],
+   "out": {
+    "main": "",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    ""
+   ],
+   "out": {
+    "main": "",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    ""
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    ""
+   ],
+   "out": ""
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "\n\n\n"
+   ],
+   "out": {
+    "main": "",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "\n\n\n"
+   ],
+   "out": {
+    "main": "",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "\n\n\n"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\n\n\n\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "\n\n\n"
+   ],
+   "out": "\n\n\n"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "out": {
+    "main": "\u003cp\u003exxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "out": {
+    "main": "\u003cp\u003exxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "out": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u003ca href=\"http://zod.urb.localhost:8475/a/x\"\u003eaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u003c/a\u003e\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+   ],
+   "out": "[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](x)"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u003ca href=\"http://zod.urb.localhost:8475/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\u003et\u003c/a\u003e\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+   ],
+   "out": "[t](/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "😀 emoji [😀](/😀)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e😀 emoji [😀](/😀)\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "😀 emoji [😀](/😀)"
+   ],
+   "out": {
+    "main": "\u003cp\u003e😀 emoji \u003ca href=\"http://zod.urb.localhost:8475/%F0%9F%98%80\"\u003e😀\u003c/a\u003e\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "😀 emoji [😀](/😀)"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n😀 emoji [😀](/😀)\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "😀 emoji [😀](/😀)"
+   ],
+   "out": "😀 emoji [😀](/😀)"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "1.5 not a list"
+   ],
+   "out": {
+    "main": "\u003cp\u003e1.5 not a list\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "1.5 not a list"
+   ],
+   "out": {
+    "main": "\u003cp\u003e1.5 not a list\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "1.5 not a list"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n1.5 not a list\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "1.5 not a list"
+   ],
+   "out": "1.5 not a list"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "1. "
+   ],
+   "out": {
+    "main": "\u003cp\u003e1. \u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "1. "
+   ],
+   "out": {
+    "main": "\u003col\u003e\n\u003cli\u003e\u003c/li\u003e\n\u003c/ol\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "1. "
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n1. \u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "1. "
+   ],
+   "out": "1. "
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "-not a list"
+   ],
+   "out": {
+    "main": "\u003cp\u003e-not a list\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "-not a list"
+   ],
+   "out": {
+    "main": "\u003cp\u003e-not a list\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "-not a list"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n-not a list\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "-not a list"
+   ],
+   "out": "-not a list"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "- "
+   ],
+   "out": {
+    "main": "\u003cp\u003e- \u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "- "
+   ],
+   "out": {
+    "main": "\u003cul\u003e\n\u003cli\u003e\u003c/li\u003e\n\u003c/ul\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "- "
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n- \u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "- "
+   ],
+   "out": "- "
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "a\n- b\nc"
+   ],
+   "out": {
+    "main": "\u003cp\u003ea\u003c/p\u003e\n\u003cp\u003e- b\u003c/p\u003e\n\u003cp\u003ec\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "a\n- b\nc"
+   ],
+   "out": {
+    "main": "\u003cp\u003ea\u003c/p\u003e\n\u003cul\u003e\n\u003cli\u003eb\u003c/li\u003e\n\u003c/ul\u003e\n\u003cp\u003ec\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "a\n- b\nc"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\na\n- b\nc\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "a\n- b\nc"
+   ],
+   "out": "a\n- b\nc"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "\u003e [q](/x) **b**"
+   ],
+   "out": {
+    "main": "\u003cblockquote\u003e[q](/x) **b**\u003c/blockquote\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "\u003e [q](/x) **b**"
+   ],
+   "out": {
+    "main": "\u003cblockquote\u003e\u003ca href=\"http://zod.urb.localhost:8475/x\"\u003eq\u003c/a\u003e \u003cstrong\u003eb\u003c/strong\u003e\u003c/blockquote\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "\u003e [q](/x) **b**"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\u0026gt; [q](/x) **b**\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "\u003e [q](/x) **b**"
+   ],
+   "out": "\u003e [q](/x) **b**"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "\u003ca href=\"urb://~nec/x\"\u003ex\u003c/a\u003e \u003cimg SRC='urb://~zod/i.png'\u003e \u003cform action=urb://~bud/f\u003e"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u0026lt;a href=\u0026#34;urb://~nec/x\u0026#34;\u0026gt;x\u0026lt;/a\u0026gt; \u0026lt;img SRC=\u0026#39;urb://~zod/i.png\u0026#39;\u0026gt; \u0026lt;form action=urb://~bud/f\u0026gt;\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "\u003ca href=\"urb://~nec/x\"\u003ex\u003c/a\u003e \u003cimg SRC='urb://~zod/i.png'\u003e \u003cform action=urb://~bud/f\u003e"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u0026lt;a href=\u0026#34;urb://~nec/x\u0026#34;\u0026gt;x\u0026lt;/a\u0026gt; \u0026lt;img SRC=\u0026#39;urb://~zod/i.png\u0026#39;\u0026gt; \u0026lt;form action=urb://~bud/f\u0026gt;\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "\u003ca href=\"urb://~nec/x\"\u003ex\u003c/a\u003e \u003cimg SRC='urb://~zod/i.png'\u003e \u003cform action=urb://~bud/f\u003e"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\u0026lt;a href=\u0026#34;urb://~nec/x\u0026#34;\u0026gt;x\u0026lt;/a\u0026gt; \u0026lt;img SRC=\u0026#39;urb://~zod/i.png\u0026#39;\u0026gt; \u0026lt;form action=urb://~bud/f\u0026gt;\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "\u003ca href=\"urb://~nec/x\"\u003ex\u003c/a\u003e \u003cimg SRC='urb://~zod/i.png'\u003e \u003cform action=urb://~bud/f\u003e"
+   ],
+   "out": "\u003ca href=\"http://nec.urb.localhost:8475/x\"\u003ex\u003c/a\u003e \u003cimg SRC='http://zod.urb.localhost:8475/i.png'\u003e \u003cform action=http://bud.urb.localhost:8475/f\u003e"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "\u003cA HREF = \"urb://~nec\"\u003e"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u0026lt;A HREF = \u0026#34;urb://~nec\u0026#34;\u0026gt;\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "\u003cA HREF = \"urb://~nec\"\u003e"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u0026lt;A HREF = \u0026#34;urb://~nec\u0026#34;\u0026gt;\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "\u003cA HREF = \"urb://~nec\"\u003e"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\u0026lt;A HREF = \u0026#34;urb://~nec\u0026#34;\u0026gt;\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "\u003cA HREF = \"urb://~nec\"\u003e"
+   ],
+   "out": "\u003cA HREF = \"http://nec.urb.localhost:8475\"\u003e"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "href=urb://~nec"
+   ],
+   "out": {
+    "main": "\u003cp\u003ehref=urb://~nec\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "href=urb://~nec"
+   ],
+   "out": {
+    "main": "\u003cp\u003ehref=urb://~nec\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "href=urb://~nec"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\nhref=urb://~nec\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "href=urb://~nec"
+   ],
+   "out": "href=http://nec.urb.localhost:8475"
+  },
+  {
+   "fn": "renderGemtext",
+   "in": [
+    "\u003ca href=\"URB://~nec\"\u003e"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u0026lt;a href=\u0026#34;URB://~nec\u0026#34;\u0026gt;\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderMarkdown",
+   "in": [
+    "\u003ca href=\"URB://~nec\"\u003e"
+   ],
+   "out": {
+    "main": "\u003cp\u003e\u0026lt;a href=\u0026#34;URB://~nec\u0026#34;\u0026gt;\u003c/p\u003e\n",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "renderText",
+   "in": [
+    "\u003ca href=\"URB://~nec\"\u003e"
+   ],
+   "out": {
+    "main": "\u003cpre\u003e\n\u0026lt;a href=\u0026#34;URB://~nec\u0026#34;\u0026gt;\u003c/pre\u003e",
+    "title": "t"
+   }
+  },
+  {
+   "fn": "rewriteHTML",
+   "in": [
+    "\u003ca href=\"URB://~nec\"\u003e"
+   ],
+   "out": "\u003ca href=\"URB://~nec\"\u003e"
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~zod"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "urb://~zod"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~nec/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "urb://~nec/x"
+   ],
+   "out": {
+    "href": "http://nec.urb.localhost:8475/x",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "URB://~zod/y"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "URB://~zod/y"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/y",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~notaship/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "urb://~notaship/x"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~zod/a/../b"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "urb://~zod/a/../b"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/../b",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "HTTPS://a.b/c?d#e"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "HTTPS://a.b/c?d#e"
+   ],
+   "out": {
+    "href": "https://a.b/c?d#e",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "http:/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "http:/x"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "http://"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "http://"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "https://a"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "https://a"
+   ],
+   "out": {
+    "href": "https://a",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "mailto:a@b"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "mailto:a@b"
+   ],
+   "out": {
+    "href": "mailto:a@b",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "Mailto:A@B"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "Mailto:A@B"
+   ],
+   "out": {
+    "href": "mailto:A@B",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "gemini://g"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "gemini://g"
+   ],
+   "out": {
+    "href": "gemini://g",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "Gemini://g"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "Gemini://g"
+   ],
+   "out": {
+    "href": "gemini://g",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "javascript:x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "javascript:x"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "data:x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "data:x"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "/"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "/"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "//"
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "//"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\\"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "\\"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    ".."
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    ".."
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "."
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "."
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "x"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/x",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "y/z"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "y/z"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/y/z",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "../../c?q=1#f"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "../../c?q=1#f"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/c",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "?q"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "?q"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/b",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "#f"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "#f"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/b",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "%41"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "%41"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/%41",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "%2e%2e/x"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "%2e%2e/x"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/x",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "é"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "é"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/%C3%A9",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "😀"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "😀"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/%F0%9F%98%80",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    ":"
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    ":"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "a:b"
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "a:b"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "~"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "~"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/~",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "("
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "("
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/(",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    " x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    " x"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "x "
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "x "
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\tx"
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "\tx"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "a\\b"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "a\\b"
+   ],
+   "out": {
+    "href": "http://zod.urb.localhost:8475/a/a/b",
+    "own": true
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "/\\x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "/\\x"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "\u0001//evil"
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "\u0001//evil"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "ftp://x"
+   ],
+   "out": false
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "ftp://x"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb:"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "urb:"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb:/~zod"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "urb:/~zod"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "safeLink",
+   "in": [
+    "urb://~zod?x#y"
+   ],
+   "out": true
+  },
+  {
+   "fn": "pageLink",
+   "in": [
+    "urb://~zod?x#y"
+   ],
+   "out": {
+    "href": "",
+    "own": false
+   }
+  },
+  {
+   "fn": "page",
+   "in": [
+    "a \u003ctitle\u003e",
+    "\u003cp\u003ex\u003c/p\u003e"
+   ],
+   "out": "\u003c!doctype html\u003e\u003chtml lang=\"en\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"\u003e\u003ctitle\u003ea \u0026lt;title\u0026gt;\u003c/title\u003e\u003cstyle\u003e:root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fbfbf8;--mute:#6b6b70;--link:#2456c8}\n@media (prefers-color-scheme:dark){:root{--fg:#e8e8e3;--bg:#18181a;--mute:#9a9aa0;--link:#8ab0ff}}\nbody{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,sans-serif}\nmain{max-width:44rem;margin:0 auto;padding:2rem 1rem}\na{color:var(--link)}p.link{margin:.3rem 0}\npre{overflow-x:auto;padding:.8rem;border:1px solid var(--mute);border-radius:6px;font-size:14px}\nblockquote{margin:1rem 0;padding-left:1rem;border-left:3px solid var(--mute);color:var(--mute)}\ninput{font:inherit;width:100%;box-sizing:border-box;padding:.5rem}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cmain\u003e\u003cp\u003ex\u003c/p\u003e\u003c/main\u003e\u003c/body\u003e\u003c/html\u003e"
+  }
+ ]
+}

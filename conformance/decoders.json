@@ -1,0 +1,1208 @@
+{
+ "about": "mesa.mjs's decoders of other ships' nouns (its decoders export, with cord as the file reader), and furum.mjs's and forum.mjs's reads and notes, given the host's grubbery: files {\"<folder> <name>\": noun} or a deep peek's {\"<folder>\": [[path, noun]]}",
+ "cases": [
+  {
+   "fn": "json",
+   "in": [
+    {
+     "$noun": "c1df0517070f177c0ec7d718d52cf8b849ab5132b81b1aa702"
+    }
+   ],
+   "out": {
+    "b": [
+     "x",
+     true
+    ],
+    "c": {},
+    "a": 1
+   }
+  },
+  {
+   "fn": "json",
+   "in": [
+    {
+     "$noun": "c1e702"
+    }
+   ],
+   "out": ""
+  },
+  {
+   "fn": "json",
+   "in": [
+    {
+     "$noun": "c1dd8026c6a5a66c06"
+    }
+   ],
+   "out": 1500
+  },
+  {
+   "fn": "json",
+   "in": [
+    {
+     "$noun": "02"
+    }
+   ],
+   "out": null
+  },
+  {
+   "fn": "tang",
+   "in": [
+    {
+     "$noun": "01af4c4e5ec0672b0b33070f070583b383978387839b2de0cbbdcd952b281b14b4e05b8377ad513438de1a4583e7b5800f17c6d6ae21e80bca5b70be417d6b140d0e5701"
+    }
+   ],
+   "out": "err\n  a leaf\n  [x, y]\n  <|p>"
+  },
+  {
+   "fn": "tangText",
+   "in": [
+    {
+     "$noun": "057cb6b23073f0705030383b78b95138b8d902bedcdb5cb982b241410bbe3578d79a191c6fcd0c9ed7023e5c185bbb86802e286fc1f906f5ad99c1e12a"
+    }
+   ],
+   "out": "a leaf\n  [x, y]\n  <|p>"
+  },
+  {
+   "fn": "tang",
+   "in": [
+    {
+     "$noun": "b8"
+    }
+   ],
+   "out": ""
+  },
+  {
+   "fn": "pathOf",
+   "in": [
+    {
+     "$noun": "c1c3c1c5c1c702"
+    }
+   ],
+   "out": "/a/b/c"
+  },
+  {
+   "fn": "pathOf",
+   "in": [
+    {
+     "$noun": "02"
+    }
+   ],
+   "out": "/"
+  },
+  {
+   "fn": "segments",
+   "in": [
+    {
+     "$noun": "c1f101df4fef8d1ce085b18b7109131b0b"
+    }
+   ],
+   "out": [
+    "x",
+    "~zod",
+    "0v1.abc"
+   ]
+  },
+  {
+   "fn": "measure",
+   "in": [
+    {
+     "$noun": "714834"
+    }
+   ],
+   "out": true
+  },
+  {
+   "fn": "list",
+   "in": [
+    {
+     "$noun": "71c8d002"
+    }
+   ],
+   "out": 3
+  },
+  {
+   "fn": "entries",
+   "in": [
+    {
+     "$noun": "051723b3e0614e01"
+    }
+   ],
+   "out": 2
+  },
+  {
+   "fn": "fileOf",
+   "in": [
+    {
+     "$noun": "85061000022b8716d9cef701f8de79d300000058c0374b936b2740be2edb790e2bc43d1ecded57bad4eda46b08e7340001304279b06e49bd5a6d5c290667374d95c3bc05"
+    },
+    {
+     "$noun": "15800018a13c58b7a45ead36ae1483b39ba6ca04788e800481c0859d958188bd91e5d302c8d7653bcf6185b8c7a3b9fd4a97ba9d74067cb6b23073b3ab002f5b181d5dda5859e0c3859d958789384cc4612202"
+    }
+   ],
+   "out": "# A page body"
+  },
+  {
+   "fn": "fileOf",
+   "in": [
+    {
+     "$noun": "85061000022b8716d9cef701f8de79d300000058c0a72b6b832740be2edb790e2bc43d1ecded57bad4eda46b08e7340001304279b06e49bd5a6d5c290667374d95c3bc05"
+    },
+    {
+     "$noun": "15800018a13c58b7a45ead36ae1483b39ba6ca04788e800481c0859d958188bd91e5d302c8d7653bcf6185b8c7a3b9fd4a97ba9d74067cb6b23073b3ab002f5b181d5dda5859e0c3859d958789384cc4612202"
+    }
+   ],
+   "out": "# A page body"
+  },
+  {
+   "fn": "fileOf",
+   "in": [
+    {
+     "$noun": "85061000022b8716d9cef701f8de79d300000058c0a77b6b132b"
+    },
+    {
+     "$noun": "15800018a13c58b7a45ead36ae1483b39ba6ca04788e800481c0859d958188bd91e5d302c8d7653bcf6185b8c7a3b9fd4a97ba9d74067cb6b23073b3ab002f5b181d5dda5859e0c3859d958789384cc4612202"
+    }
+   ],
+   "out": null
+  },
+  {
+   "fn": "fileOf",
+   "in": [
+    {
+     "$noun": "85061000022b8716d9cef701f8de79d300000058c0374b936b2740be2edb790e2bc43d1ecded57bad4eda46b08e7340001304279b06e49bd5a6d5c290667374d95c3bc05"
+    },
+    {
+     "$noun": "29"
+    }
+   ],
+   "out": null
+  },
+  {
+   "fn": "ballOf",
+   "in": [
+    {
+     "$noun": "c500024060e5d022dbf93e00df3b6f1a0000000bf8666972ed04f8e33bbc9ceba3015277215a392ba198f70be09f5a03d00efabf9a0d5ddfbdc778c080cd000448f2f21acbadd515e3699a018d205626d710cb6900023c1eec051f1b60d71a9d1060d7389f7c3300014a43150143c1033dced6e1216e952bc3052080cda102e085ea71039730f7ceb4b3973c0310b080a88537421042e9c67ef142b4e4bd3d14a606b01f86839559661a4388171994ca98bec005f0efd9585453772202d7557d3a479a35ee660002fe6383f072fff54ce66f3237bf3df3fd87c254"
+    },
+    {
+     "$noun": "15c07e180e566699690c215e64502a63fa02273c5f01fc7b3616d5d49d88c075559fce91668dbb091f670108f88f0dc2cbfdd73399bfc9dcfcf6ccf74f383cb500fea93500eda0ffabd9d0f5dd7b8c070cd80cf8747265e5cccc023e5959193c00011e0ff6828f0db06b8d4e08b06b9c4fbe0e533f0b4080242fafb1dc5a5d319ea619d008626572067cb6b23073c348ad04bedb5b9d7b98fac3d4af00fef80e2fe7fa6880d45d8856ce4a28e6fd6ca84a33b302fe58981c194080d25045c050f0408fb37578885be5caf030f50bf0c0bdcdd1cd0310b080a88537421042e9c67ef142b4e4bd6d0578e9d0e4cac2c8e60d15a0c3d47798fa35d4bfd95095666605c703086073a80078a17adcc025ccbd33edec251fa6be59c315371b8e880da13adc20ab2125301b8e88cd1e6e9059c38d3a1baad2ccac408bc143b53e4c7d87a92f"
+    }
+   ],
+   "out": [
+    [
+     [
+      "card"
+     ],
+     "c"
+    ],
+    [
+     [
+      "posts",
+      "b0"
+     ],
+     "p"
+    ],
+    [
+     [
+      "threads",
+      "deep",
+      "x"
+     ],
+     "y"
+    ]
+   ]
+  },
+  {
+   "fn": "ballOf",
+   "in": [
+    {
+     "$noun": "85061000022b8716d9cef701f8de79d300000058c0374b936b2740be2edb790e2bc43d1ecded57bad4eda46b08e7340001304279b06e49bd5a6d5c290667374d95c3bc05"
+    },
+    {
+     "$noun": "15800018a13c58b7a45ead36ae1483b39ba6ca04788e800481c0859d958188bd91e5d302c8d7653bcf6185b8c7a3b9fd4a97ba9d74067cb6b23073b3ab002f5b181d5dda5859e0c3859d958789384cc4612202"
+    }
+   ],
+   "out": null
+  },
+  {
+   "fn": "ship",
+   "in": [
+    {
+     "$noun": "02"
+    }
+   ],
+   "out": "~zod"
+  },
+  {
+   "fn": "ship",
+   "in": [
+    {
+     "$noun": "600002"
+    }
+   ],
+   "out": "~marzod"
+  },
+  {
+   "fn": "ship",
+   "in": [
+    {
+     "$noun": "c0000008"
+    }
+   ],
+   "out": "~dapnep-ronmyl"
+  },
+  {
+   "fn": "ship",
+   "in": [
+    {
+     "$noun": "00830200000000000080"
+    }
+   ],
+   "out": "~doznec--dozzod-dozzod-dozzod-dozper"
+  },
+  {
+   "fn": "furum.nextPost",
+   "in": [
+    {
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/pub conf": {
+      "$noun": "714801"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/posts b0": {
+      "$noun": "719919e0314a939ba397002f343a3ab8399d97973017710208008195438b6ce7fb007cefbc69000000ac388e037c5365636f6ee42c812ff646960710008195438b6ce7fb01f8de79d3000000980a"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/threads b0": {
+      "$noun": "7119b2cc8c038f96061000022b8716d9cef701f8de79d300000058715c9a011eb93238b63c800008ac1c5a643bdf0fc0f7ce9b060000c021cc1dc21c"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/votes b0": {
+      "$noun": "71057cb8b739ba6571aa558077ecadadadcc8d9edc3830c78de34601"
+     }
+    },
+    "news"
+   ],
+   "out": 2
+  },
+  {
+   "fn": "furum.nextPost",
+   "in": [
+    {
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/pub conf": {
+      "$noun": "714801"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/posts b0": {
+      "$noun": "719919e0314a939ba397002f343a3ab8399d97973017710208008195438b6ce7fb007cefbc69000000ac388e037c5365636f6ee42c812ff646960710008195438b6ce7fb01f8de79d3000000980a"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/threads b0": {
+      "$noun": "7119b2cc8c038f96061000022b8716d9cef701f8de79d300000058715c9a011eb93238b63c800008ac1c5a643bdf0fc0f7ce9b060000c021cc1dc21c"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/votes b0": {
+      "$noun": "71057cb8b739ba6571aa558077ecadadadcc8d9edc3830c78de34601"
+     }
+    },
+    "none"
+   ],
+   "out": null
+  },
+  {
+   "fn": "furum.posts",
+   "in": [
+    {
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/pub conf": {
+      "$noun": "714801"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/posts b0": {
+      "$noun": "719919e0314a939ba397002f343a3ab8399d97973017710208008195438b6ce7fb007cefbc69000000ac388e037c5365636f6ee42c812ff646960710008195438b6ce7fb01f8de79d3000000980a"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/threads b0": {
+      "$noun": "7119b2cc8c038f96061000022b8716d9cef701f8de79d300000058715c9a011eb93238b63c800008ac1c5a643bdf0fc0f7ce9b060000c021cc1dc21c"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/votes b0": {
+      "$noun": "71057cb8b739ba6571aa558077ecadadadcc8d9edc3830c78de34601"
+     }
+    },
+    "news"
+   ],
+   "out": [
+    {
+     "id": 1,
+     "author": "~nec",
+     "title": "Second",
+     "url": null,
+     "body": "body",
+     "created": {
+      "$date": "2025-10-27T21:20:00.123Z"
+     }
+    },
+    {
+     "id": 0,
+     "author": "~zod",
+     "title": "First",
+     "url": "https://a.b",
+     "body": null,
+     "created": {
+      "$date": "2025-10-27T21:20:00.122Z"
+     }
+    }
+   ]
+  },
+  {
+   "fn": "furum.posts",
+   "in": [
+    {
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/pub conf": {
+      "$noun": "714801"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/posts b0": {
+      "$noun": "719919e0314a939ba397002f343a3ab8399d97973017710208008195438b6ce7fb007cefbc69000000ac388e037c5365636f6ee42c812ff646960710008195438b6ce7fb01f8de79d3000000980a"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/threads b0": {
+      "$noun": "7119b2cc8c038f96061000022b8716d9cef701f8de79d300000058715c9a011eb93238b63c800008ac1c5a643bdf0fc0f7ce9b060000c021cc1dc21c"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/votes b0": {
+      "$noun": "71057cb8b739ba6571aa558077ecadadadcc8d9edc3830c78de34601"
+     }
+    },
+    "none"
+   ],
+   "error": "no board none on ~zod, or it is not shared"
+  },
+  {
+   "fn": "furum.comments",
+   "in": [
+    {
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/pub conf": {
+      "$noun": "714801"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/posts b0": {
+      "$noun": "719919e0314a939ba397002f343a3ab8399d97973017710208008195438b6ce7fb007cefbc69000000ac388e037c5365636f6ee42c812ff646960710008195438b6ce7fb01f8de79d3000000980a"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/threads b0": {
+      "$noun": "7119b2cc8c038f96061000022b8716d9cef701f8de79d300000058715c9a011eb93238b63c800008ac1c5a643bdf0fc0f7ce9b060000c021cc1dc21c"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/votes b0": {
+      "$noun": "71057cb8b739ba6571aa558077ecadadadcc8d9edc3830c78de34601"
+     }
+    },
+    "news",
+    0
+   ],
+   "out": [
+    {
+     "id": 0,
+     "parent": null,
+     "author": "~nec",
+     "body": "hi",
+     "created": {
+      "$date": "2025-10-27T21:20:00.122Z"
+     }
+    },
+    {
+     "id": 1,
+     "parent": 0,
+     "author": "~zod",
+     "body": "reply",
+     "created": {
+      "$date": "2025-10-27T21:20:00.123Z"
+     }
+    }
+   ]
+  },
+  {
+   "fn": "furum.comments",
+   "in": [
+    {
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/pub conf": {
+      "$noun": "714801"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/posts b0": {
+      "$noun": "719919e0314a939ba397002f343a3ab8399d97973017710208008195438b6ce7fb007cefbc69000000ac388e037c5365636f6ee42c812ff646960710008195438b6ce7fb01f8de79d3000000980a"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/threads b0": {
+      "$noun": "7119b2cc8c038f96061000022b8716d9cef701f8de79d300000058715c9a011eb93238b63c800008ac1c5a643bdf0fc0f7ce9b060000c021cc1dc21c"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/votes b0": {
+      "$noun": "71057cb8b739ba6571aa558077ecadadadcc8d9edc3830c78de34601"
+     }
+    },
+    "news",
+    5
+   ],
+   "out": []
+  },
+  {
+   "fn": "furum.votes",
+   "in": [
+    {
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/pub conf": {
+      "$noun": "714801"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/posts b0": {
+      "$noun": "719919e0314a939ba397002f343a3ab8399d97973017710208008195438b6ce7fb007cefbc69000000ac388e037c5365636f6ee42c812ff646960710008195438b6ce7fb01f8de79d3000000980a"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/threads b0": {
+      "$noun": "7119b2cc8c038f96061000022b8716d9cef701f8de79d300000058715c9a011eb93238b63c800008ac1c5a643bdf0fc0f7ce9b060000c021cc1dc21c"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/votes b0": {
+      "$noun": "71057cb8b739ba6571aa558077ecadadadcc8d9edc3830c78de34601"
+     }
+    },
+    "news",
+    0
+   ],
+   "out": {
+    "up": [
+     "~zod",
+     "~nec"
+    ],
+    "down": []
+   }
+  },
+  {
+   "fn": "furum.votes",
+   "in": [
+    {
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/pub conf": {
+      "$noun": "714801"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/posts b0": {
+      "$noun": "719919e0314a939ba397002f343a3ab8399d97973017710208008195438b6ce7fb007cefbc69000000ac388e037c5365636f6ee42c812ff646960710008195438b6ce7fb01f8de79d3000000980a"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/threads b0": {
+      "$noun": "7119b2cc8c038f96061000022b8716d9cef701f8de79d300000058715c9a011eb93238b63c800008ac1c5a643bdf0fc0f7ce9b060000c021cc1dc21c"
+     },
+     "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app/boards/news/content/votes b0": {
+      "$noun": "71057cb8b739ba6571aa558077ecadadadcc8d9edc3830c78de34601"
+     }
+    },
+    "news",
+    1
+   ],
+   "out": {
+    "up": [],
+    "down": []
+   }
+  },
+  {
+   "fn": "forum.board",
+   "in": [
+    {
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/pub": [
+      [
+       [
+        "card"
+       ],
+       {
+        "$noun": "7180b72d468cae6c8e1ec0b729460c84ae6c8e0e44ec2d4c8e1ce00d03117b0b93236700024060e5d022dbf93e00df3b6f1a000000037c706f7374657201"
+       }
+      ],
+      [
+       [
+        "roles"
+       ],
+       {
+        "$noun": "7131f0dadec829"
+       }
+      ],
+      [
+       [
+        "conf"
+       ],
+       {
+        "$noun": "71e80c1720030000000000000000e1"
+       }
+      ]
+     ],
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/content": [
+      [
+       [
+        "pins"
+       ],
+       {
+        "$noun": "71c814"
+       }
+      ],
+      [
+       [
+        "sidebar"
+       ],
+       {
+        "$noun": "31a0172a03594b73237301"
+       }
+      ],
+      [
+       [
+        "posts",
+        "b0"
+       ],
+       {
+        "$noun": "712143c6018feaee5d02bcd0e8e8e0e6745e5ec65cc80920000000000000000004f0bdf3a6010000b0e23803de935b394b381e400004560e2db29def07e07be74d030000602a"
+       }
+      ],
+      [
+       [
+        "threads",
+        "b0"
+       ],
+       {
+        "$noun": "71715c66c6011eb334b9393a8000105839b4c876be0fc0f7ce9b060000c0748877"
+       }
+      ],
+      [
+       [
+        "votes",
+        "b0"
+       ],
+       {
+        "$noun": "71057cb8b7393a17a75601deb1b7b6b632377a6ce6b8705c28"
+       }
+      ]
+     ]
+    },
+    "m1btest"
+   ],
+   "out": {
+    "info": {
+     "name": "m1btest",
+     "title": "M1b test board",
+     "description": "a board",
+     "host": "~zod",
+     "created": {
+      "$date": "2025-10-27T21:20:00.122Z"
+     },
+     "defaultRole": "poster",
+     "public": true
+    },
+    "roles": {
+     "~nec": "mod"
+    },
+    "nextPost": 3,
+    "prune": {
+     "minScore": 5,
+     "after": 3600000
+    },
+    "pinned": [
+     2
+    ],
+    "sidebar": "Be kind.",
+    "posts": [
+     {
+      "id": 2,
+      "author": "~nec",
+      "title": "Two",
+      "url": "https://c.d",
+      "body": null,
+      "created": {
+       "$date": "2025-10-27T21:20:00.125Z"
+      },
+      "up": [],
+      "down": [],
+      "comments": 0
+     },
+     {
+      "id": 1,
+      "author": "~zod",
+      "title": "One",
+      "url": null,
+      "body": "x",
+      "created": {
+       "$date": "2025-10-27T21:20:00.123Z"
+      },
+      "up": [
+       "~nec"
+      ],
+      "down": [],
+      "comments": 1
+     }
+    ],
+    "comments": {
+     "1": [
+      {
+       "id": 0,
+       "parent": null,
+       "author": "~nec",
+       "body": "first",
+       "created": {
+        "$date": "2025-10-27T21:20:00.122Z"
+       },
+       "up": [],
+       "down": [
+        "~zod"
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "fn": "forum.board",
+   "in": [
+    {
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/pub": [
+      [
+       [
+        "card"
+       ],
+       {
+        "$noun": "7180b72d468cae6c8e1ec0b729460c84ae6c8e0e44ec2d4c8e1ce00d03117b0b93236700024060e5d022dbf93e00df3b6f1a000000037c706f7374657201"
+       }
+      ],
+      [
+       [
+        "roles"
+       ],
+       {
+        "$noun": "7131f0dadec829"
+       }
+      ],
+      [
+       [
+        "conf"
+       ],
+       {
+        "$noun": "71e80c1720030000000000000000e1"
+       }
+      ]
+     ],
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/content": [
+      [
+       [
+        "pins"
+       ],
+       {
+        "$noun": "71c814"
+       }
+      ],
+      [
+       [
+        "sidebar"
+       ],
+       {
+        "$noun": "31a0172a03594b73237301"
+       }
+      ],
+      [
+       [
+        "posts",
+        "b0"
+       ],
+       {
+        "$noun": "712143c6018feaee5d02bcd0e8e8e0e6745e5ec65cc80920000000000000000004f0bdf3a6010000b0e23803de935b394b381e400004560e2db29def07e07be74d030000602a"
+       }
+      ],
+      [
+       [
+        "threads",
+        "b0"
+       ],
+       {
+        "$noun": "71715c66c6011eb334b9393a8000105839b4c876be0fc0f7ce9b060000c0748877"
+       }
+      ],
+      [
+       [
+        "votes",
+        "b0"
+       ],
+       {
+        "$noun": "71057cb8b7393a17a75601deb1b7b6b632377a6ce6b8705c28"
+       }
+      ]
+     ]
+    },
+    "other"
+   ],
+   "error": "~zod shares no board other with ~nec: unreachable, private or not there"
+  },
+  {
+   "fn": "forum.thread",
+   "in": [
+    {
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/pub": [
+      [
+       [
+        "card"
+       ],
+       {
+        "$noun": "7180b72d468cae6c8e1ec0b729460c84ae6c8e0e44ec2d4c8e1ce00d03117b0b93236700024060e5d022dbf93e00df3b6f1a000000037c706f7374657201"
+       }
+      ],
+      [
+       [
+        "roles"
+       ],
+       {
+        "$noun": "7131f0dadec829"
+       }
+      ],
+      [
+       [
+        "conf"
+       ],
+       {
+        "$noun": "71e80c1720030000000000000000e1"
+       }
+      ]
+     ],
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/content": [
+      [
+       [
+        "pins"
+       ],
+       {
+        "$noun": "71c814"
+       }
+      ],
+      [
+       [
+        "sidebar"
+       ],
+       {
+        "$noun": "31a0172a03594b73237301"
+       }
+      ],
+      [
+       [
+        "posts",
+        "b0"
+       ],
+       {
+        "$noun": "712143c6018feaee5d02bcd0e8e8e0e6745e5ec65cc80920000000000000000004f0bdf3a6010000b0e23803de935b394b381e400004560e2db29def07e07be74d030000602a"
+       }
+      ],
+      [
+       [
+        "threads",
+        "b0"
+       ],
+       {
+        "$noun": "71715c66c6011eb334b9393a8000105839b4c876be0fc0f7ce9b060000c0748877"
+       }
+      ],
+      [
+       [
+        "votes",
+        "b0"
+       ],
+       {
+        "$noun": "71057cb8b7393a17a75601deb1b7b6b632377a6ce6b8705c28"
+       }
+      ]
+     ]
+    },
+    "m1btest",
+    1
+   ],
+   "out": {
+    "info": {
+     "name": "m1btest",
+     "title": "M1b test board",
+     "description": "a board",
+     "host": "~zod",
+     "created": {
+      "$date": "2025-10-27T21:20:00.122Z"
+     },
+     "defaultRole": "poster",
+     "public": true
+    },
+    "post": {
+     "id": 1,
+     "author": "~zod",
+     "title": "One",
+     "url": null,
+     "body": "x",
+     "created": {
+      "$date": "2025-10-27T21:20:00.123Z"
+     },
+     "up": [
+      "~nec"
+     ],
+     "down": [],
+     "comments": 1
+    },
+    "comments": [
+     {
+      "id": 0,
+      "parent": null,
+      "author": "~nec",
+      "body": "first",
+      "created": {
+       "$date": "2025-10-27T21:20:00.122Z"
+      },
+      "up": [],
+      "down": [
+       "~zod"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "fn": "forum.thread",
+   "in": [
+    {
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/pub": [
+      [
+       [
+        "card"
+       ],
+       {
+        "$noun": "7180b72d468cae6c8e1ec0b729460c84ae6c8e0e44ec2d4c8e1ce00d03117b0b93236700024060e5d022dbf93e00df3b6f1a000000037c706f7374657201"
+       }
+      ],
+      [
+       [
+        "roles"
+       ],
+       {
+        "$noun": "7131f0dadec829"
+       }
+      ],
+      [
+       [
+        "conf"
+       ],
+       {
+        "$noun": "71e80c1720030000000000000000e1"
+       }
+      ]
+     ],
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/content": [
+      [
+       [
+        "pins"
+       ],
+       {
+        "$noun": "71c814"
+       }
+      ],
+      [
+       [
+        "sidebar"
+       ],
+       {
+        "$noun": "31a0172a03594b73237301"
+       }
+      ],
+      [
+       [
+        "posts",
+        "b0"
+       ],
+       {
+        "$noun": "712143c6018feaee5d02bcd0e8e8e0e6745e5ec65cc80920000000000000000004f0bdf3a6010000b0e23803de935b394b381e400004560e2db29def07e07be74d030000602a"
+       }
+      ],
+      [
+       [
+        "threads",
+        "b0"
+       ],
+       {
+        "$noun": "71715c66c6011eb334b9393a8000105839b4c876be0fc0f7ce9b060000c0748877"
+       }
+      ],
+      [
+       [
+        "votes",
+        "b0"
+       ],
+       {
+        "$noun": "71057cb8b7393a17a75601deb1b7b6b632377a6ce6b8705c28"
+       }
+      ]
+     ]
+    },
+    "m1btest",
+    9
+   ],
+   "error": "no post 9 on ~zod's board m1btest"
+  },
+  {
+   "fn": "forum.board",
+   "in": [
+    {
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/pub": [
+      [
+       [
+        "card"
+       ],
+       {
+        "$noun": "7180b72d468cae6c8e1ec0b729460c84ae6c8e0e44ec2d4c8e1ce00d03117b0b93236700024060e5d022dbf93e00df3b6f1a000000037c706f7374657201"
+       }
+      ],
+      [
+       [
+        "roles"
+       ],
+       {
+        "$noun": "7131f0dadec829"
+       }
+      ],
+      [
+       [
+        "conf"
+       ],
+       {
+        "$noun": "71e80c1720030000000000000000e1"
+       }
+      ]
+     ],
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/content": [
+      [
+       [
+        "pins"
+       ],
+       {
+        "$noun": "71c814"
+       }
+      ],
+      [
+       [
+        "sidebar"
+       ],
+       {
+        "$noun": "31a0172a03594b73237301"
+       }
+      ],
+      [
+       [
+        "posts",
+        "b0"
+       ],
+       {
+        "$noun": "712143c6018feaee5d02bcd0e8e8e0e6745e5ec65cc80920000000000000000004f0bdf3a6010000b0e23803de935b394b381e400004560e2db29def07e07be74d030000602a"
+       }
+      ],
+      [
+       [
+        "threads",
+        "b0"
+       ],
+       {
+        "$noun": "71715c66c6011eb334b9393a8000105839b4c876be0fc0f7ce9b060000c0748877"
+       }
+      ],
+      [
+       [
+        "votes",
+        "b0"
+       ],
+       {
+        "$noun": "71057cb8b7393a17a75601deb1b7b6b632377a6ce6b8705c28"
+       }
+      ],
+      [
+       [
+        "posts",
+        "b1"
+       ],
+       {
+        "$noun": "2105"
+       }
+      ]
+     ]
+    },
+    "m1btest"
+   ],
+   "error": "~zod's board grub is unreadable: /content/posts/b1 (not version 1)"
+  },
+  {
+   "fn": "forum.board",
+   "in": [
+    {
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/pub": [
+      [
+       [
+        "card"
+       ],
+       {
+        "$noun": "7180b72d468cae6c8e1ec0b729460c84ae6c8e0e44ec2d4c8e1ce00d03117b0b93236700024060e5d022dbf93e00df3b6f1a000000037c706f7374657201"
+       }
+      ],
+      [
+       [
+        "roles"
+       ],
+       {
+        "$noun": "7131f0dadec829"
+       }
+      ],
+      [
+       [
+        "conf"
+       ],
+       {
+        "$noun": "71e80c1720030000000000000000e1"
+       }
+      ]
+     ],
+     "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app/forum/boards/m1btest/content": [
+      [
+       [
+        "pins"
+       ],
+       {
+        "$noun": "71c814"
+       }
+      ],
+      [
+       [
+        "sidebar"
+       ],
+       {
+        "$noun": "31a0172a03594b73237301"
+       }
+      ],
+      [
+       [
+        "posts",
+        "b0"
+       ],
+       {
+        "$noun": "712143c6018feaee5d02bcd0e8e8e0e6745e5ec65cc80920000000000000000004f0bdf3a6010000b0e23803de935b394b381e400004560e2db29def07e07be74d030000602a"
+       }
+      ],
+      [
+       [
+        "threads",
+        "b0"
+       ],
+       {
+        "$noun": "71715c66c6011eb334b9393a8000105839b4c876be0fc0f7ce9b060000c0748877"
+       }
+      ],
+      [
+       [
+        "votes",
+        "b0"
+       ],
+       {
+        "$noun": "71057cb8b7393a17a75601deb1b7b6b632377a6ce6b8705c28"
+       }
+      ],
+      [
+       [
+        "votes",
+        "b1"
+       ],
+       {
+        "$noun": "710578e4cae0d8f29c8e1301"
+       }
+      ]
+     ]
+    },
+    "m1btest"
+   ],
+   "error": "~zod's board grub is unreadable: /content/votes/b1 (no vote target %reply)"
+  },
+  {
+   "fn": "forum.note",
+   "in": [
+    {
+     "from": "~zod",
+     "to": [
+      "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app",
+      "forum.sig"
+     ],
+     "mark": [
+      "/lattice",
+      "forum-note"
+     ],
+     "noun": {
+      "$noun": "01deb61831bab2393a002fcddee4eada7440f2deea40c2e4ca40c2c6e8d2dcce40e8dede40ccc2e6e85840e6d8deee40c8deeedc40c2dcc840e4cae8e4f2"
+     }
+    }
+   ],
+   "out": {
+    "host": "~zod",
+    "board": "m1btest",
+    "reason": "forum: you are acting too fast, slow down and retry",
+    "at": {
+     "$date": "2025-10-27T21:20:00.000Z"
+    }
+   }
+  },
+  {
+   "fn": "forum.note",
+   "in": [
+    {
+     "from": "~nec",
+     "to": [
+      "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app",
+      "forum.sig"
+     ],
+     "mark": [
+      "/lattice",
+      "forum-note"
+     ],
+     "noun": {
+      "$noun": "01deb61831bab2393a800733b9b7369030b7373ab432399039b43438"
+     }
+    }
+   ],
+   "out": null
+  },
+  {
+   "fn": "forum.note",
+   "in": [
+    {
+     "from": "~zod",
+     "to": [
+      "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app",
+      "forum.sig"
+     ],
+     "mark": [
+      "/lattice",
+      "forum-note"
+     ],
+     "noun": {
+      "$noun": "0578db62c4e8cae6e80ce0230c64ac8c8d0dc4ec4d0e240c44ec2d4c8e0c"
+     }
+    }
+   ],
+   "out": null
+  },
+  {
+   "fn": "furum.note",
+   "in": [
+    {
+     "from": "~zod",
+     "to": [
+      "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app",
+      "inbox.sig"
+     ],
+     "mark": [
+      "/furum",
+      "msg"
+     ],
+     "noun": {
+      "$noun": "01dfed8dae1c803f3fbd373210b932b3bab9323290bcb73a399031b430b7b372005fb8b7393a10b7373a10b3b73a37720a"
+     }
+    }
+   ],
+   "out": {
+    "from": "~zod",
+    "title": "~zod refused your change",
+    "body": "post not found"
+   }
+  },
+  {
+   "fn": "furum.note",
+   "in": [
+    {
+     "from": "~zod",
+     "to": [
+      "/apps/shell.shell/desks/furum.desk/desk/data/furum.furum_app",
+      "inbox.sig"
+     ],
+     "mark": [
+      "/furum",
+      "msg"
+     ],
+     "noun": {
+      "$noun": "012f6c8c0ec703"
+     }
+    }
+   ],
+   "out": null
+  }
+ ]
+}

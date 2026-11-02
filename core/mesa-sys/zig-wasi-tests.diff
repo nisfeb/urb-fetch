@@ -1,0 +1,27 @@
+--- a/build.zig
++++ b/build.zig
+@@ -257,6 +257,11 @@
+         }
+     }
+ 
++    var wasi_test_flags = std.array_list.Managed([]const u8).init(b.allocator);
++    defer wasi_test_flags.deinit();
++    try wasi_test_flags.appendSlice(flags.items);
++    try wasi_test_flags.append("-D_WASI_EMULATED_GETPID");
++
+     const test_step = b.step("test", "Run unit tests");
+ 
+     const tests = [_]struct { name: []const u8, file: []const u8, defs: []const []const u8 }{
+@@ -291,9 +296,11 @@
+ 
+         addIncludes(b, exe, urcrypt);
+ 
++        //  WASI has no getpid; the tests seed rand() with it
++        if (t.os.tag == .wasi) exe.linkSystemLibrary("wasi-emulated-getpid");
+         exe.addCSourceFiles(.{
+             .files = &.{tst.file},
+-            .flags = flags.items,
++            .flags = if (t.os.tag == .wasi) wasi_test_flags.items else flags.items,
+         });
+ 
+         const run = b.addRunArtifact(exe);

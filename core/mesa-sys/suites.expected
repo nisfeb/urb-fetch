@@ -1,0 +1,28 @@
+# libmesa 2cbb076's twelve suites, as its own build.zig runs them with
+# zig 0.15.2 (suites.sh zig ...). A build of ours must give the same.
+# Under WASI store_test does not compile: wasi-libc has no mkdtemp (and
+# store_sqlite.c's flock would fail at run time).
+native pact-test pass
+native ship-test pass
+native lss-test pass
+native bitset-test pass
+native noun-test pass
+native crypto-test pass
+native ident-test pass
+native azimuth-test pass
+native engine-test pass
+native store-test pass
+native gall-test pass
+native aes-siv-test pass
+wasi pact-test pass
+wasi ship-test pass
+wasi lss-test pass
+wasi bitset-test pass
+wasi noun-test pass
+wasi crypto-test pass
+wasi ident-test pass
+wasi azimuth-test pass
+wasi engine-test pass
+wasi store-test no-build
+wasi gall-test pass
+wasi aes-siv-test pass

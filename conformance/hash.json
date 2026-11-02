@@ -1,0 +1,4207 @@
+{
+ "about": "sham (hex) and mug of a value as noun() builds it, and mesa.mjs's uv and da; check.mjs checks each kind against vere",
+ "cases": [
+  {
+   "fn": "sham",
+   "in": [
+    null
+   ],
+   "out": "8799fb5d7029da5ea2507d60e7b408b9"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    true
+   ],
+   "out": "8799fb5d7029da5ea2507d60e7b408b9"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    false
+   ],
+   "out": "b8e9819599c0c7a28254d02dcb9687d6"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    0
+   ],
+   "out": "8799fb5d7029da5ea2507d60e7b408b9"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    1
+   ],
+   "out": "b8e9819599c0c7a28254d02dcb9687d6"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    255
+   ],
+   "out": "dbda3f87b2da7a33e44a1c0721551efa"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    256
+   ],
+   "out": "8d4ddc390bdaa4452fa321ad4838990e"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    65535
+   ],
+   "out": "6e82623ee0c72cc9f6ad6f15e62d009e"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    9007199254740991
+   ],
+   "out": "fe87656a486ad0a7e7484ea343f56efa"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$big": "18446744073709551616"
+    }
+   ],
+   "out": "f4e2b9e2a9ecce9fd5b4e062e835bb5d"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$big": "340282366920938463463374607431768211457"
+    }
+   ],
+   "out": "dd69c918f847633a1750aceec6c9968f"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$big": "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"
+    }
+   ],
+   "out": "95f9f75cdc217d5374ac2b90b60531e4"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    ""
+   ],
+   "out": "8799fb5d7029da5ea2507d60e7b408b9"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    "a"
+   ],
+   "out": "32f7003514a140af71988355ad49d263"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    "cord"
+   ],
+   "out": "ab2c2361053ae86e6b8b79980a9afb05"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    "ünïcode ✓"
+   ],
+   "out": "1020832648730414148f91dea8ec09c4"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "out": "3640cfff9340d8fe567602c545244721"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    [
+     1,
+     2
+    ]
+   ],
+   "out": "807aa0f6a2c7b102114da2298926aff3"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    [
+     1,
+     2,
+     3
+    ]
+   ],
+   "out": "29980eb768562c11c85570fc60f9164"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    [
+     "a",
+     null
+    ]
+   ],
+   "out": "1bdcda9f1fdb3c347c530e50bf696ef8"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    [
+     [
+      1,
+      2
+     ],
+     [
+      3,
+      4
+     ]
+    ]
+   ],
+   "out": "b948dc9de9ab9bf8760f0c74d968d581"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    [
+     null,
+     null,
+     null
+    ]
+   ],
+   "out": "53f1c2acffe96cff4e604ffeae37c0fe"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    [
+     "a",
+     "b",
+     "c",
+     null
+    ]
+   ],
+   "out": "bedb12d29502710e3a8add126f70ff19"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    null
+   ],
+   "out": "8799fb5d7029da5ea2507d60e7b408b9"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    [
+     "g",
+     "x",
+     "1",
+     "grubbery",
+     "",
+     "1",
+     "pub",
+     "page",
+     "notes",
+     "intro",
+     "0v1",
+     null
+    ]
+   ],
+   "out": "f5730f2682e863712548bcadf2a8ccff"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    [
+     "apps",
+     "shell.shell",
+     "desks",
+     "lattice.desk",
+     "desk",
+     "data",
+     "lattice.lattice_app",
+     null
+    ]
+   ],
+   "out": "c80bf530cff1d993d629787e3f29369a"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": []
+    }
+   ],
+   "out": "8799fb5d7029da5ea2507d60e7b408b9"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": []
+    }
+   ],
+   "out": "8799fb5d7029da5ea2507d60e7b408b9"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": []
+    }
+   ],
+   "out": "8799fb5d7029da5ea2507d60e7b408b9"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": []
+    }
+   ],
+   "out": "8799fb5d7029da5ea2507d60e7b408b9"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ]
+     ]
+    }
+   ],
+   "out": "f493ed25db7e5f485bcfd54870c4376c"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "3aab0c04f9297aa5d7b489ca91de9a6a"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      1000
+     ]
+    }
+   ],
+   "out": "8bd830c0a4039243971a1f65af54563d"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      "s0"
+     ]
+    }
+   ],
+   "out": "a8fb1abb02399e7f3b9b201bde3e378e"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ]
+     ]
+    }
+   ],
+   "out": "dc619ea83d829a5a20a5a7f500433562"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "28c4b7079298b4940b82a1673fdaa0ec"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919
+     ]
+    }
+   ],
+   "out": "c2cda593c0368d7a0892d389204d3741"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1"
+     ]
+    }
+   ],
+   "out": "c47893795d0056fb72d4b7b4a0badcc0"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ]
+     ]
+    }
+   ],
+   "out": "16b14afede98093e2dcbf26a8ab2aa7c"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "1f91dc125133ba91d21d0d00b32758aa"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838
+     ]
+    }
+   ],
+   "out": "f8a020d7c1d9471bc8288429bd73de2e"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2"
+     ]
+    }
+   ],
+   "out": "2e642ccd3e452b60e4c9295255f03be9"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ]
+     ]
+    }
+   ],
+   "out": "678bfb5bdc858dafadf2ebc6e8f05d2e"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "9b381843c494d18dbf49dc02ebfc88d6"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676
+     ]
+    }
+   ],
+   "out": "1aa8036445541a4f09971bfb1a6c726b"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4"
+     ]
+    }
+   ],
+   "out": "addb66291865fa103b44f4d2f4064215"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ],
+      [
+       "key-5",
+       5
+      ],
+      [
+       "key-6",
+       6
+      ],
+      [
+       "key-7",
+       7
+      ]
+     ]
+    }
+   ],
+   "out": "b119ce184ae194a02035283a0f655f7e"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p5",
+        "gmi",
+        null
+       ],
+       [
+        5,
+        "v5"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p6",
+        "gmi",
+        null
+       ],
+       [
+        6,
+        "v6"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p7",
+        "gmi",
+        null
+       ],
+       [
+        7,
+        "v7"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "bf6870898d9f2bc385d0abf638cb683a"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676,
+      40595,
+      48514,
+      56433
+     ]
+    }
+   ],
+   "out": "9d9ea71533bfd810f6b8398a4aaefe19"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s5",
+      "s6",
+      "s7"
+     ]
+    }
+   ],
+   "out": "35b19648b181adfd9bb96a379a34b3ef"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ],
+      [
+       "key-5",
+       5
+      ],
+      [
+       "key-6",
+       6
+      ],
+      [
+       "key-7",
+       7
+      ],
+      [
+       "key-8",
+       8
+      ],
+      [
+       "key-9",
+       9
+      ],
+      [
+       "key-10",
+       10
+      ],
+      [
+       "key-11",
+       11
+      ],
+      [
+       "key-12",
+       12
+      ]
+     ]
+    }
+   ],
+   "out": "a77ed970202be92fe7c0f3147e889330"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p5",
+        "gmi",
+        null
+       ],
+       [
+        5,
+        "v5"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p6",
+        "gmi",
+        null
+       ],
+       [
+        6,
+        "v6"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p7",
+        "gmi",
+        null
+       ],
+       [
+        7,
+        "v7"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p8",
+        "gmi",
+        null
+       ],
+       [
+        8,
+        "v8"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p9",
+        "gmi",
+        null
+       ],
+       [
+        9,
+        "v9"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p10",
+        "gmi",
+        null
+       ],
+       [
+        10,
+        "v10"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p11",
+        "gmi",
+        null
+       ],
+       [
+        11,
+        "v11"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p12",
+        "gmi",
+        null
+       ],
+       [
+        12,
+        "v12"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "fe7be16890ee7520d0df9b98f2f1655d"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676,
+      40595,
+      48514,
+      56433,
+      64352,
+      72271,
+      80190,
+      88109,
+      96028
+     ]
+    }
+   ],
+   "out": "6e2df861aaa1e6b46858708b1c4c779a"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s5",
+      "s6",
+      "s7",
+      "s8",
+      "s9",
+      "s10",
+      "s11",
+      "s12"
+     ]
+    }
+   ],
+   "out": "c98d3ac004ec6f18105f356063799a3f"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ],
+      [
+       "key-5",
+       5
+      ],
+      [
+       "key-6",
+       6
+      ],
+      [
+       "key-7",
+       7
+      ],
+      [
+       "key-8",
+       8
+      ],
+      [
+       "key-9",
+       9
+      ],
+      [
+       "key-10",
+       10
+      ],
+      [
+       "key-11",
+       11
+      ],
+      [
+       "key-12",
+       12
+      ],
+      [
+       "key-13",
+       13
+      ],
+      [
+       "key-14",
+       14
+      ],
+      [
+       "key-15",
+       15
+      ],
+      [
+       "key-16",
+       16
+      ],
+      [
+       "key-17",
+       17
+      ],
+      [
+       "key-18",
+       18
+      ],
+      [
+       "key-19",
+       19
+      ],
+      [
+       "key-20",
+       20
+      ],
+      [
+       "key-21",
+       21
+      ],
+      [
+       "key-22",
+       22
+      ],
+      [
+       "key-23",
+       23
+      ],
+      [
+       "key-24",
+       24
+      ],
+      [
+       "key-25",
+       25
+      ],
+      [
+       "key-26",
+       26
+      ],
+      [
+       "key-27",
+       27
+      ],
+      [
+       "key-28",
+       28
+      ],
+      [
+       "key-29",
+       29
+      ],
+      [
+       "key-30",
+       30
+      ],
+      [
+       "key-31",
+       31
+      ],
+      [
+       "key-32",
+       32
+      ],
+      [
+       "key-33",
+       33
+      ],
+      [
+       "key-34",
+       34
+      ],
+      [
+       "key-35",
+       35
+      ],
+      [
+       "key-36",
+       36
+      ],
+      [
+       "key-37",
+       37
+      ],
+      [
+       "key-38",
+       38
+      ],
+      [
+       "key-39",
+       39
+      ]
+     ]
+    }
+   ],
+   "out": "c822e63c74bcbaf75a3793ea870d061a"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p5",
+        "gmi",
+        null
+       ],
+       [
+        5,
+        "v5"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p6",
+        "gmi",
+        null
+       ],
+       [
+        6,
+        "v6"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p7",
+        "gmi",
+        null
+       ],
+       [
+        7,
+        "v7"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p8",
+        "gmi",
+        null
+       ],
+       [
+        8,
+        "v8"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p9",
+        "gmi",
+        null
+       ],
+       [
+        9,
+        "v9"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p10",
+        "gmi",
+        null
+       ],
+       [
+        10,
+        "v10"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p11",
+        "gmi",
+        null
+       ],
+       [
+        11,
+        "v11"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p12",
+        "gmi",
+        null
+       ],
+       [
+        12,
+        "v12"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p13",
+        "gmi",
+        null
+       ],
+       [
+        13,
+        "v13"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p14",
+        "gmi",
+        null
+       ],
+       [
+        14,
+        "v14"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p15",
+        "gmi",
+        null
+       ],
+       [
+        15,
+        "v15"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p16",
+        "gmi",
+        null
+       ],
+       [
+        16,
+        "v16"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p17",
+        "gmi",
+        null
+       ],
+       [
+        17,
+        "v17"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p18",
+        "gmi",
+        null
+       ],
+       [
+        18,
+        "v18"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p19",
+        "gmi",
+        null
+       ],
+       [
+        19,
+        "v19"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p20",
+        "gmi",
+        null
+       ],
+       [
+        20,
+        "v20"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p21",
+        "gmi",
+        null
+       ],
+       [
+        21,
+        "v21"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p22",
+        "gmi",
+        null
+       ],
+       [
+        22,
+        "v22"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p23",
+        "gmi",
+        null
+       ],
+       [
+        23,
+        "v23"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p24",
+        "gmi",
+        null
+       ],
+       [
+        24,
+        "v24"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p25",
+        "gmi",
+        null
+       ],
+       [
+        25,
+        "v25"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p26",
+        "gmi",
+        null
+       ],
+       [
+        26,
+        "v26"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p27",
+        "gmi",
+        null
+       ],
+       [
+        27,
+        "v27"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p28",
+        "gmi",
+        null
+       ],
+       [
+        28,
+        "v28"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p29",
+        "gmi",
+        null
+       ],
+       [
+        29,
+        "v29"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p30",
+        "gmi",
+        null
+       ],
+       [
+        30,
+        "v30"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p31",
+        "gmi",
+        null
+       ],
+       [
+        31,
+        "v31"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p32",
+        "gmi",
+        null
+       ],
+       [
+        32,
+        "v32"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p33",
+        "gmi",
+        null
+       ],
+       [
+        33,
+        "v33"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p34",
+        "gmi",
+        null
+       ],
+       [
+        34,
+        "v34"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p35",
+        "gmi",
+        null
+       ],
+       [
+        35,
+        "v35"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p36",
+        "gmi",
+        null
+       ],
+       [
+        36,
+        "v36"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p37",
+        "gmi",
+        null
+       ],
+       [
+        37,
+        "v37"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p38",
+        "gmi",
+        null
+       ],
+       [
+        38,
+        "v38"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p39",
+        "gmi",
+        null
+       ],
+       [
+        39,
+        "v39"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "5b6410718cd61ecf6635fa4e7e27abc7"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676,
+      40595,
+      48514,
+      56433,
+      64352,
+      72271,
+      80190,
+      88109,
+      96028,
+      103947,
+      111866,
+      119785,
+      127704,
+      135623,
+      143542,
+      151461,
+      159380,
+      167299,
+      175218,
+      183137,
+      191056,
+      198975,
+      206894,
+      214813,
+      222732,
+      230651,
+      238570,
+      246489,
+      254408,
+      262327,
+      270246,
+      278165,
+      286084,
+      294003,
+      301922,
+      309841
+     ]
+    }
+   ],
+   "out": "35ac4489e2aac4be73e49e02498c0383"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s5",
+      "s6",
+      "s7",
+      "s8",
+      "s9",
+      "s10",
+      "s11",
+      "s12",
+      "s13",
+      "s14",
+      "s15",
+      "s16",
+      "s17",
+      "s18",
+      "s19",
+      "s20",
+      "s21",
+      "s22",
+      "s23",
+      "s24",
+      "s25",
+      "s26",
+      "s27",
+      "s28",
+      "s29",
+      "s30",
+      "s31",
+      "s32",
+      "s33",
+      "s34",
+      "s35",
+      "s36",
+      "s37",
+      "s38",
+      "s39"
+     ]
+    }
+   ],
+   "out": "70a358fb4a4e049daa6ab5641c2b9729"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       {
+        "$big": "1"
+       },
+       [
+        0,
+        "noun 0"
+       ]
+      ],
+      [
+       {
+        "$big": "4660"
+       },
+       [
+        0,
+        "noun 1"
+       ]
+      ],
+      [
+       {
+        "$big": "18446744073709551616"
+       },
+       [
+        0,
+        "noun 2"
+       ]
+      ],
+      [
+       {
+        "$big": "18446744073709551617"
+       },
+       [
+        0,
+        "noun 3"
+       ]
+      ],
+      [
+       {
+        "$big": "170141183460469231731687303715884105733"
+       },
+       [
+        0,
+        "noun 4"
+       ]
+      ],
+      [
+       {
+        "$big": "67743901318781152046652688020001116771"
+       },
+       [
+        0,
+        "noun 5"
+       ]
+      ],
+      [
+       {
+        "$big": "154311324640108980043252166549901340601"
+       },
+       [
+        0,
+        "noun 6"
+       ]
+      ],
+      [
+       {
+        "$big": "170777908403253027204831903224999358451"
+       },
+       [
+        0,
+        "noun 7"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": "ecc26202f56ee01cf17bcf70a6fff940"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$set": [
+      {
+       "$big": "1"
+      },
+      {
+       "$big": "4660"
+      },
+      {
+       "$big": "18446744073709551616"
+      },
+      {
+       "$big": "18446744073709551617"
+      },
+      {
+       "$big": "170141183460469231731687303715884105733"
+      },
+      {
+       "$big": "67743901318781152046652688020001116771"
+      },
+      {
+       "$big": "154311324640108980043252166549901340601"
+      },
+      {
+       "$big": "170777908403253027204831903224999358451"
+      }
+     ]
+    }
+   ],
+   "out": "92a5329324fe106838e7296cf4d77806"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    {
+     "$map": [
+      [
+       "a",
+       {
+        "$map": [
+         [
+          "b",
+          {
+           "$set": [
+            1,
+            2
+           ]
+          }
+         ]
+        ]
+       }
+      ]
+     ]
+    }
+   ],
+   "out": "345a7f58677781e533a45a358615d6d8"
+  },
+  {
+   "fn": "sham",
+   "in": [
+    [
+     "o",
+     {
+      "$map": [
+       [
+        "/a",
+        [
+         "o",
+         {
+          "$map": [
+           [
+            "rev",
+            [
+             "n",
+             "3"
+            ]
+           ],
+           [
+            "id",
+            [
+             "s",
+             "0v1"
+            ]
+           ]
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   ],
+   "out": "6a57564774d5e410ad0f6263eb59dd28"
+  },
+  {
+   "fn": "mug",
+   "in": [
+    null
+   ],
+   "out": 2046756072
+  },
+  {
+   "fn": "mug",
+   "in": [
+    true
+   ],
+   "out": 2046756072
+  },
+  {
+   "fn": "mug",
+   "in": [
+    false
+   ],
+   "out": 1901865568
+  },
+  {
+   "fn": "mug",
+   "in": [
+    0
+   ],
+   "out": 2046756072
+  },
+  {
+   "fn": "mug",
+   "in": [
+    1
+   ],
+   "out": 1901865568
+  },
+  {
+   "fn": "mug",
+   "in": [
+    255
+   ],
+   "out": 937744505
+  },
+  {
+   "fn": "mug",
+   "in": [
+    256
+   ],
+   "out": 1197277890
+  },
+  {
+   "fn": "mug",
+   "in": [
+    65535
+   ],
+   "out": 1913531461
+  },
+  {
+   "fn": "mug",
+   "in": [
+    9007199254740991
+   ],
+   "out": 1824600603
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$big": "18446744073709551616"
+    }
+   ],
+   "out": 648482943
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$big": "340282366920938463463374607431768211457"
+    }
+   ],
+   "out": 987656147
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$big": "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"
+    }
+   ],
+   "out": 775739080
+  },
+  {
+   "fn": "mug",
+   "in": [
+    ""
+   ],
+   "out": 2046756072
+  },
+  {
+   "fn": "mug",
+   "in": [
+    "a"
+   ],
+   "out": 917959978
+  },
+  {
+   "fn": "mug",
+   "in": [
+    "cord"
+   ],
+   "out": 721493856
+  },
+  {
+   "fn": "mug",
+   "in": [
+    "ünïcode ✓"
+   ],
+   "out": 247942303
+  },
+  {
+   "fn": "mug",
+   "in": [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   "out": 1080116521
+  },
+  {
+   "fn": "mug",
+   "in": [
+    [
+     1,
+     2
+    ]
+   ],
+   "out": 1781973465
+  },
+  {
+   "fn": "mug",
+   "in": [
+    [
+     1,
+     2,
+     3
+    ]
+   ],
+   "out": 981539564
+  },
+  {
+   "fn": "mug",
+   "in": [
+    [
+     "a",
+     null
+    ]
+   ],
+   "out": 1759550254
+  },
+  {
+   "fn": "mug",
+   "in": [
+    [
+     [
+      1,
+      2
+     ],
+     [
+      3,
+      4
+     ]
+    ]
+   ],
+   "out": 1496649457
+  },
+  {
+   "fn": "mug",
+   "in": [
+    [
+     null,
+     null,
+     null
+    ]
+   ],
+   "out": 533478020
+  },
+  {
+   "fn": "mug",
+   "in": [
+    [
+     "a",
+     "b",
+     "c",
+     null
+    ]
+   ],
+   "out": 2115125615
+  },
+  {
+   "fn": "mug",
+   "in": [
+    null
+   ],
+   "out": 2046756072
+  },
+  {
+   "fn": "mug",
+   "in": [
+    [
+     "g",
+     "x",
+     "1",
+     "grubbery",
+     "",
+     "1",
+     "pub",
+     "page",
+     "notes",
+     "intro",
+     "0v1",
+     null
+    ]
+   ],
+   "out": 1567514283
+  },
+  {
+   "fn": "mug",
+   "in": [
+    [
+     "apps",
+     "shell.shell",
+     "desks",
+     "lattice.desk",
+     "desk",
+     "data",
+     "lattice.lattice_app",
+     null
+    ]
+   ],
+   "out": 479034602
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": []
+    }
+   ],
+   "out": 2046756072
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": []
+    }
+   ],
+   "out": 2046756072
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": []
+    }
+   ],
+   "out": 2046756072
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": []
+    }
+   ],
+   "out": 2046756072
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ]
+     ]
+    }
+   ],
+   "out": 708324770
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": 360448985
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      1000
+     ]
+    }
+   ],
+   "out": 1943941717
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      "s0"
+     ]
+    }
+   ],
+   "out": 1361191727
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ]
+     ]
+    }
+   ],
+   "out": 1861821933
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": 924227456
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919
+     ]
+    }
+   ],
+   "out": 899389764
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1"
+     ]
+    }
+   ],
+   "out": 402068832
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ]
+     ]
+    }
+   ],
+   "out": 653103879
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": 1264782024
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838
+     ]
+    }
+   ],
+   "out": 1107836242
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2"
+     ]
+    }
+   ],
+   "out": 1429353063
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ]
+     ]
+    }
+   ],
+   "out": 1458501253
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": 1658159925
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676
+     ]
+    }
+   ],
+   "out": 1797021600
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4"
+     ]
+    }
+   ],
+   "out": 1220717159
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ],
+      [
+       "key-5",
+       5
+      ],
+      [
+       "key-6",
+       6
+      ],
+      [
+       "key-7",
+       7
+      ]
+     ]
+    }
+   ],
+   "out": 1133212726
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p5",
+        "gmi",
+        null
+       ],
+       [
+        5,
+        "v5"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p6",
+        "gmi",
+        null
+       ],
+       [
+        6,
+        "v6"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p7",
+        "gmi",
+        null
+       ],
+       [
+        7,
+        "v7"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": 1081918660
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676,
+      40595,
+      48514,
+      56433
+     ]
+    }
+   ],
+   "out": 928130807
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s5",
+      "s6",
+      "s7"
+     ]
+    }
+   ],
+   "out": 878881888
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ],
+      [
+       "key-5",
+       5
+      ],
+      [
+       "key-6",
+       6
+      ],
+      [
+       "key-7",
+       7
+      ],
+      [
+       "key-8",
+       8
+      ],
+      [
+       "key-9",
+       9
+      ],
+      [
+       "key-10",
+       10
+      ],
+      [
+       "key-11",
+       11
+      ],
+      [
+       "key-12",
+       12
+      ]
+     ]
+    }
+   ],
+   "out": 1516346722
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p5",
+        "gmi",
+        null
+       ],
+       [
+        5,
+        "v5"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p6",
+        "gmi",
+        null
+       ],
+       [
+        6,
+        "v6"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p7",
+        "gmi",
+        null
+       ],
+       [
+        7,
+        "v7"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p8",
+        "gmi",
+        null
+       ],
+       [
+        8,
+        "v8"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p9",
+        "gmi",
+        null
+       ],
+       [
+        9,
+        "v9"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p10",
+        "gmi",
+        null
+       ],
+       [
+        10,
+        "v10"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p11",
+        "gmi",
+        null
+       ],
+       [
+        11,
+        "v11"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p12",
+        "gmi",
+        null
+       ],
+       [
+        12,
+        "v12"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": 990347736
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676,
+      40595,
+      48514,
+      56433,
+      64352,
+      72271,
+      80190,
+      88109,
+      96028
+     ]
+    }
+   ],
+   "out": 1707646787
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s5",
+      "s6",
+      "s7",
+      "s8",
+      "s9",
+      "s10",
+      "s11",
+      "s12"
+     ]
+    }
+   ],
+   "out": 1281039877
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       "key-0",
+       0
+      ],
+      [
+       "key-1",
+       1
+      ],
+      [
+       "key-2",
+       2
+      ],
+      [
+       "key-3",
+       3
+      ],
+      [
+       "key-4",
+       4
+      ],
+      [
+       "key-5",
+       5
+      ],
+      [
+       "key-6",
+       6
+      ],
+      [
+       "key-7",
+       7
+      ],
+      [
+       "key-8",
+       8
+      ],
+      [
+       "key-9",
+       9
+      ],
+      [
+       "key-10",
+       10
+      ],
+      [
+       "key-11",
+       11
+      ],
+      [
+       "key-12",
+       12
+      ],
+      [
+       "key-13",
+       13
+      ],
+      [
+       "key-14",
+       14
+      ],
+      [
+       "key-15",
+       15
+      ],
+      [
+       "key-16",
+       16
+      ],
+      [
+       "key-17",
+       17
+      ],
+      [
+       "key-18",
+       18
+      ],
+      [
+       "key-19",
+       19
+      ],
+      [
+       "key-20",
+       20
+      ],
+      [
+       "key-21",
+       21
+      ],
+      [
+       "key-22",
+       22
+      ],
+      [
+       "key-23",
+       23
+      ],
+      [
+       "key-24",
+       24
+      ],
+      [
+       "key-25",
+       25
+      ],
+      [
+       "key-26",
+       26
+      ],
+      [
+       "key-27",
+       27
+      ],
+      [
+       "key-28",
+       28
+      ],
+      [
+       "key-29",
+       29
+      ],
+      [
+       "key-30",
+       30
+      ],
+      [
+       "key-31",
+       31
+      ],
+      [
+       "key-32",
+       32
+      ],
+      [
+       "key-33",
+       33
+      ],
+      [
+       "key-34",
+       34
+      ],
+      [
+       "key-35",
+       35
+      ],
+      [
+       "key-36",
+       36
+      ],
+      [
+       "key-37",
+       37
+      ],
+      [
+       "key-38",
+       38
+      ],
+      [
+       "key-39",
+       39
+      ]
+     ]
+    }
+   ],
+   "out": 1535446927
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       [
+        "pub",
+        "p0",
+        "gmi",
+        null
+       ],
+       [
+        0,
+        "v0"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p1",
+        "gmi",
+        null
+       ],
+       [
+        1,
+        "v1"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p2",
+        "gmi",
+        null
+       ],
+       [
+        2,
+        "v2"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p3",
+        "gmi",
+        null
+       ],
+       [
+        3,
+        "v3"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p4",
+        "gmi",
+        null
+       ],
+       [
+        4,
+        "v4"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p5",
+        "gmi",
+        null
+       ],
+       [
+        5,
+        "v5"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p6",
+        "gmi",
+        null
+       ],
+       [
+        6,
+        "v6"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p7",
+        "gmi",
+        null
+       ],
+       [
+        7,
+        "v7"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p8",
+        "gmi",
+        null
+       ],
+       [
+        8,
+        "v8"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p9",
+        "gmi",
+        null
+       ],
+       [
+        9,
+        "v9"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p10",
+        "gmi",
+        null
+       ],
+       [
+        10,
+        "v10"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p11",
+        "gmi",
+        null
+       ],
+       [
+        11,
+        "v11"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p12",
+        "gmi",
+        null
+       ],
+       [
+        12,
+        "v12"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p13",
+        "gmi",
+        null
+       ],
+       [
+        13,
+        "v13"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p14",
+        "gmi",
+        null
+       ],
+       [
+        14,
+        "v14"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p15",
+        "gmi",
+        null
+       ],
+       [
+        15,
+        "v15"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p16",
+        "gmi",
+        null
+       ],
+       [
+        16,
+        "v16"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p17",
+        "gmi",
+        null
+       ],
+       [
+        17,
+        "v17"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p18",
+        "gmi",
+        null
+       ],
+       [
+        18,
+        "v18"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p19",
+        "gmi",
+        null
+       ],
+       [
+        19,
+        "v19"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p20",
+        "gmi",
+        null
+       ],
+       [
+        20,
+        "v20"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p21",
+        "gmi",
+        null
+       ],
+       [
+        21,
+        "v21"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p22",
+        "gmi",
+        null
+       ],
+       [
+        22,
+        "v22"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p23",
+        "gmi",
+        null
+       ],
+       [
+        23,
+        "v23"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p24",
+        "gmi",
+        null
+       ],
+       [
+        24,
+        "v24"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p25",
+        "gmi",
+        null
+       ],
+       [
+        25,
+        "v25"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p26",
+        "gmi",
+        null
+       ],
+       [
+        26,
+        "v26"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p27",
+        "gmi",
+        null
+       ],
+       [
+        27,
+        "v27"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p28",
+        "gmi",
+        null
+       ],
+       [
+        28,
+        "v28"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p29",
+        "gmi",
+        null
+       ],
+       [
+        29,
+        "v29"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p30",
+        "gmi",
+        null
+       ],
+       [
+        30,
+        "v30"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p31",
+        "gmi",
+        null
+       ],
+       [
+        31,
+        "v31"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p32",
+        "gmi",
+        null
+       ],
+       [
+        32,
+        "v32"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p33",
+        "gmi",
+        null
+       ],
+       [
+        33,
+        "v33"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p34",
+        "gmi",
+        null
+       ],
+       [
+        34,
+        "v34"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p35",
+        "gmi",
+        null
+       ],
+       [
+        35,
+        "v35"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p36",
+        "gmi",
+        null
+       ],
+       [
+        36,
+        "v36"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p37",
+        "gmi",
+        null
+       ],
+       [
+        37,
+        "v37"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p38",
+        "gmi",
+        null
+       ],
+       [
+        38,
+        "v38"
+       ]
+      ],
+      [
+       [
+        "pub",
+        "p39",
+        "gmi",
+        null
+       ],
+       [
+        39,
+        "v39"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": 252975422
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      1000,
+      8919,
+      16838,
+      24757,
+      32676,
+      40595,
+      48514,
+      56433,
+      64352,
+      72271,
+      80190,
+      88109,
+      96028,
+      103947,
+      111866,
+      119785,
+      127704,
+      135623,
+      143542,
+      151461,
+      159380,
+      167299,
+      175218,
+      183137,
+      191056,
+      198975,
+      206894,
+      214813,
+      222732,
+      230651,
+      238570,
+      246489,
+      254408,
+      262327,
+      270246,
+      278165,
+      286084,
+      294003,
+      301922,
+      309841
+     ]
+    }
+   ],
+   "out": 1209571176
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s5",
+      "s6",
+      "s7",
+      "s8",
+      "s9",
+      "s10",
+      "s11",
+      "s12",
+      "s13",
+      "s14",
+      "s15",
+      "s16",
+      "s17",
+      "s18",
+      "s19",
+      "s20",
+      "s21",
+      "s22",
+      "s23",
+      "s24",
+      "s25",
+      "s26",
+      "s27",
+      "s28",
+      "s29",
+      "s30",
+      "s31",
+      "s32",
+      "s33",
+      "s34",
+      "s35",
+      "s36",
+      "s37",
+      "s38",
+      "s39"
+     ]
+    }
+   ],
+   "out": 975555624
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       {
+        "$big": "1"
+       },
+       [
+        0,
+        "noun 0"
+       ]
+      ],
+      [
+       {
+        "$big": "4660"
+       },
+       [
+        0,
+        "noun 1"
+       ]
+      ],
+      [
+       {
+        "$big": "18446744073709551616"
+       },
+       [
+        0,
+        "noun 2"
+       ]
+      ],
+      [
+       {
+        "$big": "18446744073709551617"
+       },
+       [
+        0,
+        "noun 3"
+       ]
+      ],
+      [
+       {
+        "$big": "170141183460469231731687303715884105733"
+       },
+       [
+        0,
+        "noun 4"
+       ]
+      ],
+      [
+       {
+        "$big": "67743901318781152046652688020001116771"
+       },
+       [
+        0,
+        "noun 5"
+       ]
+      ],
+      [
+       {
+        "$big": "154311324640108980043252166549901340601"
+       },
+       [
+        0,
+        "noun 6"
+       ]
+      ],
+      [
+       {
+        "$big": "170777908403253027204831903224999358451"
+       },
+       [
+        0,
+        "noun 7"
+       ]
+      ]
+     ]
+    }
+   ],
+   "out": 1615797299
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$set": [
+      {
+       "$big": "1"
+      },
+      {
+       "$big": "4660"
+      },
+      {
+       "$big": "18446744073709551616"
+      },
+      {
+       "$big": "18446744073709551617"
+      },
+      {
+       "$big": "170141183460469231731687303715884105733"
+      },
+      {
+       "$big": "67743901318781152046652688020001116771"
+      },
+      {
+       "$big": "154311324640108980043252166549901340601"
+      },
+      {
+       "$big": "170777908403253027204831903224999358451"
+      }
+     ]
+    }
+   ],
+   "out": 2032781619
+  },
+  {
+   "fn": "mug",
+   "in": [
+    {
+     "$map": [
+      [
+       "a",
+       {
+        "$map": [
+         [
+          "b",
+          {
+           "$set": [
+            1,
+            2
+           ]
+          }
+         ]
+        ]
+       }
+      ]
+     ]
+    }
+   ],
+   "out": 837267682
+  },
+  {
+   "fn": "mug",
+   "in": [
+    [
+     "o",
+     {
+      "$map": [
+       [
+        "/a",
+        [
+         "o",
+         {
+          "$map": [
+           [
+            "rev",
+            [
+             "n",
+             "3"
+            ]
+           ],
+           [
+            "id",
+            [
+             "s",
+             "0v1"
+            ]
+           ]
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   ],
+   "out": 2086856104
+  },
+  {
+   "fn": "uv",
+   "in": [
+    {
+     "$big": "0"
+    }
+   ],
+   "out": "0v0"
+  },
+  {
+   "fn": "uv",
+   "in": [
+    {
+     "$big": "1"
+    }
+   ],
+   "out": "0v1"
+  },
+  {
+   "fn": "uv",
+   "in": [
+    {
+     "$big": "31"
+    }
+   ],
+   "out": "0vv"
+  },
+  {
+   "fn": "uv",
+   "in": [
+    {
+     "$big": "32"
+    }
+   ],
+   "out": "0v10"
+  },
+  {
+   "fn": "uv",
+   "in": [
+    {
+     "$big": "1023"
+    }
+   ],
+   "out": "0vvv"
+  },
+  {
+   "fn": "uv",
+   "in": [
+    {
+     "$big": "1024"
+    }
+   ],
+   "out": "0v100"
+  },
+  {
+   "fn": "uv",
+   "in": [
+    {
+     "$big": "3735928559"
+    }
+   ],
+   "out": "0v3f.arfnf"
+  },
+  {
+   "fn": "uv",
+   "in": [
+    {
+     "$big": "340282366920938463463374607431768211455"
+    }
+   ],
+   "out": "0v7.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv"
+  },
+  {
+   "fn": "uv",
+   "in": [
+    {
+     "$big": "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084093"
+    }
+   ],
+   "out": "0v3vv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvv.vvvvt"
+  },
+  {
+   "fn": "da",
+   "in": [
+    0
+   ],
+   "out": {
+    "$big": "170141184475152167957503069145530368000"
+   }
+  },
+  {
+   "fn": "da",
+   "in": [
+    1
+   ],
+   "out": {
+    "$big": "170141184475152167957521515889604077551"
+   }
+  },
+  {
+   "fn": "da",
+   "in": [
+    999
+   ],
+   "out": {
+    "$big": "170141184475152167975931366475166210064"
+   }
+  },
+  {
+   "fn": "da",
+   "in": [
+    1000
+   ],
+   "out": {
+    "$big": "170141184475152167975949813219239919616"
+   }
+  },
+  {
+   "fn": "da",
+   "in": [
+    1761600000123
+   ],
+   "out": {
+    "$big": "170141184507647952320018764793342242848"
+   }
+  },
+  {
+   "fn": "da",
+   "in": [
+    1793188800999
+   ],
+   "out": {
+    "$big": "170141184508230662845373708885999310864"
+   }
+  },
+  {
+   "fn": "da",
+   "in": [
+    8640000000000000
+   ],
+   "out": {
+    "$big": "170141343855020964808029031385530368000"
+   }
+  }
+ ]
+}

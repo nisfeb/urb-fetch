@@ -15,20 +15,25 @@ import (
 // gateway's renderers and with nisfeb-extension's (testdata/
 // ext_parity.mjs runs them in node), and wants the same blocks, spans,
 // sniff and link for each. It needs node and the extension's checkout,
-// at $NISFEB_EXTENSION or ../nisfeb-extension, and skips without them.
+// at $NISFEB_EXTENSION or ../nisfeb-extension, and skips without them,
+// or fails with REQUIRE_ALL set, as CI sets it.
 func TestExtensionParity(t *testing.T) {
+	skip := t.Skipf
+	if os.Getenv("REQUIRE_ALL") != "" {
+		skip = t.Fatalf
+	}
 	ext := os.Getenv("NISFEB_EXTENSION")
 	if ext == "" {
 		ext = "../nisfeb-extension"
 	}
 	if _, err := os.Stat(filepath.Join(ext, "lib", "markdown.js")); err != nil {
-		t.Skipf("no nisfeb-extension at %s", ext)
+		skip("no nisfeb-extension at %s", ext)
 	}
 	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("no node")
+		skip("no node")
 	}
 	if _, err := os.Stat("wasm/mesa.mjs"); err != nil {
-		t.Skip("no wasm/mesa.mjs")
+		skip("no wasm/mesa.mjs")
 	}
 
 	rng := rand.New(rand.NewSource(1))
