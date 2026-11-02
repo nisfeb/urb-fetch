@@ -34,10 +34,12 @@ jobs:
         with:
           node-version: 26
       # go: the native host's relay transport is tested against the Go
-      # relay (core/urb/tests/relay.rs builds it)
+      # relay (core/urb/tests/relay.rs builds it). Go 1.27, not go.mod's
+      # 1.26.0: urb-gateway's HTTP server ports 1.27's net/http, which
+      # added the 500 header line limit (gateway-diff's raw-many-headers)
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.27.0'
       # the extension, whose tests and renderer vectors run on the shims
       - uses: actions/checkout@v4
         with:
