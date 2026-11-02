@@ -48,6 +48,10 @@ jobs:
         run: core/ci/tools.sh "$RUNNER_TEMP/tools"
       - name: urcrypt and SQLite
         run: core/mesa-sys/fetch-deps.sh
+      # libmesa's zig archives, which the Go relay links: relay.rs and
+      # the gateway diff build it with go build
+      - name: libmesa, for the Go relay
+        run: make urb-fetch
       - name: mesa.wasm
         run: wasm/build.sh
       - name: the toolchain
