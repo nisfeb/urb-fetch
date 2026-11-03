@@ -344,6 +344,83 @@ fn an_expired_list_is_asked_for_again() {
     assert_eq!(alive(), 0);
 }
 
+/// Reads in flight across an expire: one that has its list keeps it, one
+/// already asking for the list gets the answer it asked for, and one
+/// after the expire asks again rather than wait on the earlier ask. An
+/// expire of a ship with no list, or of a core not open, does nothing.
+#[test]
+fn an_expire_leaves_reads_in_flight_alone() {
+    Core::new(|n| vec![7; n]).expire_revs(ZOD);
+    let mut c = core();
+    c.expire_revs(ZOD);
+    assert_eq!(c.cached_revs(ZOD), None);
+    read(&mut c, 10, 9, "urb://~zod/n/a");
+    let wire = only_peek(&c);
+    answer(&mut c, 20, &wire, revs(&[("/a", "0v1")]));
+    let outs = sage(&mut c, 30, "/g/x/1/grubbery//1/pub/page/a/0v1", "md", "one");
+    assert!(matches!(done(&outs, 9), Some(Ok(_))), "{outs:?}");
+    // past the 60 s: read 10 asks for the list, then the expire, then
+    // read 11 asks again on its own
+    read(&mut c, 70_000, 10, "urb://~zod/n/a");
+    let first = only_peek(&c);
+    c.expire_revs(ZOD);
+    read(&mut c, 70_010, 11, "urb://~zod/n/a");
+    let peeks = c.waiting().peeks;
+    assert_eq!(peeks.len(), 2, "{peeks:?}");
+    let second = peeks.into_iter().find(|w| *w != first).unwrap();
+    answer(&mut c, 70_020, &first, revs(&[("/a", "0v1")]));
+    assert_eq!(
+        c.waiting().keens,
+        vec!["/g/x/1/grubbery//1/pub/page/a/0v1".to_string()]
+    );
+    answer(&mut c, 70_030, &second, revs(&[("/a", "0v2")]));
+    let mut keens = c.waiting().keens;
+    keens.sort();
+    assert_eq!(
+        keens,
+        [
+            "/g/x/1/grubbery//1/pub/page/a/0v1",
+            "/g/x/1/grubbery//1/pub/page/a/0v2"
+        ]
+    );
+    let outs = sage(
+        &mut c,
+        70_040,
+        "/g/x/1/grubbery//1/pub/page/a/0v1",
+        "md",
+        "one",
+    );
+    let Some(Ok(Reply::Read(p))) = done(&outs, 10) else {
+        panic!("{outs:?}");
+    };
+    assert_eq!(p.body, "one");
+    // read 12 has its list (0v2's, inside the 60 s) and is keening when
+    // the list is expired: it is answered all the same
+    read(&mut c, 70_050, 12, "urb://~zod/n/a");
+    assert!(c.waiting().peeks.is_empty(), "{:?}", c.waiting());
+    c.expire_revs(ZOD);
+    let outs = sage(
+        &mut c,
+        70_060,
+        "/g/x/1/grubbery//1/pub/page/a/0v2",
+        "md",
+        "two",
+    );
+    for call in [11, 12] {
+        let Some(Ok(Reply::Read(p))) = done(&outs, call) else {
+            panic!("{call}: {outs:?}");
+        };
+        assert_eq!(p.body, "two");
+    }
+    // the expire kept the list, for a refresh nobody answers
+    assert_eq!(
+        c.cached_revs(ZOD),
+        Some(vec![("/a".to_string(), "0v2".to_string())])
+    );
+    drop(c);
+    assert_eq!(alive(), 0);
+}
+
 #[test]
 fn one_read_looks_in_the_one_list_it_got() {
     let mut c = core();
