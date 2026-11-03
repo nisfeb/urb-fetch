@@ -694,6 +694,60 @@ It writes `/tmp/soak/round-<timestamp>/` with every log and `summary.json` (`ok`
 
 **Round 1 (2026-11-01, commit 6a535f0, extension 49935ff): not ok, 1 difference, 0 failures.** cli-diff 42 of 42 the same with no retry, gateway-diff 123 of 123, migrate every check passed, all six harnesses passed on both lib/s with the same check lists, the gateway tick 19 of 19, and 21 of 22 browse steps the same. The difference: reading ~rup (which answers but runs no lattice), the JS lib/ says `~rup did not answer. It may be offline, or not run Lattice.` after retrying, and the Rust lib/ says at once `~rup answered no lattice peek (offline, or no lattice)`. It is explained, not a Rust bug: nisfeb-extension 49935ff vendors urb-fetch main (1536949), whose mesa.mjs marks every missing lattice base `later`, while rust-core carries urb-fetch #13 (7b8c343), which marks only a ship that gives no answer as `later`, and the Rust core follows that. It goes away once #13 is merged and the extension vendors it; until then every round will report it. Evidence: `/tmp/soak/round-20261101T185711Z/`.
 
+## Public mode (2026-11-03)
+
+`urb-gateway -public <domain>` serves lattice pages, read only, to anyone with a browser, at `https://<ship>.<domain>/<path>`, behind a TLS proxy. It is option (b) of lattice's shipless web reader spec (nisfeb/lattice `docs/superpowers/specs/2026-11-03-shipless-web-reader-design.md`, plan `docs/superpowers/plans/2026-11-03-shipless-web-reader.md`). Nothing here is deployed; the recipe below is for the owner, after the decisions marked OWNER.
+
+**Without `-public` nothing changes.** The loopback gateway's handler (`routes.rs`) is untouched, and its usage text is the Go gateway's: the public flags are parsed beside the Go ones but `-h` lists them only when `-public` is given too. `urb-render`'s link functions gained `_at` forms that take a `Base` (scheme, host suffix, port); the old ones are those with `Base::local(port)`, so their bytes are the same, and gateway-diff and the vectors say so.
+
+**The code.** `public.rs` is the public handler, `limits.rs` the client and publisher limits, `lists.rs` the blocklist and opt-in list. `http.rs` now keeps each request's headers and TCP peer, which the loopback handler ignores.
+
+**What it does.**
+
+- Hosts: the apex is the home page; `<ship>.<domain>` (one label, a ship's name as libmesa parses it, case lowered) is that ship's pages; every other Host is 421, `<ship>.urb.localhost`, `localhost` and `127.0.0.1` included. Each ship is its own origin.
+- The chrome: every ship page is the gateway's static HTML, with no script, under `default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'`: the ship and path, a home link, Bookmark, Comment and Follow as disabled buttons with "Connect a ship to ...", Open in lattice (the urb:// address), Get lattice, and the abuse contact. Gemtext, Markdown and text render inside it as on loopback, their links pointed at the public hosts; `js`, `css`, `noun` and any other mark are escaped text.
+- A publisher's HTML: the chrome shows "This page is from ~ship, not from <domain>." and an `<iframe sandbox="allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation" src="?frame">`. The `?frame` answer is the rewritten HTML under lattice's `+sandbox-csp` plus `frame-ancestors 'self'`; it is 403 when `Sec-Fetch-Dest` is `document` or `Sec-Fetch-Site` is not `same-origin`. `?raw` is `text/plain` under `sandbox`.
+- Every answer: `Strict-Transport-Security: max-age=31536000; includeSubDomains`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy: same-origin`, `X-Robots-Tag: noindex, nofollow`, a CSP with `frame-ancestors 'self'`, never `Set-Cookie`. `/robots.txt` on every host disallows everything. `Cache-Control: public, max-age=60` on pages, `max-age=300` on the home page and robots.txt, `no-store` on everything else.
+- Home: two sentences, an address form (GET `/go`, which takes `urb://~ship/page` and `~ship/page`), the start list read through the engine from `-start`, or `START_FALLBACK` (empty until the owner names one: "No start list yet."), and the footer.
+- Errors: `fail_of`'s words in the chrome; a 504 has a retry link; a 404 adds that a page shared rather than published needs that ship; `/k/` and `/t/` say "This page is private. Connect the ship it was shared with."; a forum board is 501, "Reading boards on the web is coming. Open in lattice to read it now." Furum boards have no urb:// address the gateway reads.
+- Limits: per client, a token bucket (`-rate 60` a minute, `-burst 20`), 429 with `Retry-After`; an IPv6 client is its /64. The client is the TCP peer, or the last entry of `X-Forwarded-For` when the peer is loopback and `-trust-proxy` is set. Per publisher, `-ship-cold 4` reads in flight and `-ship-rate 120` a minute, else 503 with `Retry-After`. Pages (and "not published") are kept for 60 s, at most 64 MB, so a cached answer never reaches the engine and never counts. Bodies over `-max-body` (4 MB) are refused with the desktop's words. The HTTP server's 512-connection cap and Go timeouts hold as on loopback.
+- Lists: `-blocklist` and `-optin` are files of `~ship` or `~ship/path` lines (`#` comments; `urb://` allowed), re-read when their mtime changes, a bad line logged and skipped. A path prefix matches whole segments of the page's vault path, so `~zod/a` holds `/a`, `/n/a` and `/a/b`, not `/ab`. A blocked page is 451 with the abuse contact, before the engine is touched. The blocklist wins over the opt-in list.
+- Logs: one line per request, `<status> <ship or -> <ms>ms`, never a path, query or address. The engine's own lines (which name scry paths and peers' addresses) are dropped unless `-log-engine`. Counters (requests, reads, cache hits, 429s, 451s, 503s, failures) are served at `/metrics` on `-metrics <loopback addr>` only.
+- Guards: `-public` needs `-abuse`, a lower-case domain with a dot and no port, and `-listen` on loopback; it refuses to run as `~ricsul-bilwyt` or a moon of it.
+
+**The flags, and the owner's decisions.** Each OWNER value defaults to the safest choice, or to nothing; none is guessed.
+
+| flag | default | |
+|---|---|---|
+| `-public <domain>` | none (off) | OWNER: the dedicated apex |
+| `-abuse <contact>` | none: required | OWNER: the abuse contact |
+| `-consent optin\|all` | `optin` | OWNER: the publisher-consent default. `optin` serves only ships or pages on `-optin`; with no list every ship page is 403 ("~ship has not chosen to have its pages read on <domain>"). `all` serves every published page not blocklisted |
+| `-optin <file>` | none | the publishers who opted in, until lattice publishes its own flag |
+| `-blocklist <file>` | none | |
+| `-start <urb url>` | none | OWNER: the start list |
+| `-moon`, `-fake`, or neither (a comet) | a comet | OWNER: the gateway's identity, one per `-state` folder |
+| `-log-engine` | off | OWNER: the log policy; off is the spec's proposal (no paths, no IPs) |
+| `-get-lattice <url>` | `https://github.com/nisfeb/lattice` | |
+| `-trust-proxy` | off | set it behind the TLS proxy |
+| `-rate`, `-burst`, `-ship-cold`, `-ship-rate`, `-max-body` | 60, 20, 4, 120, 4194304 | |
+| `-metrics <addr>` | none | loopback only |
+| `-public-port <port>` | none | for tests: the port public links name |
+
+**Tests.** `cargo test -p urb-gateway` covers the host rule (a planet, a moon and a 56-character comet; two labels, upper case, a non-ship label and foreign hosts), the headers on every route kind and no `Set-Cookie`, no `<script` in any chrome, hostile HTML only in `?frame`, `?frame` as a document or cross-site 403, each mark, the error words, the home page and `/go`, the limits on a fake clock (refill, the /64, the forwarded rule, per-ship caps, the cache not counting), the body cap, the blocklist and opt-in lists (segment boundaries, reload on change, bad lines), and a log with no path, query or address.
+
+`FLEET_WHO=<claim> node core/ci/public-gateway.mjs` runs it end to end on this machine: it resets lattice-gate (~dep) and lattice-gate-peer (~wep) to `lattice`, publishes a Markdown, a gemtext, a hostile HTML page and a start list on ~wep and a page that frames ~wep and the apex on ~dep, runs `urb-gateway -public test.example` as a new fake moon of ~wep behind a node:https proxy on 127.0.0.1:8443 with a self-signed `*.test.example` certificate (standing in for Caddy, which this machine does not have), and checks it with raw requests and in headless Brave (`--host-resolver-rules`). Run of 2026-11-03: 53 of 53. In Brave the hostile frame's origin is `null`, `document.cookie`, `localStorage`, `parent.document` and `top.document` throw, fetches of its own ship's pages and of the apex fail, its `top.location` assignment does nothing, and ~dep's page cannot frame ~wep's page, ~wep's frame or the apex (three `frame-ancestors` refusals). A blocklist edit took effect without a restart; a client was 429 after 20, with Retry-After, another client was not, and a forged `X-Forwarded-For` changed nothing; every log line was `<status> <ship> <ms>ms`.
+
+**Deploying (the owner's, not run).** After the decisions above: a dedicated apex with a DNS provider that has an API, wildcard DNS for `<domain>` and `*.<domain>`, and a Public Suffix List submission. One VPS with public IPv4 and the gateway's UDP port open. Caddy with a DNS-01 wildcard certificate:
+
+```
+<domain>, *.<domain> {
+	tls { dns <provider> {env.DNS_API_TOKEN} }
+	reverse_proxy 127.0.0.1:8475
+}
+```
+
+and the gateway as a systemd unit: `urb-gateway -public <domain> -trust-proxy -abuse <contact> -consent <choice> -optin /etc/urb-gateway/optin -blocklist /etc/urb-gateway/blocklist -start <urb url> -metrics 127.0.0.1:9475 -state /var/lib/urb-gateway` (with `-moon <keyfile>` if the identity is a moon). The first live reads are the owner's own published pages.
+
 ## Later consumers
 
 **Lattice desktop (Tauri).** It does not use urb-fetch's engine today. When it does, it takes the `urb` crate with the `native` feature, and `urb-render`, as Cargo dependencies pinned to a urb-fetch commit, and runs the native host in its own process. It does not use the wasm build, so WebKitGTK's wasm does not matter to it. It has no SQLite of its own today, so it takes libmesa's. If it gains one, the native build links libmesa's store against that copy instead (see "SQLite twice"). The desktop is not a gate for any release in this plan. It gets its own plan once the port has shipped.
