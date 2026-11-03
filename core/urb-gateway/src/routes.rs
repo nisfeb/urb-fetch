@@ -221,6 +221,7 @@ mod tests {
             path: path.into(),
             raw_query: q.into(),
             minor: 1,
+            ..Request::default()
         }
     }
 

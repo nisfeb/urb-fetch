@@ -32,6 +32,10 @@ pub struct Request {
     pub raw_query: Vec<u8>,
     /// HTTP/1.x's x, which the answer's status line repeats
     pub minor: u8,
+    /// the headers, by their canonical names, in the order they came
+    pub headers: Vec<(Vec<u8>, Vec<u8>)>,
+    /// the TCP peer, when the server knows it
+    pub peer: Option<std::net::IpAddr>,
 }
 
 impl Request {
@@ -43,6 +47,14 @@ impl Request {
     /// `req.URL.Query().Has(key)`
     pub fn has(&self, key: &[u8]) -> bool {
         self.query().iter().any(|(k, _)| k == key)
+    }
+
+    /// the values of the header named key (canonical, `Sec-Fetch-Dest`)
+    pub fn headers(&self, key: &str) -> impl Iterator<Item = &[u8]> {
+        self.headers
+            .iter()
+            .filter(move |(k, _)| k == key.as_bytes())
+            .map(|(_, v)| v.as_slice())
     }
 
     /// `req.URL.Query().Get(key)`: the first value, or none
@@ -95,7 +107,9 @@ pub fn status_text(code: u16) -> &'static str {
         405 => "Method Not Allowed",
         421 => "Misdirected Request",
         417 => "Expectation Failed",
+        429 => "Too Many Requests",
         431 => "Request Header Fields Too Large",
+        451 => "Unavailable For Legal Reasons",
         500 => "Internal Server Error",
         501 => "Not Implemented",
         502 => "Bad Gateway",
@@ -727,6 +741,8 @@ pub fn read_request(r: &mut impl BufRead) -> Got {
             path,
             raw_query,
             minor: minor.min(1),
+            peer: None,
+            headers,
         },
         close,
         body,
@@ -994,6 +1010,7 @@ pub fn serve_conn_with(
     let Ok(rd) = conn.try_clone() else {
         return;
     };
+    let peer = conn.peer_addr().ok().map(|a| a.ip());
     let mut r = Conn::new(rd);
     let mut w = &conn;
     // a new connection's head is due from when it was accepted
@@ -1034,7 +1051,10 @@ pub fn serve_conn_with(
                 }
                 return;
             }
-            Got::Req(h) => h,
+            Got::Req(mut h) => {
+                h.req.peer = peer;
+                h
+            }
         };
         // the body is due by the read timeout from the request's start
         r.until = Some(t0 + lim.read);
