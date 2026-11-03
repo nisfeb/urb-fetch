@@ -232,9 +232,59 @@ fn urb_ship(s: &[u8]) -> Option<(&[u8], &[u8])> {
     (n > 0).then(|| (&s[6..7 + n], &rest[n..]))
 }
 
+/// Where the gateway serves ship pages: `<scheme><ship><suffix><port>`.
+/// The loopback gateway's is `http://<ship>.urb.localhost:<port>`
+/// ([`Base::local`]); a public gateway's is `https://<ship>.<domain>`
+/// ([`Base::public`]), with no port.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Base {
+    /// `http://` or `https://`
+    pub scheme: String,
+    /// `.urb.localhost`, or `.<domain>`
+    pub suffix: String,
+    /// `:<port>`, or empty
+    pub port: String,
+}
+
+impl Base {
+    /// the loopback gateway's, on port
+    pub fn local(port: &str) -> Base {
+        Base {
+            scheme: "http://".into(),
+            suffix: HOST_SUFFIX.into(),
+            port: format!(":{port}"),
+        }
+    }
+
+    /// a public gateway's, at `https://<ship>.<domain>`
+    pub fn public(domain: &str) -> Base {
+        Base {
+            scheme: "https://".into(),
+            suffix: format!(".{domain}"),
+            port: String::new(),
+        }
+    }
+
+    /// `<scheme><who><suffix><port>`: the origin of who's pages
+    pub fn origin(&self, who: &[u8]) -> Vec<u8> {
+        [
+            self.scheme.as_bytes(),
+            who,
+            self.suffix.as_bytes(),
+            self.port.as_bytes(),
+        ]
+        .concat()
+    }
+}
+
 /// `gatewayURL(url, port)`: where the gateway serves an urb:// url,
 /// `None` where Go gives an error (not urb://~, or no ship)
 pub fn gateway_url(url: &[u8], port: &str) -> Option<Vec<u8>> {
+    gateway_url_at(url, &Base::local(port))
+}
+
+/// [`gateway_url`], served from base
+pub fn gateway_url_at(url: &[u8], base: &Base) -> Option<Vec<u8>> {
     let rest = url.strip_prefix(b"urb://~")?;
     let (who, path) = match rest.iter().position(|&b| b == b'/') {
         Some(i) => (&rest[..i], &rest[i + 1..]),
@@ -243,18 +293,7 @@ pub fn gateway_url(url: &[u8], port: &str) -> Option<Vec<u8>> {
     if !ship::parses(&[b"~", who].concat()) {
         return None;
     }
-    Some(
-        [
-            b"http://",
-            who,
-            HOST_SUFFIX.as_bytes(),
-            b":",
-            port.as_bytes(),
-            b"/",
-            path,
-        ]
-        .concat(),
-    )
+    Some([&base.origin(who)[..], b"/", path].concat())
 }
 
 /// `html.EscapeString(s)`
@@ -268,7 +307,12 @@ pub fn html_escape(s: &[u8]) -> Vec<u8> {
 /// `None` when the host isn't a ship's (`<ship>.urb.localhost`, the
 /// ship's name holding no dot; it is not checked here, as Go's isn't)
 pub fn urb_of_host(host: &[u8], path: &[u8]) -> Option<Vec<u8>> {
-    let who = host.strip_suffix(HOST_SUFFIX.as_bytes())?;
+    urb_of_host_at(host, path, HOST_SUFFIX)
+}
+
+/// [`urb_of_host`] for ship hosts `<ship><suffix>`
+pub fn urb_of_host_at(host: &[u8], path: &[u8], suffix: &str) -> Option<Vec<u8>> {
+    let who = host.strip_suffix(suffix.as_bytes())?;
     if who.contains(&b'.') {
         return None;
     }
@@ -408,10 +452,16 @@ fn resolve(base: &[u8], r: &[u8]) -> Vec<u8> {
 /// address page goes, as `(href, own)`. An empty href leaves it as
 /// text; own is whether the gateway serves it.
 pub fn page_link<'a>(page: &'a [u8], port: &'a str) -> impl Fn(&[u8]) -> (Vec<u8>, bool) + 'a {
-    move |target| link(page, port, target)
+    let base = Base::local(port);
+    move |target| link(page, &base, target)
 }
 
-fn link(page: &[u8], port: &str, target: &[u8]) -> (Vec<u8>, bool) {
+/// [`page_link`], served from base
+pub fn page_link_at<'a>(page: &'a [u8], base: &'a Base) -> impl Fn(&[u8]) -> (Vec<u8>, bool) + 'a {
+    move |target| link(page, base, target)
+}
+
+fn link(page: &[u8], at: &Base, target: &[u8]) -> (Vec<u8>, bool) {
     let none = (Vec::new(), false);
     if !safe_link(target) {
         return none;
@@ -427,7 +477,7 @@ fn link(page: &[u8], port: &str, target: &[u8]) -> (Vec<u8>, bool) {
     if let Some((_, rest)) = urb_ship(t)
         && (rest.is_empty() || rest[0] == b'/')
     {
-        return gateway_url(t, port).map_or(none, |u| (u, true));
+        return gateway_url_at(t, at).map_or(none, |u| (u, true));
     }
     // webLink, `^[hH][tT][tT][pP][sS]?://[^/]`
     let web = [&b"https://"[..], b"http://"]
@@ -459,7 +509,7 @@ fn link(page: &[u8], port: &str, target: &[u8]) -> (Vec<u8>, bool) {
     if p == b"/" {
         p.clear();
     }
-    gateway_url(&[b"urb://", who, &p].concat(), port).map_or(none, |u| (u, true))
+    gateway_url_at(&[b"urb://", who, &p].concat(), at).map_or(none, |u| (u, true))
 }
 
 /// `anchor(href, own, text)`: a link, or the text alone for no href
@@ -1093,6 +1143,11 @@ pub fn render_as(mark: &str, body: &[u8]) -> &'static str {
 /// gateway, as `((?i:href|src|action)\s*=\s*["']?)urb://~([a-z-]+)`
 /// replaced by `${1}http://${2}.urb.localhost:<port>`
 pub fn rewrite_html(body: &[u8], port: &str) -> Vec<u8> {
+    rewrite_html_at(body, &Base::local(port))
+}
+
+/// [`rewrite_html`], the links pointed at base
+pub fn rewrite_html_at(body: &[u8], base: &Base) -> Vec<u8> {
     let mut out = Vec::with_capacity(body.len());
     let (mut last, mut i) = (0, 0);
     while i < body.len() {
@@ -1100,11 +1155,7 @@ pub fn rewrite_html(body: &[u8], port: &str) -> Vec<u8> {
         match attr_at(&body[i..]) {
             Some((g1, g2)) => {
                 out.extend_from_slice(&body[last..i + g1]);
-                out.extend_from_slice(b"http://");
-                out.extend_from_slice(&body[i + g1 + 7..i + g2]);
-                out.extend_from_slice(HOST_SUFFIX.as_bytes());
-                out.push(b':');
-                out.extend_from_slice(port.as_bytes());
+                out.extend_from_slice(&base.origin(&body[i + g1 + 7..i + g2]));
                 i += g2;
                 last = i;
             }
@@ -1154,9 +1205,14 @@ fn attr_at(s: &[u8]) -> Option<(usize, usize)> {
 /// publisher's HTML is only ever served in the sandbox; everything
 /// else the gateway renders itself, with no scripts, titled by its url.
 pub fn render(url: &[u8], mark: &str, body: &[u8], port: &str) -> (&'static str, Vec<u8>) {
-    let link = page_link(url, port);
+    render_at(url, mark, body, &Base::local(port))
+}
+
+/// [`render`], its links pointed at base
+pub fn render_at(url: &[u8], mark: &str, body: &[u8], base: &Base) -> (&'static str, Vec<u8>) {
+    let link = page_link_at(url, base);
     match render_as(mark, body) {
-        "html" => (SANDBOX, rewrite_html(body, port)),
+        "html" => (SANDBOX, rewrite_html_at(body, base)),
         "md" => (OWN, render_markdown(body, url, &link)),
         "gmi" => (OWN, render_gemtext(body, url, &link)),
         _ => (OWN, render_text(body, url)),
