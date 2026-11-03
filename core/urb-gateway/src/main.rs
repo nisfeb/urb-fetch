@@ -20,9 +20,11 @@ mod run {
     use urb::host::{Event, Host};
     use urb::{Reply, Request};
     use urb_gateway::flags::{self, Flag, Kind};
+    use urb_gateway::lists::List;
+    use urb_gateway::public::{self, Consent, Public};
     use urb_gateway::routes::{Fail, Gateway, Page, fail_of};
     use urb_gateway::state::{self, GatewayUdp, go_path_error};
-    use urb_gateway::{golog, http};
+    use urb_gateway::{golog, http, limits};
 
     static STOP: AtomicBool = AtomicBool::new(false);
 
@@ -105,6 +107,149 @@ mod run {
         ]
     }
 
+    /// The public mode's flags (docs/rust-core.md, "Public mode"). They
+    /// are parsed with the Go gateway's, but `-h` lists them only when
+    /// `-public` is given too, so without it the gateway's usage, like
+    /// everything else it does, is the Go gateway's.
+    ///
+    /// The values marked OWNER are the owner's decisions (the shipless
+    /// web reader spec, "What the owner must decide"): each defaults to
+    /// the safest choice, or to nothing, and none is guessed.
+    fn public_flags() -> Vec<Flag> {
+        let f = |name, kind, default: &str, usage| Flag {
+            name,
+            kind,
+            default: default.to_string(),
+            usage,
+        };
+        vec![
+            f(
+                "public",
+                Kind::Str,
+                "",
+                "OWNER: serve the public, read-only web gateway for this domain: https://<ship>.<domain>/<path>, behind a TLS proxy (the listener stays on loopback)",
+            ),
+            f(
+                "abuse",
+                Kind::Str,
+                "",
+                "OWNER: the abuse contact shown on every public page (required with -public)",
+            ),
+            f(
+                "consent",
+                Kind::Str,
+                "optin",
+                "OWNER: which publishers the public gateway serves: optin (only those on -optin) or all (every published page, unless blocklisted)",
+            ),
+            f(
+                "optin",
+                Kind::Str,
+                "",
+                "file of ~ship and ~ship/path lines who opted in to the public gateway, re-read when it changes",
+            ),
+            f(
+                "blocklist",
+                Kind::Str,
+                "",
+                "file of ~ship and ~ship/path lines the public gateway refuses (451), re-read when it changes",
+            ),
+            f(
+                "start",
+                Kind::Str,
+                "",
+                "OWNER: the urb:// url of the start list on the public home page",
+            ),
+            f(
+                "get-lattice",
+                Kind::Str,
+                "https://github.com/nisfeb/lattice",
+                "where the public pages' Get lattice link goes",
+            ),
+            f(
+                "trust-proxy",
+                Kind::Bool,
+                "",
+                "take the client's address from X-Forwarded-For when the peer is loopback (the TLS proxy)",
+            ),
+            f(
+                "rate",
+                Kind::Str,
+                "60",
+                "requests a minute per client in public mode",
+            ),
+            f(
+                "burst",
+                Kind::Str,
+                "20",
+                "requests a client may make at once in public mode",
+            ),
+            f(
+                "ship-cold",
+                Kind::Str,
+                "4",
+                "reads in flight per publisher in public mode",
+            ),
+            f(
+                "ship-rate",
+                Kind::Str,
+                "120",
+                "reads a minute per publisher in public mode",
+            ),
+            f(
+                "max-body",
+                Kind::Str,
+                "4194304",
+                "the largest page the public gateway serves, in bytes",
+            ),
+            f(
+                "metrics",
+                Kind::Str,
+                "",
+                "serve the public gateway's counters at /metrics on this loopback address",
+            ),
+            f(
+                "log-engine",
+                Kind::Bool,
+                "",
+                "OWNER: in public mode, also log the engine's own lines, which name paths and peers' addresses (off: status, duration and ship only)",
+            ),
+            f(
+                "public-port",
+                Kind::Str,
+                "",
+                "for tests: the port the public links name, for a TLS proxy on a high port",
+            ),
+        ]
+    }
+
+    /// whether args ask for public mode, for `-h`
+    fn asks_public(args: &[String]) -> bool {
+        args.iter().any(|a| {
+            let n = a.trim_start_matches('-');
+            a.starts_with('-') && (n == "public" || n.starts_with("public="))
+        })
+    }
+
+    /// a number flag, or Go's words for one that is not
+    fn number(opt: &flags::Parsed, fl: &[Flag], name: &str) -> u64 {
+        let v = opt.str(name, fl);
+        v.parse().unwrap_or_else(|_| {
+            eprintln!("invalid value {v:?} for flag -{name}: parse error");
+            std::process::exit(2)
+        })
+    }
+
+    /// whether addr (host:port) is on loopback
+    fn loopback(addr: &str) -> bool {
+        let host = http::split_host_port(addr.as_bytes())
+            .map(|h| String::from_utf8_lossy(h).into_owned())
+            .unwrap_or_default();
+        host == "localhost"
+            || host
+                .parse::<std::net::IpAddr>()
+                .is_ok_and(|ip| ip.is_loopback())
+    }
+
     /// `listenAll(addr)`: the listeners and the port, on both loopbacks
     /// for localhost
     fn listen_all(addr: &str) -> (Vec<TcpListener>, String) {
@@ -180,17 +325,67 @@ mod run {
     pub fn main() -> i32 {
         let args: Vec<String> = std::env::args().collect();
         let prog = args.first().cloned().unwrap_or_default();
-        let fl = the_flags();
+        let go_flags = the_flags();
+        let mut fl = the_flags();
+        fl.extend(public_flags());
         let opt = match flags::parse(&args[1..], &fl) {
             Ok(o) => o,
             Err(stop) => {
                 if let Some(m) = stop.message {
                     eprintln!("{m}");
                 }
-                eprint!("{}", flags::usage(&prog, &fl));
+                let shown = if asks_public(&args[1..]) {
+                    &fl
+                } else {
+                    &go_flags
+                };
+                eprint!("{}", flags::usage(&prog, shown));
                 return stop.code;
             }
         };
+        let domain = opt.str("public", &fl);
+        let pub_cfg = if domain.is_empty() {
+            None
+        } else {
+            if !public::valid_domain(&domain) {
+                golog::fatal(&format!(
+                    "-public {domain:?}: not a lower-case DNS name with a dot and no port"
+                ));
+            }
+            let abuse = opt.str("abuse", &fl);
+            if abuse.trim().is_empty() {
+                golog::fatal("-public needs -abuse: the contact every public page shows");
+            }
+            let consent = opt.str("consent", &fl);
+            let Some(consent) = Consent::parse(&consent) else {
+                golog::fatal(&format!("-consent {consent:?}: optin or all"));
+            };
+            if !loopback(&opt.str("listen", &fl)) {
+                golog::fatal("-public serves behind a TLS proxy: keep -listen on loopback");
+            }
+            let n = |name| number(&opt, &fl, name);
+            let as32 = |name| u32::try_from(n(name)).unwrap_or(u32::MAX);
+            Some(public::Config {
+                domain,
+                port: opt.str("public-port", &fl),
+                abuse,
+                get_lattice: opt.str("get-lattice", &fl),
+                start: opt.str("start", &fl),
+                consent,
+                max_body: usize::try_from(n("max-body")).unwrap_or(usize::MAX),
+                trust_proxy: opt.bool("trust-proxy", &fl),
+                limits: limits::Config {
+                    rate: as32("rate"),
+                    burst: as32("burst"),
+                    ship_cold: as32("ship-cold"),
+                    ship_rate: as32("ship-rate"),
+                },
+            })
+        };
+        let metrics = opt.str("metrics", &fl);
+        if !metrics.is_empty() && (pub_cfg.is_none() || !loopback(&metrics)) {
+            golog::fatal("-metrics is for -public, on a loopback address");
+        }
         let (fake, moon) = (opt.str("fake", &fl), opt.str("moon", &fl));
         if let Err(e) = state::one_identity(&fake, &moon) {
             golog::fatal(&e);
@@ -214,7 +409,14 @@ mod run {
 
         // the host lives on a thread of its own: the HTTP threads hand
         // it their reads and wake it
-        let log: Log = Arc::new(|l: &str| golog::line(l));
+        // in public mode the engine's lines name paths and peers'
+        // addresses, so by default they are not logged
+        let quiet = pub_cfg.is_some() && !opt.bool("log-engine", &fl);
+        let log: Log = if quiet {
+            Arc::new(|_: &str| {})
+        } else {
+            Arc::new(|l: &str| golog::line(l))
+        };
         libmesa_log(log.clone());
         // libmesa reads MESA_TRACE from the environment; the Go binding
         // traces when it is set too, so it is left as it is
@@ -287,6 +489,9 @@ mod run {
             Ok(Err(e)) => golog::fatal(&e),
             Err(_) => golog::fatal("the host stopped"),
         };
+        if pub_cfg.is_some() && our.ends_with("ricsul-bilwyt") {
+            golog::fatal("the public gateway never runs as ~ricsul-bilwyt or a moon of it");
+        }
         golog::line(&format!("running as {our}"));
         unsafe { signal(SIGINT, on_int) };
 
@@ -306,14 +511,52 @@ mod run {
         let fetch: &'static (dyn Fn(&str) -> Result<Page, Fail> + Sync) =
             Box::leak(Box::new(fetch));
         let glog: &'static (dyn Fn(&str) + Sync) = &|l: &str| golog::line(l);
-        let gw: &'static Gateway<'static> = Box::leak(Box::new(Gateway {
-            port: port.clone(),
-            ship: our,
-            fetch,
-            log: glog,
-        }));
-        let handle: &'static (dyn Fn(&http::Request) -> http::Response + Sync) =
-            Box::leak(Box::new(|r: &http::Request| gw.handle(r)));
+        let is_public = pub_cfg.is_some();
+        let handle: &'static (dyn Fn(&http::Request) -> http::Response + Sync) = match pub_cfg {
+            None => {
+                let gw: &'static Gateway<'static> = Box::leak(Box::new(Gateway {
+                    port: port.clone(),
+                    ship: our,
+                    fetch,
+                    log: glog,
+                }));
+                Box::leak(Box::new(|r: &http::Request| gw.handle(r)))
+            }
+            Some(cfg) => {
+                let list = |name: &str| {
+                    let p = opt.str(name, &fl);
+                    let p = (!p.is_empty()).then(|| PathBuf::from(p));
+                    List::new(p, Box::new(|l: &str| golog::line(l)))
+                };
+                let (blocklist, optin) = (list("blocklist"), list("optin"));
+                if cfg.consent == Consent::OptIn && !optin.configured() {
+                    golog::line("consent optin with no -optin list: every ship page answers 403");
+                }
+                let domain = cfg.domain.clone();
+                let pg: &'static Public<'static> = Box::leak(Box::new(Public::new(
+                    cfg,
+                    our,
+                    fetch,
+                    glog,
+                    &std::time::Instant::now,
+                    blocklist,
+                    optin,
+                )));
+                if !metrics.is_empty() {
+                    let (mlns, _) = listen_all(&metrics);
+                    let mh: &'static (dyn Fn(&http::Request) -> http::Response + Sync) =
+                        Box::leak(Box::new(|r: &http::Request| pg.metrics(r)));
+                    for ln in mlns {
+                        let slots = Arc::new(http::Slots::default());
+                        thread::spawn(move || http::accept(ln, mh, slots, 16, http::Limits::GO));
+                    }
+                }
+                golog::line(&format!(
+                    "public mode for https://{domain}/ and https://<ship>.{domain}/"
+                ));
+                Box::leak(Box::new(|r: &http::Request| pg.handle(r)))
+            }
+        };
         // at most MAX_CONNS connections at once, over both listeners
         let slots = Arc::new(http::Slots::default());
         for ln in lns {
@@ -322,7 +565,11 @@ mod run {
                 http::accept(ln, handle, slots, http::MAX_CONNS, http::Limits::GO)
             });
         }
-        golog::line(&format!("serving http://urb.localhost:{port}/"));
+        if is_public {
+            golog::line(&format!("serving on port {port}, for the TLS proxy"));
+        } else {
+            golog::line(&format!("serving http://urb.localhost:{port}/"));
+        }
         while !STOP.load(Ordering::Relaxed) {
             if host_thread.is_finished() {
                 return ended(host_thread);

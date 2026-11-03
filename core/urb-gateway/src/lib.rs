@@ -16,10 +16,16 @@
 //! - [`state`] is the state folder: `comet.key`, `<ship>.db` and
 //!   `<ship>.db.port`, as `main.go`'s `open` keeps them.
 //! - [`golog`] is Go's `log`: a line with the local date and time.
+//! - [`public`] is the public mode (`-public <domain>`), a handler of
+//!   its own, with [`limits`] (per client and per publisher) and
+//!   [`lists`] (the blocklist and the publishers who opted in).
 #![cfg(not(target_family = "wasm"))]
 
 pub mod flags;
 pub mod golog;
 pub mod http;
+pub mod limits;
+pub mod lists;
+pub mod public;
 pub mod routes;
 pub mod state;
