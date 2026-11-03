@@ -38,6 +38,8 @@ use std::rc::Rc;
 
 /// +revs-ttl: how long a peer's revision list is kept
 pub const REVS_TTL: u64 = 60_000;
+/// a kept list's time once [`Core::expire_revs`] has aged it: past any TTL
+const EXPIRED: u64 = u64::MAX;
 /// +mesa-timeout: how long a keen waits before it is yawned
 pub const KEEN_TIMEOUT: u64 = 10_000;
 /// +remote-timeout: how long a peek or a poke waits
@@ -549,6 +551,18 @@ impl Core {
                 })
                 .collect(),
         )
+    }
+
+    /// Age the revision list kept for a ship, so the next read of one of
+    /// its pages asks for the list again rather than wait out REVS_TTL: a
+    /// reader's reload, after a page was edited. The old list is kept as
+    /// the fallback for a refresh nobody answers, as an aged one is. The
+    /// JS has no such call; nothing it does changes.
+    pub fn expire_revs(&self, who: &str) {
+        let Some(i) = self.w.inst() else { return };
+        if let Some(e) = i.revs.borrow_mut().get_mut(who) {
+            e.0 = EXPIRED;
+        }
     }
 
     #[doc(hidden)]
@@ -2478,7 +2492,9 @@ fn rev_list(w: &World, i: &Rc<Inst>, her: Ship, who: String) -> Promise {
             let r = i.revs.borrow().get(&who).cloned();
             match r {
                 // now() - r.at > REVS_TTL, in the JS's numbers
-                Some((at, list)) if (w.now() as i128 - at as i128) <= REVS_TTL as i128 => {
+                Some((at, list))
+                    if at != EXPIRED && (w.now() as i128 - at as i128) <= REVS_TTL as i128 =>
+                {
                     Step::Ret(Val::Obj(list))
                 }
                 _ => {
