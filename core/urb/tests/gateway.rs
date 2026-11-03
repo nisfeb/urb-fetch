@@ -285,6 +285,65 @@ fn a_stale_list_beats_none_and_an_entry_needs_an_id() {
     assert_eq!(alive(), 0);
 }
 
+/// A reload: an expired list is asked for again inside its 60 s, the new
+/// id is keened, and a refresh nobody answers still keeps the old list.
+#[test]
+fn an_expired_list_is_asked_for_again() {
+    let mut c = core();
+    read(&mut c, 10, 9, "urb://~zod/n/a");
+    let wire = only_peek(&c);
+    answer(&mut c, 20, &wire, revs(&[("/a", "0v1")]));
+    let outs = sage(&mut c, 30, "/g/x/1/grubbery//1/pub/page/a/0v1", "md", "one");
+    assert!(matches!(done(&outs, 9), Some(Ok(_))), "{outs:?}");
+    // inside the 60 s the list is kept, and the read keens at once
+    read(&mut c, 1_000, 10, "urb://~zod/n/a");
+    assert!(c.waiting().peeks.is_empty(), "{:?}", c.waiting());
+    let outs = sage(
+        &mut c,
+        1_010,
+        "/g/x/1/grubbery//1/pub/page/a/0v1",
+        "md",
+        "one",
+    );
+    assert!(matches!(done(&outs, 10), Some(Ok(_))), "{outs:?}");
+    // expired: the list is asked for again, and the new id keened
+    c.expire_revs(ZOD);
+    c.expire_revs("~nec");
+    read(&mut c, 2_000, 11, "urb://~zod/n/a");
+    let again = only_peek(&c);
+    answer(&mut c, 2_010, &again, revs(&[("/a", "0v2")]));
+    assert_eq!(
+        c.waiting().keens,
+        vec!["/g/x/1/grubbery//1/pub/page/a/0v2".to_string()]
+    );
+    let outs = sage(
+        &mut c,
+        2_020,
+        "/g/x/1/grubbery//1/pub/page/a/0v2",
+        "md",
+        "two",
+    );
+    let Some(Ok(Reply::Read(p))) = done(&outs, 11) else {
+        panic!("{outs:?}");
+    };
+    assert_eq!(p.body, "two");
+    assert_eq!(
+        c.cached_revs(ZOD),
+        Some(vec![("/a".to_string(), "0v2".to_string())])
+    );
+    // expired again, and nobody answers: the old list is used
+    c.expire_revs(ZOD);
+    read(&mut c, 3_000, 12, "urb://~zod/n/a");
+    only_peek(&c);
+    run_to(&mut c, 3_000 + 30_000);
+    assert_eq!(
+        c.waiting().keens,
+        vec!["/g/x/1/grubbery//1/pub/page/a/0v2".to_string()]
+    );
+    drop(c);
+    assert_eq!(alive(), 0);
+}
+
 #[test]
 fn one_read_looks_in_the_one_list_it_got() {
     let mut c = core();
