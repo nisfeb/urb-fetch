@@ -1,5 +1,5 @@
 diff --git a/src/eng/eng.h b/src/eng/eng.h
-index 6e96107..9467d5d 100644
+index 6e96107..abfe3cd 100644
 --- a/src/eng/eng.h
 +++ b/src/eng/eng.h
 @@ -35,6 +35,8 @@
@@ -27,19 +27,20 @@ index 6e96107..9467d5d 100644
    c3_o          fak_o;       //  fake network
    //  time
    c3_d          now_d;
-@@ -402,6 +406,7 @@ void      eng_req_free(eng_req* req_u);
+@@ -402,6 +406,8 @@ void      eng_req_free(eng_req* req_u);
  void      eng_req_send(mesa_engine* eng, eng_peer* per_u, eng_req* req_u);
  void      eng_hear_page(mesa_engine* eng, mesa_lane lan_u, u3_mesa_pact* pac_u);
  void      eng_req_wake(mesa_engine* eng, eng_peer* per_u);
 +void      eng_req_hurry(mesa_engine* eng, eng_peer* per_u, c3_d del_d);
++void      eng_req_hurry_all(mesa_engine* eng, c3_d del_d);
  void      eng_req_rebase(mesa_engine* eng, eng_peer* per_u);
  c3_c*     eng_keen_path(eng_peer* per_u, eng_req* req_u);
  c3_d      eng_req_deadline(eng_peer* per_u);
 diff --git a/src/eng/eng_fetch.c b/src/eng/eng_fetch.c
-index 4fa38e2..12deb0a 100644
+index 4fa38e2..6f796e0 100644
 --- a/src/eng/eng_fetch.c
 +++ b/src/eng/eng_fetch.c
-@@ -519,6 +519,26 @@ eng_req_wake(mesa_engine* eng, eng_peer* per_u)
+@@ -519,6 +519,58 @@ eng_req_wake(mesa_engine* eng, eng_peer* per_u)
    }
  }
  
@@ -48,18 +49,50 @@ index 4fa38e2..12deb0a 100644
 +**                  (anyone can read our proof, so it mustn't undo the
 +**                  backoff for good)
 +*/
++static c3_o
++_req_hurry(mesa_engine* eng, eng_peer* per_u, c3_d del_d)
++{
++  c3_o hur_o = c3n;
++
++  for ( eng_req* req_u = per_u->req_u; req_u; req_u = req_u->nex_u ) {
++    if ( (REQ_ACK == req_u->typ_e) && (req_u->nex_d > eng->now_d + del_d) ) {
++      req_u->nex_d = eng->now_d + del_d;
++      req_u->rto_d = ENG_RTO_MIN;
++      hur_o = c3y;
++    }
++  }
++  return hur_o;
++}
++
 +void
 +eng_req_hurry(mesa_engine* eng, eng_peer* per_u, c3_d del_d)
 +{
 +  if ( eng->now_d < per_u->hur_d ) {
 +    return;
 +  }
-+  for ( eng_req* req_u = per_u->req_u; req_u; req_u = req_u->nex_u ) {
-+    if ( (REQ_ACK == req_u->typ_e) && (req_u->nex_d > eng->now_d + del_d) ) {
-+      req_u->nex_d = eng->now_d + del_d;
-+      req_u->rto_d = ENG_RTO_MIN;
-+      per_u->hur_d = eng->now_d + ENG_HURRY_GAP;
-+    }
++  if ( c3y == _req_hurry(eng, per_u, del_d) ) {
++    per_u->hur_d = eng->now_d + ENG_HURRY_GAP;
++  }
++}
++
++/* eng_req_hurry_all(): resend our pokes to everyone in [del_d] ms, at
++**                      most once per ENG_HURRY_GAP. It leaves each
++**                      peer's own hurry alone: a ship that reads our
++**                      proof just after our galaxy has must still get
++**                      its resend soon.
++*/
++void
++eng_req_hurry_all(mesa_engine* eng, c3_d del_d)
++{
++  if ( eng->now_d < eng->hur_d ) {
++    return;
++  }
++  eng->hur_d = eng->now_d + ENG_HURRY_GAP;
++  for ( eng_peer_map_itr itr_u = eng_peer_map_first(&eng->per_u);
++        !eng_peer_map_is_end(itr_u);
++        itr_u = eng_peer_map_next(itr_u) )
++  {
++    _req_hurry(eng, itr_u.data->val, del_d);
 +  }
 +}
 +
@@ -67,10 +100,10 @@ index 4fa38e2..12deb0a 100644
  eng_req_deadline(eng_peer* per_u)
  {
 diff --git a/src/eng/eng_serve.c b/src/eng/eng_serve.c
-index 0986c98..af8cb04 100644
+index 0986c98..ea88c2d 100644
 --- a/src/eng/eng_serve.c
 +++ b/src/eng/eng_serve.c
-@@ -564,6 +564,52 @@ _serve(mesa_engine* eng, eng_line* lin_u, u3_mesa_name* nam_u, mesa_lane lan_u)
+@@ -564,6 +564,43 @@ _serve(mesa_engine* eng, eng_line* lin_u, u3_mesa_name* nam_u, mesa_lane lan_u)
    c3_free(fre_y);
  }
  
@@ -104,16 +137,7 @@ index 0986c98..af8cb04 100644
 +  }
 +
 +  if ( (c3y == eng->pin_o) && (c3y == u3_ships_equal(rcv_u, eng->gal_u)) ) {
-+    if ( eng->now_d < eng->hur_d ) {
-+      return;
-+    }
-+    eng->hur_d = eng->now_d + ENG_HURRY_GAP;
-+    for ( eng_peer_map_itr itr_u = eng_peer_map_first(&eng->per_u);
-+          !eng_peer_map_is_end(itr_u);
-+          itr_u = eng_peer_map_next(itr_u) )
-+    {
-+      eng_req_hurry(eng, itr_u.data->val, ENG_HURRY_MS);
-+    }
++    eng_req_hurry_all(eng, ENG_HURRY_MS);
 +  }
 +  else if ( (per_u = eng_peer_get(eng, rcv_u)) ) {
 +    eng_req_hurry(eng, per_u, ENG_HURRY_MS);
@@ -123,7 +147,7 @@ index 0986c98..af8cb04 100644
  /* eng_serve_peek(): a %peek for something of ours
  */
  void
-@@ -582,6 +628,7 @@ eng_serve_peek(mesa_engine* eng, mesa_lane lan_u, u3_mesa_name* nam_u)
+@@ -582,6 +619,7 @@ eng_serve_peek(mesa_engine* eng, mesa_lane lan_u, u3_mesa_name* nam_u)
  
    if ( (lin_u = eng_line_get(eng, pat_c)) ) {
      _serve(eng, lin_u, nam_u, lan_u);
@@ -132,7 +156,7 @@ index 0986c98..af8cb04 100644
    c3_free(pat_c);
  }
 diff --git a/test/engine_test.c b/test/engine_test.c
-index 769c3db..6e85a2f 100644
+index 769c3db..7fdbebe 100644
 --- a/test/engine_test.c
 +++ b/test/engine_test.c
 @@ -154,7 +154,7 @@ _test_vectors(void)
@@ -140,11 +164,11 @@ index 769c3db..6e85a2f 100644
  /* a simulated network
  */
 -#define NODES 5
-+#define NODES 6
++#define NODES 7
  
  typedef struct _dgram {
    mesa_lane      fro_u;
-@@ -1115,6 +1115,124 @@ _test_comet(_node* nec)
+@@ -1115,6 +1115,188 @@ _test_comet(_node* nec)
    _clear(com); _clear(nec);
  }
  
@@ -246,6 +270,12 @@ index 769c3db..6e85a2f 100644
 +  expect(0 != req_u, "hurry gap: no pending poke");
 +
 +  if ( req_u ) {
++    //  our galaxy read our proof: everyone is hurried, and each peer's
++    //  own hurry is still there for when it reads the proof itself
++    mesa_engine_wake(com->eng, now_d);
++    eng_req_hurry_all(com->eng, ENG_HURRY_MS);
++    expect(0 == per_u->hur_d, "hurry gap: the galaxy's hurry took the peer's");
++    _run(600);
 +    one_w = req_u->try_w;
 +    mesa_engine_wake(com->eng, now_d);
 +    eng_req_hurry(com->eng, per_u, ENG_HURRY_MS);
@@ -266,15 +296,74 @@ index 769c3db..6e85a2f 100644
 +  _clear(com); _clear(nec);
 +}
 +
++/* the proof's path names its reader, so anyone can claim to be our
++** galaxy or the ship: reads over and over, as both, at worst out of
++** step, hurry a poke to a ship that's down at most twice per
++** ENG_HURRY_GAP, not every read
++*/
++static void
++_test_hurry_flood(_node* nec)
++{
++  mesa_ident ide;
++  mesa_ship  stars[1] = { _ship("~marnec") };
++  c3_y       eny_y[64];
++  _node*     com;
++  c3_d       bon_d;
++  u3_ship    nsh_u = { nec->who.lo, nec->who.hi };
++  eng_peer*  per_u;
++  eng_req*   req_u = 0;
++  c3_w       fir_w, las_w;
++
++  for ( c3_w i = 0; i < 64; i++ ) eny_y[i] = (c3_y)(i * 17 + 3);
++  u3_assert( mesa_comet_mine(1, stars, eny_y, 1000000, &ide) );
++  com = _add_node(&ide);
++
++  nec->off_o = c3y;
++  mesa_flow_open(com->eng, nec->who, &bon_d);
++  _send(com, nec, bon_d, mesa_atom_cord("flooded with reads"));
++  _run(60000);
++
++  per_u = eng_peer_get(com->eng, nsh_u);
++  for ( eng_req* r = per_u ? per_u->req_u : 0; r; r = r->nex_u ) {
++    if ( REQ_ACK == r->typ_e ) req_u = r;
++  }
++  expect(0 != req_u, "hurry flood: no pending poke");
++
++  if ( req_u ) {
++    fir_w = req_u->try_w;
++    //  480 s of reads every 500 ms: the galaxy's alone for the first
++    //  60 s, so its budget and the ship's run half a gap apart
++    for ( c3_w i = 0; i < 960; i++ ) {
++      mesa_engine_wake(com->eng, now_d);
++      eng_req_hurry_all(com->eng, ENG_HURRY_MS);
++      if ( i >= 120 ) {
++        eng_req_hurry(com->eng, per_u, ENG_HURRY_MS);
++      }
++      _run(500);
++    }
++    las_w = req_u->try_w;
++    //  8 hurries at most, each a resend in 500 ms and then the backoff
++    //  from ENG_RTO_MIN for the 60 s to the next: 1+1+2+4+...+32 s, 7
++    //  resends. Unbounded, it would be one every 500 ms, 960.
++    expect(las_w - fir_w <= 8 * 7,
++           "hurry flood: %u resends in 480 s", las_w - fir_w);
++  }
++
++  nec->off_o = c3n;
++  _run(5 * 60 * 1000);
++  _clear(com); _clear(nec);
++}
++
  /* a moon: its keys come from its parent, which keeps them current
  */
  static void
-@@ -1508,6 +1626,8 @@ main(int argc, char* argv[])
+@@ -1508,6 +1690,9 @@ main(int argc, char* argv[])
    _test_loss(zod, nec);
    _test_restart(zod, nec);
    _test_comet(nec);
 +  _test_comet_stock(nec);
 +  _test_hurry_gap(nec);
++  _test_hurry_flood(nec);
    _test_gall_sys(zod, nec);
    _test_moon(zod, nec);
    _test_flub(zod, &nod_u[non_w - 1]);
