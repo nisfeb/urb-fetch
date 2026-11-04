@@ -179,7 +179,7 @@ fn main() {
         }
         for d in diffs {
             let ok = Command::new("patch")
-                .args(["-s", "-p1", "-d"])
+                .args(["-s", "-N", "-p1", "-d"])
                 .arg(&copy)
                 .arg("-i")
                 .arg(d)

@@ -11,8 +11,8 @@ out=$here/build
 rm -rf "$out/libmesa"
 mkdir -p "$out/libmesa"
 git -C "$here/../third_party/libmesa" archive HEAD | tar -x -C "$out/libmesa"
-patch -s -d "$out/libmesa" -p1 < "$here/../core/mesa-sys/libmesa-first-contact.diff"
-patch -s -d "$out/libmesa" -p1 < "$here/libmesa-wasm32.diff"
+patch -s -N -d "$out/libmesa" -p1 < "$here/../core/mesa-sys/libmesa-first-contact.diff"
+patch -s -N -d "$out/libmesa" -p1 < "$here/libmesa-wasm32.diff"
 (cd "$out/libmesa" && "$ZIG" build -Dtarget=wasm32-wasi -Dno-host=true -Doptimize=ReleaseFast)
 
 lib=$out/libmesa/zig-out/lib

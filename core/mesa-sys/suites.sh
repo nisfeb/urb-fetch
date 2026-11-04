@@ -100,7 +100,7 @@ zig_suites() {
   src=$work/libmesa
   mkdir -p "$src"
   git -C "$upstream" archive HEAD | tar -x -C "$src"
-  patch -s -d "$src" -p1 < "$here/libmesa-first-contact.diff"
+  patch -s -N -d "$src" -p1 < "$here/libmesa-first-contact.diff"
   set -- -Dno-host=true
   [ "$mode" = release ] && set -- "$@" -Doptimize=ReleaseFast
   # zig builds for the build machine's CPU unless told; mesa-sys builds
@@ -108,8 +108,8 @@ zig_suites() {
   [ "$where" = native ] && set -- "$@" -Dcpu=baseline
   echo "suites: zig $("$zig" version); C: $("$zig" cc --version | head -1)"
   if [ "$where" = wasi ]; then
-    patch -s -d "$src" -p1 < "$repo/wasm/libmesa-wasm32.diff"
-    patch -s -d "$src" -p1 < "$here/zig-wasi-tests.diff"
+    patch -s -N -d "$src" -p1 < "$repo/wasm/libmesa-wasm32.diff"
+    patch -s -N -d "$src" -p1 < "$here/zig-wasi-tests.diff"
     set -- "$@" -Dtarget=wasm32-wasi -fwasmtime
   fi
   for t in $TESTS; do
