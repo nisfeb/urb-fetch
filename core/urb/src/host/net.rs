@@ -251,8 +251,13 @@ pub struct Udp {
     /// galaxy -> (ip, when it was looked up)
     galaxies: Arc<Mutex<HashMap<u8, (Ipv4Addr, u64)>>>,
     asking: Arc<Mutex<HashSet<u8>>>,
+    /// datagrams to a galaxy not looked up yet, sent once it is
+    held: Arc<Mutex<HashMap<u8, Vec<Vec<u8>>>>>,
     log: Log,
 }
+
+/// the most datagrams held for one galaxy while it is looked up
+const HELD_MAX: usize = 64;
 
 impl Udp {
     /// the port kept in dir, chosen now if there is none
@@ -289,12 +294,15 @@ impl Udp {
             listener: None,
             galaxies: Arc::default(),
             asking: Arc::default(),
+            held: Arc::default(),
             log,
         }
     }
 
     /// where galaxy g is, if known; looked up in the background when not,
-    /// or when its answer is five minutes old
+    /// or when its answer is five minutes old. What is sent to a galaxy
+    /// not known yet is held, and sent once the lookup has its address:
+    /// dropped, it would wait out a whole resend, a second or more.
     fn galaxy(&self, g: u8) -> Option<SocketAddrV4> {
         if self.fake {
             return Some(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 31337 + u16::from(g)));
@@ -302,8 +310,13 @@ impl Udp {
         let hit = self.galaxies.lock().unwrap().get(&g).copied();
         let stale = hit.is_none_or(|(_, at)| now_ms().saturating_sub(at) > 300_000);
         if stale && self.asking.lock().unwrap().insert(g) {
-            let (galaxies, asking, log) =
-                (self.galaxies.clone(), self.asking.clone(), self.log.clone());
+            let (galaxies, asking, held, log) = (
+                self.galaxies.clone(),
+                self.asking.clone(),
+                self.held.clone(),
+                self.log.clone(),
+            );
+            let sock = self.sock.as_ref().and_then(|s| s.try_clone().ok());
             thread::spawn(move || {
                 let name = galaxy_name(g);
                 let found = (format!("{name}.urbit.org"), 0u16)
@@ -316,11 +329,25 @@ impl Udp {
                         })
                         .ok_or_else(|| "no IPv4 address".to_string())
                     });
+                // held is locked across the insert, so send() either
+                // holds a datagram before this takes them, or sees the ip
+                let mut h = held.lock().unwrap();
+                let waiting = h.remove(&g).unwrap_or_default();
                 match found {
                     Ok(ip) => {
                         galaxies.lock().unwrap().insert(g, (ip, now_ms()));
+                        drop(h);
+                        let to = SocketAddrV4::new(ip, 13337 + u16::from(g));
+                        if let Some(s) = &sock {
+                            for b in waiting {
+                                let _ = s.send_to(&b, to);
+                            }
+                        }
                     }
-                    Err(e) => log(&format!("can't find galaxy {name}: {e}")),
+                    Err(e) => {
+                        drop(h);
+                        log(&format!("can't find galaxy {name}: {e}"))
+                    }
                 }
                 asking.lock().unwrap().remove(&g);
             });
@@ -375,7 +402,26 @@ impl Transport for Udp {
 
     fn send(&mut self, lane: Lane, bytes: &[u8]) {
         let to = match lane {
-            Lane::Galaxy(g) => self.galaxy(g),
+            Lane::Galaxy(g) => {
+                let to = self.galaxy(g);
+                if to.is_none() && self.sock.is_some() {
+                    let mut h = self.held.lock().unwrap();
+                    // looked up since: send it now
+                    let hit = self.galaxies.lock().unwrap().get(&g).copied();
+                    if let Some((ip, _)) = hit {
+                        drop(h);
+                        Some(SocketAddrV4::new(ip, 13337 + u16::from(g)))
+                    } else {
+                        let q = h.entry(g).or_default();
+                        if q.len() < HELD_MAX {
+                            q.push(bytes.to_vec());
+                        }
+                        None
+                    }
+                } else {
+                    to
+                }
+            }
             Lane::Ip(ip, port) => Some(SocketAddrV4::new(
                 if self.fake {
                     Ipv4Addr::LOCALHOST
@@ -393,6 +439,7 @@ impl Transport for Udp {
     fn close(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
         self.sock = None;
+        self.held.lock().unwrap().clear();
     }
 }
 
