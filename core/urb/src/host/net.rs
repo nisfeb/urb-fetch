@@ -329,27 +329,29 @@ impl Udp {
                         })
                         .ok_or_else(|| "no IPv4 address".to_string())
                     });
-                // held is locked across the insert, so send() either
-                // holds a datagram before this takes them, or sees the ip
+                // held is locked across the insert and the end of the
+                // ask, so send() either holds a datagram before this
+                // takes them, or sees the ip, or (on a failure) starts
+                // a lookup of its own: none is left held with no lookup
                 let mut h = held.lock().unwrap();
                 let waiting = h.remove(&g).unwrap_or_default();
-                match found {
+                let to = match &found {
                     Ok(ip) => {
-                        galaxies.lock().unwrap().insert(g, (ip, now_ms()));
-                        drop(h);
-                        let to = SocketAddrV4::new(ip, 13337 + u16::from(g));
-                        if let Some(s) = &sock {
-                            for b in waiting {
-                                let _ = s.send_to(&b, to);
-                            }
-                        }
+                        galaxies.lock().unwrap().insert(g, (*ip, now_ms()));
+                        Some(SocketAddrV4::new(*ip, 13337 + u16::from(g)))
                     }
-                    Err(e) => {
-                        drop(h);
-                        log(&format!("can't find galaxy {name}: {e}"))
+                    Err(_) => None,
+                };
+                asking.lock().unwrap().remove(&g);
+                drop(h);
+                if let Err(e) = found {
+                    log(&format!("can't find galaxy {name}: {e}"));
+                }
+                if let (Some(to), Some(s)) = (to, &sock) {
+                    for b in waiting {
+                        let _ = s.send_to(&b, to);
                     }
                 }
-                asking.lock().unwrap().remove(&g);
             });
         }
         hit.map(|(ip, _)| SocketAddrV4::new(ip, 13337 + u16::from(g)))
