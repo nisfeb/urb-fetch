@@ -1,0 +1,189 @@
+diff --git a/src/eng/eng.h b/src/eng/eng.h
+index 6e96107..425f7b3 100644
+--- a/src/eng/eng.h
++++ b/src/eng/eng.h
+@@ -35,6 +35,7 @@
+ #define ENG_STASH_MAX    8           //  their pokes we keep, each
+ #define ENG_IDLE_MS      600000      //  unload a quiet peer from memory
+ #define ENG_GC_MS        60000       //  how often we look for them
++#define ENG_HURRY_MS     500         //  a poke's resend, once they have our keys
+ 
+ /* dire: %for (we send pleas) or %bak (we send boons)
+ */
+@@ -402,6 +403,7 @@ void      eng_req_free(eng_req* req_u);
+ void      eng_req_send(mesa_engine* eng, eng_peer* per_u, eng_req* req_u);
+ void      eng_hear_page(mesa_engine* eng, mesa_lane lan_u, u3_mesa_pact* pac_u);
+ void      eng_req_wake(mesa_engine* eng, eng_peer* per_u);
++void      eng_req_hurry(mesa_engine* eng, eng_peer* per_u, c3_d del_d);
+ void      eng_req_rebase(mesa_engine* eng, eng_peer* per_u);
+ c3_c*     eng_keen_path(eng_peer* per_u, eng_req* req_u);
+ c3_d      eng_req_deadline(eng_peer* per_u);
+diff --git a/src/eng/eng_fetch.c b/src/eng/eng_fetch.c
+index 4fa38e2..201d5bb 100644
+--- a/src/eng/eng_fetch.c
++++ b/src/eng/eng_fetch.c
+@@ -519,6 +519,20 @@ eng_req_wake(mesa_engine* eng, eng_peer* per_u)
+   }
+ }
+ 
++/* eng_req_hurry(): resend our pokes to [per_u] in [del_d] ms, their
++**                  backoff started again
++*/
++void
++eng_req_hurry(mesa_engine* eng, eng_peer* per_u, c3_d del_d)
++{
++  for ( eng_req* req_u = per_u->req_u; req_u; req_u = req_u->nex_u ) {
++    if ( (REQ_ACK == req_u->typ_e) && (req_u->nex_d > eng->now_d + del_d) ) {
++      req_u->nex_d = eng->now_d + del_d;
++      req_u->rto_d = ENG_RTO_MIN;
++    }
++  }
++}
++
+ c3_d
+ eng_req_deadline(eng_peer* per_u)
+ {
+diff --git a/src/eng/eng_serve.c b/src/eng/eng_serve.c
+index 0986c98..058b6c6 100644
+--- a/src/eng/eng_serve.c
++++ b/src/eng/eng_serve.c
+@@ -564,6 +564,46 @@ _serve(mesa_engine* eng, eng_line* lin_u, u3_mesa_name* nam_u, mesa_lane lan_u)
+   c3_free(fre_y);
+ }
+ 
++/* _proof_asked(): someone read our attestation, [pat_c]
++**
++**   A comet's first pokes reach a stock ship before it has the comet's
++**   keys, and it drops them: it reads /pawn/proof, and acks only the
++**   next resend, which the backoff may hold for a minute or more. So
++**   once it has the proof, resend soon. If the reader is our galaxy, it
++**   can forward to us from now on, and the proofs other ships asked for
++**   through it before may have died there: resend to everyone.
++*/
++static void
++_proof_asked(mesa_engine* eng, const c3_c* pat_c)
++{
++  knot_path pax_u;
++  u3_ship   rcv_u;
++  eng_peer* per_u;
++
++  if (  (c3__pawn != u3_ship_rank(eng->our_u))
++     || (c3n == knot_path_split(strlen(pat_c), pat_c, &pax_u))
++     || (10 != pax_u.len_w)
++     || (c3n == knot_seg_is(&pax_u.seg_u[6], "pawn"))
++     || (c3n == knot_seg_is(&pax_u.seg_u[7], "proof"))
++     || (c3n == knot_p_parse(pax_u.seg_u[8].len_z,
++                             pax_u.seg_u[8].str_c, rcv_u)) )
++  {
++    return;
++  }
++
++  if ( (c3y == eng->pin_o) && (c3y == u3_ships_equal(rcv_u, eng->gal_u)) ) {
++    for ( eng_peer_map_itr itr_u = eng_peer_map_first(&eng->per_u);
++          !eng_peer_map_is_end(itr_u);
++          itr_u = eng_peer_map_next(itr_u) )
++    {
++      eng_req_hurry(eng, itr_u.data->val, ENG_HURRY_MS);
++    }
++  }
++  else if ( (per_u = eng_peer_get(eng, rcv_u)) ) {
++    eng_req_hurry(eng, per_u, ENG_HURRY_MS);
++  }
++}
++
+ /* eng_serve_peek(): a %peek for something of ours
+ */
+ void
+@@ -582,6 +622,7 @@ eng_serve_peek(mesa_engine* eng, mesa_lane lan_u, u3_mesa_name* nam_u)
+ 
+   if ( (lin_u = eng_line_get(eng, pat_c)) ) {
+     _serve(eng, lin_u, nam_u, lan_u);
++    _proof_asked(eng, pat_c);
+   }
+   c3_free(pat_c);
+ }
+diff --git a/test/engine_test.c b/test/engine_test.c
+index 769c3db..869d081 100644
+--- a/test/engine_test.c
++++ b/test/engine_test.c
+@@ -1115,6 +1115,72 @@ _test_comet(_node* nec)
+   _clear(com); _clear(nec);
+ }
+ 
++/* a comet's first contact with a ship that, as stock ames does, drops
++** what an unknown comet sends rather than keeping it for when it has
++** the comet's keys. The ship can't reach the comet for the first 10 s
++** (its galaxy doesn't know the comet's lane yet), so the comet's resends
++** back off. Once the ship has read the comet's proof, its ack must come
++** soon after, not a whole backoff later.
++*/
++static _node* sto_u;    //  the stock-like ship
++static u3_ship sco_u;   //  the comet it drops pokes from
++
++static void
++_stock_step(void)
++{
++  eng_peer* per_u = eng_peer_get(sto_u->eng, sco_u);
++
++  if ( per_u ) {
++    while ( per_u->stl_u ) {
++      eng_out* nex_u = per_u->stl_u->nex_u;
++      c3_free(per_u->stl_u->buf_y);
++      c3_free(per_u->stl_u);
++      per_u->stl_u = nex_u;
++    }
++    per_u->stn_w = 0;
++  }
++}
++
++static void
++_test_comet_stock(_node* nec)
++{
++  mesa_ident ide;
++  mesa_ship  stars[1] = { _ship("~marnec") };
++  c3_y       eny_y[64];
++  _node*     com;
++  c3_d       bon_d, kno_d = 0, don_d = 0;
++
++  for ( c3_w i = 0; i < 64; i++ ) eny_y[i] = (c3_y)(i * 7 + 11);
++  u3_assert( mesa_comet_mine(1, stars, eny_y, 1000000, &ide) );
++  com = _add_node(&ide);
++  sto_u = nec;
++  sco_u[0] = ide.who.lo;
++  sco_u[1] = ide.who.hi;
++  ste_f = _stock_step;
++
++  mesa_flow_open(com->eng, nec->who, &bon_d);
++  _send(com, nec, bon_d, mesa_atom_cord("first contact"));
++  com->drp_w = 100;
++  _run(10000);
++  com->drp_w = 0;
++
++  for ( c3_w i = 0; (i < 3000) && !don_d; i++ ) {
++    eng_peer* per_u = eng_peer_get(nec->eng, sco_u);
++    _run(100);
++    if ( !kno_d && per_u && (c3y == per_u->kno_o) ) kno_d = now_d;
++    if ( _count(com, "done") ) don_d = now_d;
++  }
++  ste_f = 0;
++
++  expect(1 == _count(nec, "plea"), "stock comet plea: %u", _count(nec, "plea"));
++  expect(kno_d && don_d, "stock comet: keys at %" PRIu64 ", done at %" PRIu64,
++         kno_d, don_d);
++  expect(don_d && (don_d - kno_d <= 1000),
++         "stock comet: acked %" PRIu64 " ms after the ship had its keys",
++         don_d - kno_d);
++  _clear(com); _clear(nec);
++}
++
+ /* a moon: its keys come from its parent, which keeps them current
+ */
+ static void
+@@ -1508,6 +1574,7 @@ main(int argc, char* argv[])
+   _test_loss(zod, nec);
+   _test_restart(zod, nec);
+   _test_comet(nec);
++  _test_comet_stock(nec);
+   _test_gall_sys(zod, nec);
+   _test_moon(zod, nec);
+   _test_flub(zod, &nod_u[non_w - 1]);

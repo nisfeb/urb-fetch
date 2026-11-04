@@ -75,7 +75,7 @@ for l in open(sys.argv[1]):
     exe=$work/$name
     if [ "$MESA_WASM" = 1 ]; then
       # shellcheck disable=SC2086
-      if "$MESA_CC" $MESA_CFLAGS -D_WASI_EMULATED_GETPID "$upstream/test/$file.c" $libs \
+      if "$MESA_CC" $MESA_CFLAGS -D_WASI_EMULATED_GETPID "$MESA_ROOT/test/$file.c" $libs \
           -lwasi-emulated-getpid -Wl,-z,stack-size=1048576 -o "$exe.wasm" 2> "$work/$name.log"; then
         (cd "$work" && wasmtime run --dir=. "$exe.wasm") >> "$work/$name.log" 2>&1 &&
           echo "$name pass" || echo "$name fail"
@@ -84,7 +84,7 @@ for l in open(sys.argv[1]):
       fi
     else
       # shellcheck disable=SC2086
-      if "$MESA_CC" $MESA_CFLAGS "$upstream/test/$file.c" $libs -lm -lpthread \
+      if "$MESA_CC" $MESA_CFLAGS "$MESA_ROOT/test/$file.c" $libs -lm -lpthread \
           -o "$exe" 2> "$work/$name.log"; then
         (cd "$work" && "$exe") >> "$work/$name.log" 2>&1 &&
           echo "$name pass" || echo "$name fail"
@@ -100,6 +100,7 @@ zig_suites() {
   src=$work/libmesa
   mkdir -p "$src"
   git -C "$upstream" archive HEAD | tar -x -C "$src"
+  patch -s -d "$src" -p1 < "$here/libmesa-first-contact.diff"
   set -- -Dno-host=true
   [ "$mode" = release ] && set -- "$@" -Doptimize=ReleaseFast
   # zig builds for the build machine's CPU unless told; mesa-sys builds

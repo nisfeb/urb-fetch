@@ -4,10 +4,11 @@
 //! The flags are build.zig's, at libmesa 2cbb076. A release build
 //! matches zig's ReleaseFast (-O2 -DNDEBUG), a debug build its Debug
 //! (-O0) less the UBSan runtime. urcrypt and SQLite are -O2 always, as
-//! build.zig has them. For wasm32-wasip1 the sources are copied and
-//! wasm/libmesa-wasm32.diff is applied to the copy, as wasm/build.sh
-//! does, and the compiler is the wasi-sdk's clang at WASI_SDK_PATH with
-//! zig's wasm CPU (lime1).
+//! build.zig has them. The sources are copied and libmesa-first-contact.diff
+//! (a fix not yet upstream) is applied to the copy. For wasm32-wasip1
+//! wasm/libmesa-wasm32.diff is applied too, as wasm/build.sh does, and
+//! the compiler is the wasi-sdk's clang at WASI_SDK_PATH with zig's wasm
+//! CPU (lime1).
 //!
 //! It also writes suite.env to OUT_DIR: the compiler and flags, so
 //! suites.sh builds libmesa's own tests exactly as this built libmesa.
@@ -104,6 +105,7 @@ fn main() {
     let repo = manifest.join("../..");
     let upstream = repo.join("third_party/libmesa");
     let diff = repo.join("wasm/libmesa-wasm32.diff");
+    let first = manifest.join("libmesa-first-contact.diff");
     let deps = env::var_os("MESA_SYS_DEPS")
         .map(PathBuf::from)
         .unwrap_or_else(|| manifest.join("deps"));
@@ -112,7 +114,9 @@ fn main() {
         &upstream.join("src"),
         &upstream.join("include"),
         &upstream.join("vendor"),
+        &upstream.join("test"),
         &diff,
+        &first,
     ] {
         println!("cargo:rerun-if-changed={}", p.display());
     }
@@ -157,27 +161,33 @@ fn main() {
 
     let t = target();
 
-    // the wasm build compiles a patched copy, so the submodule stays clean
-    let root = if t.wasm {
+    // every build compiles a patched copy, so the submodule stays clean:
+    // libmesa-first-contact.diff always, wasm/libmesa-wasm32.diff for
+    // wasm too
+    let root = {
         let copy = out.join("libmesa");
         if copy.exists() {
             fs::remove_dir_all(&copy).unwrap();
         }
-        for d in ["include", "src", "vendor"] {
+        for d in ["include", "src", "vendor", "test"] {
             copy_dir(&upstream.join(d), &copy.join(d));
         }
         fs::copy(upstream.join("build.zig"), copy.join("build.zig")).unwrap();
-        let ok = Command::new("patch")
-            .args(["-s", "-p1", "-d"])
-            .arg(&copy)
-            .arg("-i")
-            .arg(&diff)
-            .status()
-            .expect("run patch");
-        assert!(ok.success(), "wasm/libmesa-wasm32.diff did not apply");
+        let mut diffs = vec![&first];
+        if t.wasm {
+            diffs.push(&diff);
+        }
+        for d in diffs {
+            let ok = Command::new("patch")
+                .args(["-s", "-p1", "-d"])
+                .arg(&copy)
+                .arg("-i")
+                .arg(d)
+                .status()
+                .expect("run patch");
+            assert!(ok.success(), "{} did not apply", d.display());
+        }
         copy
-    } else {
-        upstream.clone()
     };
 
     let os_define = match (t.wasm, t.os.as_str()) {

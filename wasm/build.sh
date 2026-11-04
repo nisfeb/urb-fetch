@@ -1,6 +1,7 @@
 #!/bin/sh
-# Builds build/mesa.wasm: libmesa for wasm32-wasi, with libmesa-wasm32.diff
-# applied to a copy of the submodule, linked with glue.c as a WASI reactor.
+# Builds build/mesa.wasm: libmesa for wasm32-wasi, with libmesa-first-contact.diff
+# and libmesa-wasm32.diff applied to a copy of the submodule, linked with
+# glue.c as a WASI reactor.
 # libmesa pins zig 0.15.2; point ZIG at that version.
 set -eu
 ZIG=${ZIG:-zig}
@@ -10,6 +11,7 @@ out=$here/build
 rm -rf "$out/libmesa"
 mkdir -p "$out/libmesa"
 git -C "$here/../third_party/libmesa" archive HEAD | tar -x -C "$out/libmesa"
+patch -s -d "$out/libmesa" -p1 < "$here/../core/mesa-sys/libmesa-first-contact.diff"
 patch -s -d "$out/libmesa" -p1 < "$here/libmesa-wasm32.diff"
 (cd "$out/libmesa" && "$ZIG" build -Dtarget=wasm32-wasi -Dno-host=true -Doptimize=ReleaseFast)
 
