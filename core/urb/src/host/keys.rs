@@ -103,7 +103,7 @@ mod tests {
             },
         };
         k.put(who, &e);
-        assert_eq!(FileKeys::new(&dir).get(who), Some(e));
+        assert_eq!(FileKeys::new(&dir).get(who), Some(e.clone()));
         // a file under another ship's name is not this ship's
         fs::copy(dir.join("nisfeb"), dir.join("zod")).unwrap();
         assert_eq!(k.get((0, 0)), None);
