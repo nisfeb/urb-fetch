@@ -223,6 +223,11 @@ export async function instantiate(wasm, { log = console.error, env = {}, entropy
   return { X, text, answer };
 }
 
+// The key cache open() keeps by default: in memory, shared by every
+// open() in this JS realm.
+let memoryText = '';
+export const memoryKeys = { load: () => memoryText, save: t => { memoryText = t; } };
+
 // ------------------------------------------------------------- the relay
 
 // Datagrams over a WebSocket to `urb-fetch -relay`, which sends and
@@ -305,10 +310,20 @@ const CONVS = { cord: conv('cord'), text: conv('text'), exists: conv('exists'), 
 
 export async function open({ wasm, transport, store, log = console.error, env = {}, fake = false,
                              now = Date.now, entropy = randomBytes, random,
-                             timers = globalTimers, fetch = globalFetch }) {
+                             timers = globalTimers, fetch = globalFetch, keys = memoryKeys }) {
   const { setTimeout, clearTimeout } = timers;
   const { X, text, answer } = await instantiate(wasm, { log, env, entropy, random });
   const h = X.urb_core_new();
+  // the key cache (core/urb/src/keys.rs): ships' points, used before the
+  // roller answers. keys is {load(), save(text)}, either may be async;
+  // false for none. Off the fake network only.
+  const keyed = !fake && keys && X.urb_core_keys && X.urb_core_keys(h) === 0;
+  let keyPuts = 0;
+  if (keyed) {
+    const t = await keys.load();
+    if (t) text('urb_keys_load', [], String(t));
+    keyPuts = X.urb_keys_puts();
+  }
 
   let dead = null;        // why the module stopped, once it has
   let ids = 0;
@@ -383,6 +398,11 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     live = r.timers;
     for (const o of r.out) act(o);
     if (!firing) arm();
+    if (keyed && X.urb_keys_puts() !== keyPuts) {
+      keyPuts = X.urb_keys_puts();
+      X.urb_keys_dump();
+      Promise.resolve(keys.save(answer())).catch(e => log(`keeping the key cache failed: ${e?.message ?? e}`));
+    }
   }
 
   // one real timer, for the earliest the core has set

@@ -21,12 +21,35 @@ pub mod wire;
 pub use render_wasm;
 
 use serde_json::{Value as J, json};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 use urb::Core;
+use urb::engine::Ship;
+use urb::keys::{Entry, KeyStore, MemKeys};
 
 thread_local! {
     static OUT: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
     static CORES: RefCell<Vec<Option<Core>>> = const { RefCell::new(Vec::new()) };
+    static KEYS: Rc<Shared> = Rc::new(Shared::default());
+}
+
+/// the key cache every core in the module shares (urb::keys), counting
+/// its writes so the shim knows when to keep it
+#[derive(Default)]
+struct Shared {
+    keys: MemKeys,
+    puts: Cell<u32>,
+}
+
+impl KeyStore for Shared {
+    fn get(&self, who: Ship) -> Option<Entry> {
+        self.keys.get(who)
+    }
+
+    fn put(&self, who: Ship, e: &Entry) {
+        self.keys.put(who, e);
+        self.puts.set(self.puts.get().wrapping_add(1));
+    }
 }
 
 fn answer(r: Result<String, String>) -> i32 {
@@ -99,6 +122,46 @@ pub extern "C" fn urb_core_new() -> u32 {
         c.push(Some(Core::new(entropy)));
         (c.len() - 1) as u32
     })
+}
+
+/// give a core the module's key cache: it then uses ships' points it
+/// holds before the roller answers. 1 if there is no such core.
+#[unsafe(no_mangle)]
+pub extern "C" fn urb_core_keys(h: u32) -> i32 {
+    CORES.with(|c| match c.borrow_mut().get_mut(h as usize) {
+        Some(Some(core)) => {
+            core.set_keys(KEYS.with(|k| k.clone()));
+            0
+        }
+        _ => 1,
+    })
+}
+
+/// how many times the key cache has been written: when it changes, the
+/// shim takes [`urb_keys_dump`] to keep
+#[unsafe(no_mangle)]
+pub extern "C" fn urb_keys_puts() -> u32 {
+    KEYS.with(|k| k.puts.get())
+}
+
+/// the key cache, as text (urb::keys::encode's lines)
+#[unsafe(no_mangle)]
+pub extern "C" fn urb_keys_dump() -> i32 {
+    answer(Ok(KEYS.with(|k| k.keys.dump())))
+}
+
+/// take a key cache [`urb_keys_dump`] gave; lines that don't read are
+/// skipped
+///
+/// # Safety
+/// `p` and `n` must be what [`urb_alloc`] gave, filled.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn urb_keys_load(p: *mut u8, n: usize) -> i32 {
+    let text = unsafe { taken(p, n) };
+    answer(text.map(|t| {
+        KEYS.with(|k| k.keys.load(&t));
+        String::new()
+    }))
 }
 
 /// let a core go, and its engine

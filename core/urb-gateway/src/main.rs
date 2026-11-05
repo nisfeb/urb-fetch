@@ -240,6 +240,12 @@ mod run {
             let io = NetIo::new(Box::new(udp), Box::new(found.store), hlog.clone());
             let waker = io.waker();
             let mut host = Host::new(io, random);
+            if fake.is_empty() {
+                // ships' points, shared by every identity in the folder
+                host.set_keys(std::rc::Rc::new(urb::host::keys::FileKeys::new(
+                    st.join("keys"),
+                )));
+            }
             let our = match host.open(!fake.is_empty()) {
                 Ok(o) => o,
                 Err(f) => {

@@ -13,6 +13,7 @@ pub mod forum;
 #[cfg(feature = "native")]
 pub mod host;
 pub mod js;
+pub mod keys;
 pub mod msg;
 pub mod noun;
 pub mod publish;

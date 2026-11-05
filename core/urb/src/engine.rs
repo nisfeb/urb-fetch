@@ -122,6 +122,45 @@ pub fn mine_comet_under(stars: &[u64], eny: &[u8; 64]) -> Option<String> {
     }
 }
 
+/// A ship's point (+point:jael minus history): what the engine takes
+/// from the roller's getPoint answer, and what the key cache keeps.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Point {
+    pub rift: u64,
+    pub life: u64,
+    /// 'b' ++ auth ++ crypt
+    pub pass: [u8; 65],
+    pub sponsor: Option<Ship>,
+}
+
+/// the roller's getPoint answer for a ship, parsed: None if it isn't one
+pub fn point_parse(s: Ship, json: &[u8]) -> Option<Point> {
+    let one = [0u8; 1];
+    let p = if json.is_empty() {
+        one.as_ptr()
+    } else {
+        json.as_ptr()
+    };
+    let mut pot: sys::mesa_point = unsafe { std::mem::zeroed() };
+    let ok = unsafe { sys::mesa_azimuth_point_parse(mship(s), json.len(), p.cast(), &mut pot) };
+    (ok == sys::mesa_azimuth_err_MESA_AZIMUTH_OK).then(|| Point {
+        rift: pot.rift,
+        life: pot.life,
+        pass: pot.pass,
+        sponsor: pot.has_sponsor.then_some((pot.sponsor.lo, pot.sponsor.hi)),
+    })
+}
+
+/// the ships above s by its name (+sein): a planet's star and that
+/// star's galaxy, a star's galaxy; none for a galaxy, a moon or a comet
+pub fn default_parents(s: Ship) -> Vec<Ship> {
+    match s {
+        (lo, 0) if (1 << 16..1 << 32).contains(&lo) => vec![(lo & 0xffff, 0), (lo & 0xff, 0)],
+        (lo, 0) if (1 << 8..1 << 16).contains(&lo) => vec![(lo & 0xff, 0)],
+        _ => Vec::new(),
+    }
+}
+
 /// the roller's getPoint request for a ship, as JSON text
 pub fn point_request(s: Ship) -> String {
     unsafe { take(sys::mesa_azimuth_point_request(mship(s))) }.unwrap_or_default()
@@ -240,23 +279,40 @@ impl Engine {
     /// glue.c's point: the roller's getPoint answer, or None for none
     pub fn point(&self, s: Ship, json: Option<&[u8]>) -> Result<bool, Failure> {
         let e = self.e()?;
-        let mut pot: sys::mesa_point = unsafe { std::mem::zeroed() };
-        if let Some(j) = json {
-            let one = [0u8; 1];
-            let p = if j.is_empty() {
-                one.as_ptr()
-            } else {
-                j.as_ptr()
-            };
-            let ok =
-                unsafe { sys::mesa_azimuth_point_parse(mship(s), j.len(), p.cast(), &mut pot) };
-            if ok == sys::mesa_azimuth_err_MESA_AZIMUTH_OK {
-                unsafe { sys::mesa_engine_point(e, &pot) };
-                return Ok(true);
-            }
+        if let Some(p) = json.and_then(|j| point_parse(s, j)) {
+            self.apply_point(s, &p)?;
+            return Ok(true);
         }
         unsafe { sys::mesa_engine_point_missing(e, mship(s)) };
         Ok(false)
+    }
+
+    /// a ship's point, as the roller gave it once (the key cache's)
+    pub fn apply_point(&self, s: Ship, p: &Point) -> Result<(), Failure> {
+        let e = self.e()?;
+        let mut pot: sys::mesa_point = unsafe { std::mem::zeroed() };
+        pot.who = mship(s);
+        pot.rift = p.rift;
+        pot.life = p.life;
+        pot.pass = p.pass;
+        if let Some(sp) = p.sponsor {
+            pot.has_sponsor = true;
+            pot.sponsor = mship(sp);
+        }
+        unsafe { sys::mesa_engine_point(e, &pot) };
+        Ok(())
+    }
+
+    /// the keys, rift and sponsor the engine has for s, if it has keys
+    pub fn peer(&self, s: Ship) -> Option<Point> {
+        let e = self.e().ok()?;
+        let mut pot: sys::mesa_point = unsafe { std::mem::zeroed() };
+        unsafe { sys::mesa_engine_peer(e, mship(s), &mut pot) }.then(|| Point {
+            rift: pot.rift,
+            life: pot.life,
+            pass: pot.pass,
+            sponsor: pot.has_sponsor.then_some((pot.sponsor.lo, pot.sponsor.hi)),
+        })
     }
 
     /// glue.c's point_fake: a fake ship's keys, from its name
