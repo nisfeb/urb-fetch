@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use urb::core::{ForumCall, FurumCall, Kind as Ek, Output};
 use urb::host::Host;
+use urb::host::keys::FileKeys;
 use urb::host::net::{Log, NetIo, Relay, Tap, Traced, Transport, Udp, libmesa_log, now_ms, random};
 use urb::host::store::{FileStore, Given, node_error, node_read_error, node_rename_error};
 use urb::js::{self, Js, Json, Object};
@@ -114,6 +115,8 @@ fn connect(opt: &Parsed, log: &Log, tap: Option<Tap>) -> R<Cli> {
             st.join("urb-fetch-wasm")
         }
     };
+    // ships' points, shared by every identity under the folder
+    let keys = base.join("keys");
     let mut dir = base;
     let mut given = None;
     let fake = opt.str("fake");
@@ -190,6 +193,9 @@ fn connect(opt: &Parsed, log: &Log, tap: Option<Tap>) -> R<Cli> {
     );
     io.tap = tap;
     let mut host = Host::new(io, random);
+    if fake.is_none() {
+        host.set_keys(std::rc::Rc::new(FileKeys::new(keys)));
+    }
     let our = host.open(fake.is_some())?;
     log(&format!(
         "as {our}, ready in {}s{}",

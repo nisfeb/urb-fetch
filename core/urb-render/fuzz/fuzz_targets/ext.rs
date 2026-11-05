@@ -57,5 +57,7 @@ fuzz_target!(|data: &[u8]| {
         target(l);
     }
     urb_render::render_as(None, &body);
-    linear(data.len(), "ext");
+    // the text the renderers read: a byte that is not UTF-8 is read as
+    // U+FFFD, three bytes
+    linear(body.len(), "ext");
 });

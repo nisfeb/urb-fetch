@@ -18,8 +18,9 @@
 //! the outputs of each input come in the JS's order (see [`crate::rt`]).
 
 use crate::codec::{self, Budget, MAX_NUMBER, Measured};
-use crate::engine::{self, Engine, Journal, Ship, ship_text};
+use crate::engine::{self, Engine, Journal, Point, Ship, ship_text};
 use crate::js::{self, Js, Json, Object};
+use crate::keys::{self, Entry, KEY_TTL, KeyStore};
 use crate::msg::{self, File};
 use crate::noun::{self, Noun, NounRef, Value};
 use crate::publish::{self, PubState};
@@ -401,8 +402,22 @@ impl Core {
                 publ: RefCell::new(None),
                 forums: RefCell::new(HashMap::new()),
                 watch: Cell::new(false),
+                keys: RefCell::new(None),
             }),
         }
+    }
+
+    /// Keep ships' points in keys, and use them before the roller
+    /// answers (crate::keys). Without it every lookup waits on the
+    /// roller, as the JS does.
+    pub fn set_keys(&mut self, keys: Rc<dyn KeyStore>) {
+        *self.w.keys.borrow_mut() = Some(keys);
+    }
+
+    /// the point the open engine has for ship, if it has its keys
+    pub fn peer(&self, ship: &str) -> Option<Point> {
+        let s = engine::ship_parse(ship)?;
+        self.w.inst()?.eng.peer(s)
     }
 
     /// One input, at now: what it caused. Err if a tick names no timer
@@ -650,6 +665,8 @@ pub(crate) struct World {
     forums: RefCell<HashMap<String, Rc<ForumSt>>>,
     /// Request::Watch
     watch: Cell<bool>,
+    /// the key cache, if the host gave one ([`Core::set_keys`])
+    keys: RefCell<Option<Rc<dyn KeyStore>>>,
 }
 
 impl Drop for World {
@@ -982,6 +999,68 @@ impl World {
         if !i.asking.borrow_mut().insert(who) {
             return Ok(());
         }
+        let keys = self.keys.borrow().clone();
+        // the cache serves only an engine's first lookup of a ship, and
+        // only while fresh: once the engine has keys for it, asking
+        // again means it wants the roller's, never the cache's
+        let now = self.now();
+        let cached = if i.applied.borrow().contains_key(&who) {
+            None
+        } else {
+            keys.as_ref()
+                .and_then(|k| k.get(who))
+                .filter(|e| keys::fresh(e, now))
+        };
+        if let Some(e) = &cached {
+            // the cached keys, once the engine call that asked has
+            // returned; the roller is asked again below
+            let (i2, p) = (i.clone(), e.point.clone());
+            self.set_timeout(
+                Box::new(move |w| {
+                    // the roller answered first: its keys stand, and
+                    // older ones from the cache must not replace them
+                    if i2.applied.borrow().contains_key(&who) {
+                        return;
+                    }
+                    i2.applied.borrow_mut().insert(who, p.clone());
+                    i2.call(w, || {
+                        let _ = i2.eng.apply_point(who, &p);
+                    })
+                }),
+                0,
+                format!("point {}", ship_text(who)),
+            );
+        }
+        // its parents by name are likely its sponsors: ask for them now,
+        // not once its own answer names them
+        for p in engine::default_parents(who) {
+            let known = keys
+                .as_ref()
+                .is_some_and(|k| k.get(p).is_some_and(|e| keys::fresh(&e, now)));
+            if !known && !i.applied.borrow().contains_key(&p) {
+                self.lookup(&i, p);
+            }
+        }
+        let c = self.lookup(&i, who);
+        let before = cached.map(|e| e.point);
+        on_ok(self, &c, move |w, js| {
+            i.asking.borrow_mut().remove(&who);
+            i.lookups.borrow_mut().remove(&who);
+            w.settle_point(&i, who, before, js);
+            Ok(Val::Undef)
+        });
+        Ok(())
+    }
+
+    /// A roller lookup of who: a promise of its answer's text, or null
+    /// if it failed. One made in the last ROLLER_WAIT is shared, so a
+    /// lookup made ahead for a sponsor serves the engine's own.
+    fn lookup(&self, i: &Rc<Inst>, who: Ship) -> Promise {
+        if let Some((at, p)) = i.lookups.borrow().get(&who)
+            && self.now() < at + ROLLER_WAIT
+        {
+            return p.clone();
+        }
         let body = engine::point_request(who);
         // given up on after 30 s by the host's fetch; the timer is the
         // engine's, so a trace has it
@@ -1012,17 +1091,86 @@ impl World {
             ));
             Ok(Val::Null)
         });
-        on_ok(self, &c, move |w, js| {
-            i.asking.borrow_mut().remove(&who);
-            i.call(w, || {
-                let _ = match &js {
-                    Val::Str(s) => i.eng.point(who, Some(s.as_bytes())),
-                    _ => i.eng.point(who, None),
-                };
+        if let Some(k) = self.keys.borrow().clone() {
+            // every point the roller gives is kept, a sponsor's made
+            // ahead too, whether or not the engine asks for it
+            on_ok(self, &c, move |w, js| {
+                if let Val::Str(s) = &js
+                    && let Some(point) = engine::point_parse(who, s.as_bytes())
+                {
+                    k.put(who, &Entry { at: w.now(), point });
+                }
+                Ok(js)
             });
-            Ok(Val::Undef)
-        });
-        Ok(())
+        }
+        i.lookups.borrow_mut().insert(who, (self.now(), c.clone()));
+        c
+    }
+
+    /// The roller's answer for who, given the point the engine had from
+    /// the cache (before). With none, the engine takes the answer as it
+    /// always has. With one, an answer that differs replaces it at once
+    /// (a new rift breaches the ship's sessions, a new life rekeys
+    /// them), and a failed lookup leaves it.
+    fn settle_point(&self, i: &Rc<Inst>, who: Ship, before: Option<Point>, js: Val) {
+        let got = match &js {
+            Val::Str(s) => engine::point_parse(who, s.as_bytes()),
+            _ => None,
+        };
+        match (&before, &got) {
+            (Some(b), Some(g)) if b == g => {}
+            (Some(_), None) => {}
+            _ => {
+                if let (Some(b), Some(g)) = (&before, &got) {
+                    self.log(format!(
+                        "the keys of {} changed: life {} to {}, rift {} to {}",
+                        ship_text(who),
+                        b.life,
+                        g.life,
+                        b.rift,
+                        g.rift
+                    ));
+                }
+                if let Some(g) = &got {
+                    i.applied.borrow_mut().insert(who, g.clone());
+                }
+                i.call(self, || {
+                    let _ = match &js {
+                        Val::Str(s) => i.eng.point(who, Some(s.as_bytes())),
+                        _ => i.eng.point(who, None),
+                    };
+                });
+            }
+        }
+        if self.keys.borrow().is_some() && i.eng.is_open() {
+            self.rekey_later(i, who);
+        }
+    }
+
+    /// ask the roller for who again in KEY_TTL, and give the engine what
+    /// changed
+    fn rekey_later(&self, i: &Rc<Inst>, who: Ship) {
+        let i2 = i.clone();
+        let t = self.set_timeout(
+            Box::new(move |w| {
+                i2.rekeys.borrow_mut().remove(&who);
+                if !i2.eng.is_open() {
+                    return;
+                }
+                let before = i2.applied.borrow().get(&who).cloned();
+                let c = w.lookup(&i2, who);
+                on_ok(w, &c, move |w, js| {
+                    i2.lookups.borrow_mut().remove(&who);
+                    w.settle_point(&i2, who, before, js);
+                    Ok(Val::Undef)
+                });
+            }),
+            KEY_TTL,
+            format!("rekey {}", ship_text(who)),
+        );
+        if let Some(old) = i.rekeys.borrow_mut().insert(who, t) {
+            self.clear_timeout(old);
+        }
     }
 
     /// hook: a poke to us. %grubbery-transfer answers our peeks and
@@ -1637,6 +1785,13 @@ pub(crate) struct Inst {
     // each ship's revision list, and when it was asked for
     revs: RefCell<HashMap<String, (u64, Rc<Object>)>>,
     asking: RefCell<HashSet<Ship>>,
+    // each roller lookup under way or just done, and when it began: a
+    // ship's own and the ones made ahead for its parents
+    lookups: RefCell<HashMap<Ship, (u64, Promise)>>,
+    // the point each ship's keys came from, as the engine was given it
+    applied: RefCell<HashMap<Ship, Point>>,
+    // each ship's KEY_TTL timer, while a key cache is kept
+    rekeys: RefCell<HashMap<Ship, u64>>,
     inbox: RefCell<Option<Listener>>,
     // what we publish, as grub.serve and scry.serve set it
     server: RefCell<Server>,
@@ -2088,6 +2243,9 @@ fn open(
                 bases: RefCell::new(HashMap::new()),
                 revs: RefCell::new(HashMap::new()),
                 asking: RefCell::new(HashSet::new()),
+                lookups: RefCell::new(HashMap::new()),
+                applied: RefCell::new(HashMap::new()),
+                rekeys: RefCell::new(HashMap::new()),
                 inbox: RefCell::new(None),
                 server: RefCell::new(Server::default()),
             });
@@ -2181,6 +2339,9 @@ fn keyed(w: &World, i: Rc<Inst>, keyfile: String, rows: Option<Vec<u8>>, fresh: 
 fn close(w: &World, i: Rc<Inst>) -> Promise {
     spawn(w, move |w| {
         if let Some(t) = i.timer.take() {
+            w.clear_timeout(t);
+        }
+        for (_, t) in i.rekeys.take() {
             w.clear_timeout(t);
         }
         let saved = i.saved.borrow().clone();

@@ -21,6 +21,7 @@
 //! - a store that fails to commit is logged as `saving the engine's
 //!   state failed: …`, and the engine goes on.
 
+pub mod keys;
 pub mod net;
 pub mod store;
 
@@ -130,6 +131,11 @@ impl<I: Io> Host<I> {
 
     pub fn core(&self) -> &Core {
         &self.core
+    }
+
+    /// keep ships' points in keys (crate::keys), before open
+    pub fn set_keys(&mut self, keys: std::rc::Rc<dyn crate::keys::KeyStore>) {
+        self.core.set_keys(keys);
     }
 
     fn step(&mut self, input: Input) {
