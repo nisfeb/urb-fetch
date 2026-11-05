@@ -20,7 +20,7 @@
 use crate::codec::{self, Budget, MAX_NUMBER, Measured};
 use crate::engine::{self, Engine, Journal, Point, Ship, ship_text};
 use crate::js::{self, Js, Json, Object};
-use crate::keys::{Entry, KEY_TTL, KeyStore};
+use crate::keys::{self, Entry, KEY_TTL, KeyStore};
 use crate::msg::{self, File};
 use crate::noun::{self, Noun, NounRef, Value};
 use crate::publish::{self, PubState};
@@ -1000,13 +1000,28 @@ impl World {
             return Ok(());
         }
         let keys = self.keys.borrow().clone();
-        let cached = keys.as_ref().and_then(|k| k.get(who));
+        // the cache serves only an engine's first lookup of a ship, and
+        // only while fresh: once the engine has keys for it, asking
+        // again means it wants the roller's, never the cache's
+        let now = self.now();
+        let cached = if i.applied.borrow().contains_key(&who) {
+            None
+        } else {
+            keys.as_ref()
+                .and_then(|k| k.get(who))
+                .filter(|e| keys::fresh(e, now))
+        };
         if let Some(e) = &cached {
             // the cached keys, once the engine call that asked has
             // returned; the roller is asked again below
             let (i2, p) = (i.clone(), e.point.clone());
             self.set_timeout(
                 Box::new(move |w| {
+                    // the roller answered first: its keys stand, and
+                    // older ones from the cache must not replace them
+                    if i2.applied.borrow().contains_key(&who) {
+                        return;
+                    }
                     i2.applied.borrow_mut().insert(who, p.clone());
                     i2.call(w, || {
                         let _ = i2.eng.apply_point(who, &p);
@@ -1019,7 +1034,9 @@ impl World {
         // its parents by name are likely its sponsors: ask for them now,
         // not once its own answer names them
         for p in engine::default_parents(who) {
-            let known = keys.as_ref().is_some_and(|k| k.get(p).is_some());
+            let known = keys
+                .as_ref()
+                .is_some_and(|k| k.get(p).is_some_and(|e| keys::fresh(&e, now)));
             if !known && !i.applied.borrow().contains_key(&p) {
                 self.lookup(&i, p);
             }

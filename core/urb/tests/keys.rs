@@ -124,8 +124,79 @@ impl T {
 
 fn cached(who: &str, p: Point) -> Rc<MemKeys> {
     let k = Rc::new(MemKeys::default());
-    k.put(ship_parse(who).unwrap(), &Entry { at: 1, point: p });
+    k.put(ship_parse(who).unwrap(), &Entry { at: AT, point: p });
     k
+}
+
+/// when cached() entries were given: just before each T starts
+const AT: u64 = 1_793_534_021_000;
+
+#[test]
+fn an_old_entry_waits_on_the_roller() {
+    let k = Rc::new(MemKeys::default());
+    k.put(
+        (0, 0),
+        &Entry {
+            at: AT - urb::keys::KEY_MAX_AGE - 1,
+            point: point("~zod", 6, 2, 0x11, None),
+        },
+    );
+    let mut t = T::new(k);
+    t.call(2, Request::Read("urb://~zod/page".into()));
+    t.run(0);
+    assert_eq!(t.c.peer("~zod"), None);
+    t.answer("~zod", roller("~zod", 7, 2, 0x22, None));
+    assert_eq!(t.c.peer("~zod").unwrap().life, 7);
+}
+
+#[test]
+fn a_roller_answer_before_the_cached_one_stands() {
+    let mut t = T::new(cached("~zod", point("~zod", 5, 2, 0x11, None)));
+    t.call(2, Request::Read("urb://~zod/page".into()));
+    // the roller answers before the cached keys' timer fires
+    t.answer("~zod", roller("~zod", 6, 2, 0x22, None));
+    t.run(0);
+    assert_eq!(t.c.peer("~zod"), Some(point("~zod", 6, 2, 0x22, None)));
+}
+
+#[test]
+fn a_rotation_mid_session_takes_the_new_keys_and_never_the_old() {
+    // two engines on the device share the cache
+    let keys = cached("~zod", point("~zod", 6, 2, 0x11, None));
+    let mut a = T::new(keys.clone());
+    a.call(2, Request::Read("urb://~zod/page".into()));
+    a.run(0);
+    a.answer("~zod", roller("~zod", 6, 2, 0x11, None));
+    assert_eq!(a.c.peer("~zod").unwrap().life, 6);
+    // ~zod rotates its keys; a's next lookup sees it
+    a.run(urb::keys::KEY_TTL);
+    assert_eq!(
+        a.c.peer("~zod").unwrap().life,
+        6,
+        "the old keys until the roller says"
+    );
+    a.answer("~zod", roller("~zod", 7, 2, 0x22, None));
+    assert_eq!(a.c.peer("~zod"), Some(point("~zod", 7, 2, 0x22, None)));
+    assert_eq!(keys.get((0, 0)).unwrap().point.life, 7);
+    // a later lookup by a's engine is answered by the roller alone: an
+    // older entry another process left can't take the keys back
+    keys.put(
+        (0, 0),
+        &Entry {
+            at: a.now,
+            point: point("~zod", 6, 2, 0x11, None),
+        },
+    );
+    a.run(urb::keys::KEY_TTL);
+    assert_eq!(a.c.peer("~zod").unwrap().life, 7);
+    a.answer("~zod", roller("~zod", 8, 3, 0x33, None));
+    assert_eq!(a.c.peer("~zod"), Some(point("~zod", 8, 3, 0x33, None)));
+    // a fresh engine on the device starts from what a learned
+    let mut b = T::new(keys.clone());
+    b.now = a.now;
+    b.call(2, Request::Read("urb://~zod/page".into()));
+    b.run(0);
+    assert_eq!(b.c.peer("~zod").unwrap().rift, 3);
 }
 
 #[test]

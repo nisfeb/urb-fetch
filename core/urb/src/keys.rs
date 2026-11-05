@@ -2,8 +2,9 @@
 //! when, kept across comets so a fresh one need not wait on the roller.
 //!
 //! A point is public (it is on azimuth), so one cache serves every
-//! identity on the device. The core uses a cached point at once and asks
-//! the roller again in the background; if the roller's answer differs
+//! identity on the device. The core uses a cached point given in the
+//! last [`KEY_MAX_AGE`] at once, for an engine's first lookup of a ship
+//! only, and asks the roller again in the background; if the roller's answer differs
 //! (a new life, rift, key or sponsor), the cache takes it and the engine
 //! is given it, which breaches the ship's sessions on a new rift and
 //! rekeys them on a new life (libmesa's `eng_point_apply`). While an
@@ -20,6 +21,23 @@ use std::collections::HashMap;
 
 /// how often an engine asks the roller again for a ship it uses
 pub const KEY_TTL: u64 = 24 * 60 * 60 * 1000;
+
+/// How old a cached point may be and still be used before the roller
+/// answers. An older one waits on the roller, as with no cache, so keys
+/// a ship has since replaced can't be used for long by a device that
+/// was away, nor at all while its roller lookups fail.
+pub const KEY_MAX_AGE: u64 = 30 * 24 * 60 * 60 * 1000;
+
+/// How many ships a [`MemKeys`] keeps: past it, the entry the roller
+/// gave longest ago goes.
+pub const MEM_MAX: usize = 4096;
+
+/// whether e may be used at now without the roller: given in the last
+/// KEY_MAX_AGE, and not from the future (a clock set back, or a bad
+/// entry)
+pub fn fresh(e: &Entry, now: u64) -> bool {
+    e.at <= now.saturating_add(60_000) && now.saturating_sub(e.at) <= KEY_MAX_AGE
+}
 
 /// a ship's point and when the roller gave it (ms since 1970)
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -45,7 +63,21 @@ impl KeyStore for MemKeys {
     }
 
     fn put(&self, who: Ship, e: &Entry) {
-        self.0.borrow_mut().insert(who, e.clone());
+        let mut m = self.0.borrow_mut();
+        m.insert(who, e.clone());
+        evict(&mut m);
+    }
+}
+
+/// drop the oldest entries past MEM_MAX
+fn evict(m: &mut HashMap<Ship, Entry>) {
+    if m.len() <= MEM_MAX {
+        return;
+    }
+    let mut v: Vec<(u64, Ship)> = m.iter().map(|(w, e)| (e.at, *w)).collect();
+    v.sort_unstable();
+    for (_, w) in &v[..m.len() - MEM_MAX] {
+        m.remove(w);
     }
 }
 
@@ -60,12 +92,17 @@ impl MemKeys {
     /// take the lines [`MemKeys::dump`] gave; lines that don't read are
     /// skipped, and an entry newer than one held replaces it
     pub fn load(&self, text: &str) {
+        let mut m = self.0.borrow_mut();
         for (w, e) in text.lines().filter_map(decode) {
-            let mut m = self.0.borrow_mut();
             if m.get(&w).is_none_or(|o| o.at < e.at) {
                 m.insert(w, e);
+                // bounded as it goes, however long the text
+                if m.len() > 2 * MEM_MAX {
+                    evict(&mut m);
+                }
             }
         }
+        evict(&mut m);
     }
 }
 
@@ -159,6 +196,58 @@ mod tests {
         ] {
             assert_eq!(decode(bad), None, "{bad}");
         }
+    }
+
+    #[test]
+    fn mem_keeps_at_most_mem_max() {
+        let k = MemKeys::default();
+        let mut pass = [0u8; 65];
+        pass[0] = b'b';
+        let p = Point {
+            rift: 0,
+            life: 1,
+            pass,
+            sponsor: None,
+        };
+        let n = MEM_MAX as u64 + 10;
+        for i in 0..n {
+            k.put(
+                (0x1_0000 + i, 0),
+                &Entry {
+                    at: 100 + i,
+                    point: p.clone(),
+                },
+            );
+        }
+        assert_eq!(k.0.borrow().len(), MEM_MAX);
+        // the oldest went, the newest stayed
+        assert!(k.get((0x1_0000, 0)).is_none());
+        assert!(k.get((0x1_0000 + n - 1, 0)).is_some());
+        let text = k.dump();
+        let j = MemKeys::default();
+        j.load(&text);
+        j.load(&text.repeat(2));
+        assert_eq!(j.0.borrow().len(), MEM_MAX);
+    }
+
+    #[test]
+    fn fresh_is_recent_and_not_ahead() {
+        let mut pass = [0u8; 65];
+        pass[0] = b'b';
+        let e = |at| Entry {
+            at,
+            point: Point {
+                rift: 0,
+                life: 1,
+                pass,
+                sponsor: None,
+            },
+        };
+        let now = 1_793_534_021_060;
+        assert!(fresh(&e(now), now));
+        assert!(fresh(&e(now - KEY_MAX_AGE), now));
+        assert!(!fresh(&e(now - KEY_MAX_AGE - 1), now));
+        assert!(!fresh(&e(now + 3_600_000), now));
     }
 
     #[test]
