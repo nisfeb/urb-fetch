@@ -244,7 +244,12 @@ fn galaxy_name(g: u8) -> String {
 pub struct Udp {
     port: u16,
     fake: bool,
-    sock: Option<UdpSocket>,
+    /// the socket while started. A galaxy's lookup sends what was held
+    /// through this slot, never a socket of its own, so a lookup that
+    /// outlives close() holds no port a later start must bind
+    sock: Arc<Mutex<Option<Arc<UdpSocket>>>>,
+    /// a galaxy's name to its IPv4 address (DNS; a slow one in tests)
+    resolve: fn(&str) -> Result<Ipv4Addr, String>,
     /// the listener's stop flag, a fresh one each start
     stop: Arc<AtomicBool>,
     listener: Option<thread::JoinHandle<()>>,
@@ -258,6 +263,20 @@ pub struct Udp {
 
 /// the most datagrams held for one galaxy while it is looked up
 const HELD_MAX: usize = 64;
+
+/// host's first IPv4 address
+fn dns(host: &str) -> Result<Ipv4Addr, String> {
+    (host, 0u16)
+        .to_socket_addrs()
+        .map_err(|e| e.to_string())
+        .and_then(|mut a| {
+            a.find_map(|a| match a {
+                std::net::SocketAddr::V4(v) => Some(*v.ip()),
+                _ => None,
+            })
+            .ok_or_else(|| "no IPv4 address".to_string())
+        })
+}
 
 impl Udp {
     /// the port kept in dir, chosen now if there is none
@@ -289,7 +308,8 @@ impl Udp {
         Udp {
             port,
             fake,
-            sock: None,
+            sock: Arc::default(),
+            resolve: dns,
             stop: Arc::new(AtomicBool::new(false)),
             listener: None,
             galaxies: Arc::default(),
@@ -316,19 +336,10 @@ impl Udp {
                 self.held.clone(),
                 self.log.clone(),
             );
-            let sock = self.sock.as_ref().and_then(|s| s.try_clone().ok());
+            let (sock, resolve) = (self.sock.clone(), self.resolve);
             thread::spawn(move || {
                 let name = galaxy_name(g);
-                let found = (format!("{name}.urbit.org"), 0u16)
-                    .to_socket_addrs()
-                    .map_err(|e| e.to_string())
-                    .and_then(|mut a| {
-                        a.find_map(|a| match a {
-                            std::net::SocketAddr::V4(v) => Some(*v.ip()),
-                            _ => None,
-                        })
-                        .ok_or_else(|| "no IPv4 address".to_string())
-                    });
+                let found = resolve(&format!("{name}.urbit.org"));
                 // held is locked across the insert and the end of the
                 // ask, so send() either holds a datagram before this
                 // takes them, or sees the ip, or (on a failure) starts
@@ -347,7 +358,8 @@ impl Udp {
                 if let Err(e) = found {
                     log(&format!("can't find galaxy {name}: {e}"));
                 }
-                if let (Some(to), Some(s)) = (to, &sock) {
+                let s = sock.lock().unwrap().clone();
+                if let (Some(to), Some(s)) = (to, s) {
                     for b in waiting {
                         let _ = s.send_to(&b, to);
                     }
@@ -398,7 +410,7 @@ impl Transport for Udp {
                 }
             }
         }));
-        self.sock = Some(sock);
+        *self.sock.lock().unwrap() = Some(Arc::new(sock));
         Ok(())
     }
 
@@ -406,7 +418,7 @@ impl Transport for Udp {
         let to = match lane {
             Lane::Galaxy(g) => {
                 let to = self.galaxy(g);
-                if to.is_none() && self.sock.is_some() {
+                if to.is_none() && self.sock.lock().unwrap().is_some() {
                     let mut h = self.held.lock().unwrap();
                     // looked up since: send it now
                     let hit = self.galaxies.lock().unwrap().get(&g).copied();
@@ -433,14 +445,15 @@ impl Transport for Udp {
                 port,
             )),
         };
-        if let (Some(s), Some(to)) = (&self.sock, to) {
+        let s = self.sock.lock().unwrap().clone();
+        if let (Some(s), Some(to)) = (s, to) {
             let _ = s.send_to(bytes, to);
         }
     }
 
     fn close(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
-        self.sock = None;
+        *self.sock.lock().unwrap() = None;
         self.held.lock().unwrap().clear();
     }
 }
@@ -794,5 +807,31 @@ mod tests {
             Some(("h:80".into(), "h".into(), "/x".into()))
         );
         assert_eq!(ws_parts("wss://h"), None);
+    }
+
+    // a lookup that fails after a while, as DNS does when offline
+    fn slow(_: &str) -> Result<Ipv4Addr, String> {
+        thread::sleep(Duration::from_millis(1500));
+        Err("offline".into())
+    }
+
+    #[test]
+    fn a_lookup_left_running_by_close_keeps_no_port() {
+        let port = UdpSocket::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        let log: Log = Arc::new(|_| {});
+        let mut u = Udp::with_port(port, false, log);
+        u.resolve = slow;
+        u.start("~zod", channel().0).unwrap();
+        u.send(Lane::Galaxy(0), b"held");
+        u.close();
+        // started again, as a host's next open does, the lookup still
+        // running: the port is free
+        let started = u.start("~zod", channel().0);
+        u.close();
+        assert_eq!(started, Ok(()));
     }
 }
