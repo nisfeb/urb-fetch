@@ -484,16 +484,20 @@ export const messages = {
 // frame in is [ip:4][port:2][datagram], big-endian. While the socket is
 // down datagrams are dropped, and the engine resends them.
 export function relayTransport(url, log = console.error) {
-  let ws = null, closed = false, ship, onPacket;
+  //  dialing: the socket still connecting; again: the reconnect's
+  //  timer. close() stops both, so nothing reconnects after it
+  let ws = null, closed = false, ship, onPacket, dialing = null, again = null;
   const connect = () => new Promise((resolve, reject) => {
     const s = new WebSocket(url);
     let opened = false;
+    dialing = s;
     //  a relay that accepts and never answers the upgrade would hang
     //  start, and every reconnect after it: give it up, which closes it
     const late = setTimeout(() => s.close(), RELAY_CONNECT_TIMEOUT);
     s.binaryType = 'arraybuffer';
     s.onopen = () => {
       clearTimeout(late);
+      if (dialing === s) dialing = null;
       opened = true;
       ws = s;
       s.send(ship);
@@ -507,9 +511,13 @@ export function relayTransport(url, log = console.error) {
     s.onerror = () => {};
     s.onclose = () => {
       clearTimeout(late);
+      if (dialing === s) dialing = null;
       if (ws === s) ws = null;
       if (!opened) reject(new Error(`can't reach the relay at ${url}`));
-      if (!closed) setTimeout(() => connect().catch(() => {}), 2000);
+      if (!closed) again = setTimeout(() => {
+        again = null;
+        connect().catch(() => {});
+      }, 2000);
     };
   });
   return {
@@ -538,6 +546,8 @@ export function relayTransport(url, log = console.error) {
     },
     close() {
       closed = true;
+      clearTimeout(again);
+      dialing?.close();
       ws?.close();
     },
   };

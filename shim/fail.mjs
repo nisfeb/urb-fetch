@@ -11,11 +11,14 @@
 //   - random_get is the host's random(n) when it gives one
 //   - render.wasm compiles on its first call: a failure throws there,
 //     not at import
+//   - relayTransport's cases (wasm/test/relay-cases.mjs): a relay that
+//     never answers gives up after 10 s, and close() stops a reconnect
 //
 //   node shim/fail.mjs
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { relayCases } from '../wasm/test/relay-cases.mjs';
 import { fromLines } from '../wasm/trace.mjs';
 import * as M from './mesa.mjs';
 
@@ -235,6 +238,12 @@ const settle = (p, w) => Promise.race([
     /wasm is off/.test(first?.message) && second?.message === first?.message, `${first?.message} / ${second?.message}`);
   const { call } = await import('./render.js');
   check('render.wasm: compiled on its first call, it renders', call('render_looks_html', [' <p>']) === true);
+}
+
+for (const [what, run] of relayCases) {
+  let failure;
+  try { failure = await run(M.relayTransport); } catch (e) { failure = e.message; }
+  check(`relayTransport: ${what}`, failure === undefined, failure);
 }
 
 console.log(failed ? `\n${failed} failed` : '\nall passed');
