@@ -22,7 +22,7 @@ use crate::js::{self, Json, Object};
 use crate::msg::File;
 use crate::msg::da_of;
 use crate::noun::Value;
-use crate::url::DESK_BASE;
+use crate::url::{DESK_BASE, knot};
 use crate::{Int, url};
 
 /// +keen-path: where a page's body is bound
@@ -36,13 +36,6 @@ pub fn pub_dir() -> String {
 /// the vault, which holds each page as %gmi
 pub fn vault() -> String {
     format!("{DESK_BASE}/pub/vault")
-}
-
-/// /^[a-z0-9~._-]+$/
-fn knot(s: &str) -> bool {
-    !s.is_empty()
-        && s.bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"~._-".contains(&b))
 }
 
 /// pageKey: '/<name>' for a page's name ('notes/intro', '/notes/intro/'),

@@ -30,7 +30,7 @@ pub struct Url {
 }
 
 /// a path segment lattice takes: /^[a-z0-9~._-]+$/
-fn knot(s: &str) -> bool {
+pub(crate) fn knot(s: &str) -> bool {
     !s.is_empty()
         && s.bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"~._-".contains(&b))
