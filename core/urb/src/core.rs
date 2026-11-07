@@ -1018,8 +1018,12 @@ impl World {
             self.set_timeout(
                 Box::new(move |w| {
                     // the roller answered first: its keys stand, and
-                    // older ones from the cache must not replace them
-                    if i2.applied.borrow().contains_key(&who) {
+                    // older ones from the cache must not replace them;
+                    // nor may they the newer keys the engine kept from
+                    // a session before
+                    if i2.applied.borrow().contains_key(&who)
+                        || i2.eng.peer(who).is_some_and(|h| keys::older(&p, &h))
+                    {
                         return;
                     }
                     i2.applied.borrow_mut().insert(who, p.clone());
@@ -1093,12 +1097,17 @@ impl World {
         });
         if let Some(k) = self.keys.borrow().clone() {
             // every point the roller gives is kept, a sponsor's made
-            // ahead too, whether or not the engine asks for it
+            // ahead too, whether or not the engine asks for it, unless
+            // the cache holds a newer one (a stale answer, or another
+            // process's newer lookup)
             on_ok(self, &c, move |w, js| {
                 if let Val::Str(s) = &js
                     && let Some(point) = engine::point_parse(who, s.as_bytes())
                 {
-                    k.put(who, &Entry { at: w.now(), point });
+                    let e = Entry { at: w.now(), point };
+                    if k.get(who).is_none_or(|o| keys::supersedes(&e, &o)) {
+                        k.put(who, &e);
+                    }
                 }
                 Ok(js)
             });
@@ -1111,12 +1120,47 @@ impl World {
     /// the cache (before). With none, the engine takes the answer as it
     /// always has. With one, an answer that differs replaces it at once
     /// (a new rift breaches the ship's sessions, a new life rekeys
-    /// them), and a failed lookup leaves it.
+    /// them), and a failed lookup leaves it (it is at most KEY_MAX_AGE
+    /// old). An answer older than the keys the engine holds is never
+    /// given it: eng_point_apply takes any other life as a rekey.
     fn settle_point(&self, i: &Rc<Inst>, who: Ship, before: Option<Point>, js: Val) {
         let got = match &js {
             Val::Str(s) => engine::point_parse(who, s.as_bytes()),
             _ => None,
         };
+        let held = i.eng.peer(who);
+        if let (Some(h), Some(g)) = (&held, &got)
+            && keys::older(g, h)
+        {
+            self.log(format!(
+                "an older point for {} was refused: life {} rift {}, holding life {} rift {}",
+                ship_text(who),
+                g.life,
+                g.rift,
+                h.life,
+                h.rift
+            ));
+            // the engine asks again later, as after a failed lookup
+            i.call(self, || {
+                let _ = i.eng.point(who, None);
+            });
+        } else {
+            self.give_point(i, who, before, got, js);
+        }
+        if self.keys.borrow().is_some() && i.eng.is_open() {
+            self.rekey_later(i, who);
+        }
+    }
+
+    /// settle_point's answer, given the engine
+    fn give_point(
+        &self,
+        i: &Rc<Inst>,
+        who: Ship,
+        before: Option<Point>,
+        got: Option<Point>,
+        js: Val,
+    ) {
         match (&before, &got) {
             (Some(b), Some(g)) if b == g => {}
             (Some(_), None) => {}
@@ -1141,9 +1185,6 @@ impl World {
                     };
                 });
             }
-        }
-        if self.keys.borrow().is_some() && i.eng.is_open() {
-            self.rekey_later(i, who);
         }
     }
 
