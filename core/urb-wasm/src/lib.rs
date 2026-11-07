@@ -47,8 +47,9 @@ impl KeyStore for Shared {
     }
 
     fn put(&self, who: Ship, e: &Entry) {
-        self.keys.put(who, e);
-        self.puts.set(self.puts.get().wrapping_add(1));
+        if self.keys.keep(who, e) {
+            self.puts.set(self.puts.get().wrapping_add(1));
+        }
     }
 }
 

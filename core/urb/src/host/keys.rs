@@ -2,10 +2,13 @@
 //! [`crate::keys::encode`]d line, shared by every identity that runs
 //! from the same state folder (a point is public). A file is written
 //! whole to a temporary name and renamed into place, so two processes
-//! that write at once leave one whole entry, never a torn one.
+//! that write at once leave one whole entry, never a torn one. A write
+//! holds the folder's lock file while it compares and renames, so of
+//! two processes that write at once the newer point stands, never the
+//! later writer's ([`crate::keys::supersedes`]).
 
 use crate::engine::{Ship, ship_text};
-use crate::keys::{Entry, KeyStore, decode, encode};
+use crate::keys::{Entry, KeyStore, decode, encode, supersedes};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -13,6 +16,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 /// the longest file read: an entry is one line of under 300 bytes
 const FILE_MAX: u64 = 1024;
+
+/// the lock file every write holds: a dot name, so never a ship's
+const LOCK: &str = ".lock";
 
 /// each temporary file's own number in this process, so two engines in
 /// one process never write the same one
@@ -56,6 +62,17 @@ impl KeyStore for FileKeys {
         #[cfg(unix)]
         std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
         if b.create(&self.dir).is_err() {
+            return;
+        }
+        // released when dropped; where files can't be locked, the
+        // compare is still made, unguarded
+        let lock = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(self.dir.join(LOCK));
+        let _held = lock.as_ref().ok().filter(|f| f.lock().is_ok());
+        if self.get(who).is_some_and(|o| !supersedes(e, &o)) {
             return;
         }
         let path = self.path(who);
@@ -128,7 +145,7 @@ mod tests {
         // no temporary files left behind
         k.put(who, &e);
         let n = fs::read_dir(&dir).unwrap().count();
-        assert_eq!(n, 2, "nisfeb and zod only");
+        assert_eq!(n, 3, "nisfeb, zod and the lock only");
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -168,8 +185,45 @@ mod tests {
             h.join().unwrap();
         }
         let e = FileKeys::new(&dir).get(who).expect("a whole entry");
-        assert_eq!(e, entry(e.point.life));
-        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1, "no temporary files");
+        // the newest point stands, not the last writer's
+        assert_eq!(e, entry(8199));
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 2, "no temporary files");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_older_point_never_replaces_a_newer() {
+        let dir = std::env::temp_dir().join(format!("urb-keys-older-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let who = ship_parse("~nisfeb").unwrap();
+        let e = |at: u64, rift: u64, life: u64| {
+            let mut pass = [life as u8; 65];
+            pass[0] = b'b';
+            Entry {
+                at,
+                point: Point {
+                    rift,
+                    life,
+                    pass,
+                    sponsor: None,
+                },
+            }
+        };
+        let k = FileKeys::new(&dir);
+        k.put(who, &e(100, 1, 5));
+        // a lower life, or a lower rift, given later: refused
+        k.put(who, &e(200, 1, 4));
+        k.put(who, &e(300, 0, 9));
+        assert_eq!(k.get(who), Some(e(100, 1, 5)));
+        // the same point given later, or a newer one: taken
+        k.put(who, &e(400, 1, 5));
+        assert_eq!(k.get(who), Some(e(400, 1, 5)));
+        k.put(who, &e(10, 2, 1));
+        assert_eq!(k.get(who), Some(e(10, 2, 1)));
+        // a long-unused entry gives way
+        let late = 10 + crate::keys::KEY_FORGET + 1;
+        k.put(who, &e(late, 1, 1));
+        assert_eq!(k.get(who), Some(e(late, 1, 1)));
         let _ = fs::remove_dir_all(&dir);
     }
 }
