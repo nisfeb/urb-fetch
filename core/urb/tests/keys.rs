@@ -432,6 +432,7 @@ fn keys_the_engine_kept_beat_an_older_cached_point() {
             fake: false,
         },
     );
+    t.run(0);
     t.call(5, Request::Read("urb://~zod/page".into()));
     // the engine asks the roller again; the cache's older point, though
     // fresh, must not be given it
