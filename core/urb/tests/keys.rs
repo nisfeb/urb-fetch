@@ -1,8 +1,10 @@
 //! The key cache (crate::keys) and the sponsor lookups made ahead, on a
 //! core off the fake network whose roller answers are made up here.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
-use urb::engine::{Point, ship_parse};
+use urb::engine::{Point, Ship, ship_parse};
 use urb::keys::{Entry, KeyStore, MemKeys};
 use urb::{Core, Input, Output, Request};
 
@@ -35,12 +37,12 @@ fn point(who: &str, life: u64, rift: u64, key: u8, sponsor: Option<&str>) -> Poi
 struct T {
     c: Core,
     now: u64,
-    keys: Rc<MemKeys>,
+    keys: Rc<dyn KeyStore>,
     out: Vec<Output>,
 }
 
 impl T {
-    fn new(keys: Rc<MemKeys>) -> T {
+    fn new(keys: Rc<dyn KeyStore>) -> T {
         let mut c = Core::new(|n| vec![7; n]);
         c.set_keys(keys.clone());
         let mut t = T {
@@ -316,4 +318,128 @@ fn a_sponsor_unlike_the_name_is_looked_up_after() {
     t.run(0);
     assert!(t.keys.get(ship_parse(&star).unwrap()).is_some());
     assert_eq!(t.c.peer(&star), None);
+}
+
+/// a store that keeps whatever it is given, as a host's own might: the
+/// core must not hand it an older point
+#[derive(Default)]
+struct Plain(RefCell<HashMap<Ship, Entry>>);
+
+impl KeyStore for Plain {
+    fn get(&self, who: Ship) -> Option<Entry> {
+        self.0.borrow().get(&who).cloned()
+    }
+
+    fn put(&self, who: Ship, e: &Entry) {
+        self.0.borrow_mut().insert(who, e.clone());
+    }
+}
+
+#[test]
+fn a_stale_roller_answer_never_replaces_newer_cached_keys() {
+    let k = Rc::new(Plain::default());
+    k.put(
+        (0, 0),
+        &Entry {
+            at: AT,
+            point: point("~zod", 7, 2, 0x22, None),
+        },
+    );
+    let mut t = T::new(k.clone());
+    t.call(2, Request::Read("urb://~zod/page".into()));
+    t.run(0);
+    assert_eq!(t.c.peer("~zod").unwrap().life, 7);
+    // a roller replica behind the chain answers
+    t.answer("~zod", roller("~zod", 6, 2, 0x11, None));
+    assert!(t.logged("an older point for ~zod was refused"));
+    assert_eq!(t.c.peer("~zod"), Some(point("~zod", 7, 2, 0x22, None)));
+    assert_eq!(k.get((0, 0)).unwrap().point.life, 7);
+}
+
+#[test]
+fn a_rekey_never_takes_an_older_life() {
+    let mut t = T::new(Rc::new(MemKeys::default()));
+    t.call(2, Request::Read("urb://~zod/page".into()));
+    t.answer("~zod", roller("~zod", 7, 2, 0x22, None));
+    t.run(0);
+    assert_eq!(t.c.peer("~zod").unwrap().life, 7);
+    t.run(urb::keys::KEY_TTL);
+    t.answer("~zod", roller("~zod", 6, 2, 0x11, None));
+    assert_eq!(t.c.peer("~zod"), Some(point("~zod", 7, 2, 0x22, None)));
+    assert_eq!(t.keys.get((0, 0)).unwrap().point.life, 7);
+    // a later rotation still lands
+    t.run(urb::keys::KEY_TTL);
+    t.answer("~zod", roller("~zod", 8, 2, 0x33, None));
+    assert_eq!(t.c.peer("~zod"), Some(point("~zod", 8, 2, 0x33, None)));
+}
+
+#[test]
+fn a_cached_point_past_a_day_is_not_used_when_the_roller_fails() {
+    let k = Rc::new(MemKeys::default());
+    k.put(
+        (0, 0),
+        &Entry {
+            at: AT - 2 * 24 * 60 * 60 * 1000,
+            point: point("~zod", 6, 2, 0x11, None),
+        },
+    );
+    let mut t = T::new(k);
+    t.call(2, Request::Read("urb://~zod/page".into()));
+    t.run(0);
+    assert_eq!(t.c.peer("~zod"), None, "not used before the roller answers");
+    let id = t.fetch_of("~zod").unwrap();
+    t.step(Input::Fetched {
+        id,
+        answer: Err("fetch failed".into()),
+    });
+    assert_eq!(t.c.peer("~zod"), None, "nor once it fails");
+}
+
+#[test]
+fn keys_the_engine_kept_beat_an_older_cached_point() {
+    let k = Rc::new(Plain::default());
+    let mut t = T::new(k.clone());
+    t.call(2, Request::Read("urb://~zod/page".into()));
+    t.answer("~zod", roller("~zod", 7, 2, 0x22, None));
+    t.run(0);
+    assert_eq!(t.c.peer("~zod").unwrap().life, 7);
+    let rows: Vec<u8> = t
+        .out
+        .iter()
+        .filter_map(|o| match o {
+            Output::Commit(r) => Some(r.clone()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    t.call(3, Request::Close);
+    t.run(0);
+    // a process from before the compare left an older point
+    k.put(
+        (0, 0),
+        &Entry {
+            at: t.now,
+            point: point("~zod", 6, 2, 0x11, None),
+        },
+    );
+    t.out.clear();
+    t.call(
+        4,
+        Request::Open {
+            keyfile: Some(KEYFILE.into()),
+            rows: Some(rows),
+            fresh: false,
+            fake: false,
+        },
+    );
+    t.run(0);
+    t.call(5, Request::Read("urb://~zod/page".into()));
+    // the engine asks the roller again; the cache's older point, though
+    // fresh, must not be given it
+    assert!(t.fetch_of("~zod").is_some(), "{:?}", t.asked());
+    t.run(0);
+    assert_eq!(t.c.peer("~zod"), Some(point("~zod", 7, 2, 0x22, None)));
+    // the roller confirms, and the cache takes it back
+    t.answer("~zod", roller("~zod", 7, 2, 0x22, None));
+    assert_eq!(k.get((0, 0)).unwrap().point.life, 7);
 }

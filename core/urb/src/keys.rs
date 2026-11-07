@@ -23,10 +23,20 @@ use std::collections::HashMap;
 pub const KEY_TTL: u64 = 24 * 60 * 60 * 1000;
 
 /// How old a cached point may be and still be used before the roller
-/// answers. An older one waits on the roller, as with no cache, so keys
-/// a ship has since replaced can't be used for long by a device that
-/// was away, nor at all while its roller lookups fail.
-pub const KEY_MAX_AGE: u64 = 30 * 24 * 60 * 60 * 1000;
+/// answers. An older one waits on the roller, as with no cache.
+///
+/// The engine can't take back a point once given, so a cached point it
+/// was given stays in use if the roller lookup then fails. This window
+/// bounds how stale that can be: no older than the keys a running engine
+/// already uses between its [`KEY_TTL`] lookups. The cost is speed: a
+/// device away for more than a day waits on the roller for its first
+/// contact with each ship, as it would with no cache.
+pub const KEY_MAX_AGE: u64 = KEY_TTL;
+
+/// How long a store keeps a point against an older one: past it, the
+/// entry is long unused (it isn't [`fresh`]), and a lower point may take
+/// its place, so one bad entry can't keep a ship out of the cache.
+pub const KEY_FORGET: u64 = 30 * 24 * 60 * 60 * 1000;
 
 /// How many ships a [`MemKeys`] keeps: past it, the entry the roller
 /// gave longest ago goes.
@@ -37,6 +47,28 @@ pub const MEM_MAX: usize = 4096;
 /// entry)
 pub fn fresh(e: &Entry, now: u64) -> bool {
     e.at <= now.saturating_add(60_000) && now.saturating_sub(e.at) <= KEY_MAX_AGE
+}
+
+/// whether a is older than b: a lower rift, or the same rift and a
+/// lower life
+pub fn older(a: &Point, b: &Point) -> bool {
+    (a.rift, a.life) < (b.rift, b.life)
+}
+
+/// Whether a store holding old may take new in its place: a newer point
+/// always, the same point (rift and life) given no earlier, and an older
+/// point only once old is past [`KEY_FORGET`] or dated ahead of new (a
+/// clock set back, or a bad entry).
+pub fn supersedes(new: &Entry, old: &Entry) -> bool {
+    if older(&old.point, &new.point) {
+        return true;
+    }
+    let lapsed =
+        new.at > old.at.saturating_add(KEY_FORGET) || old.at > new.at.saturating_add(60_000);
+    if older(&new.point, &old.point) {
+        return lapsed;
+    }
+    new.at >= old.at || lapsed
 }
 
 /// a ship's point and when the roller gave it (ms since 1970)
@@ -50,6 +82,7 @@ pub struct Entry {
 /// that can't be read or written is only slower.
 pub trait KeyStore {
     fn get(&self, who: Ship) -> Option<Entry>;
+    /// keep e for who, unless what is held for who [`supersedes`] it not
     fn put(&self, who: Ship, e: &Entry);
 }
 
@@ -63,9 +96,7 @@ impl KeyStore for MemKeys {
     }
 
     fn put(&self, who: Ship, e: &Entry) {
-        let mut m = self.0.borrow_mut();
-        m.insert(who, e.clone());
-        evict(&mut m);
+        self.keep(who, e);
     }
 }
 
@@ -82,6 +113,17 @@ fn evict(m: &mut HashMap<Ship, Entry>) {
 }
 
 impl MemKeys {
+    /// [`KeyStore::put`], and whether e was kept
+    pub fn keep(&self, who: Ship, e: &Entry) -> bool {
+        let mut m = self.0.borrow_mut();
+        if m.get(&who).is_some_and(|o| !supersedes(e, o)) {
+            return false;
+        }
+        m.insert(who, e.clone());
+        evict(&mut m);
+        true
+    }
+
     /// every entry, one [`encode`]d line each
     pub fn dump(&self) -> String {
         let mut v: Vec<_> = self.0.borrow().iter().map(|(w, e)| encode(*w, e)).collect();
@@ -90,11 +132,12 @@ impl MemKeys {
     }
 
     /// take the lines [`MemKeys::dump`] gave; lines that don't read are
-    /// skipped, and an entry newer than one held replaces it
+    /// skipped, and an entry replaces one held only if it [`supersedes`]
+    /// it
     pub fn load(&self, text: &str) {
         let mut m = self.0.borrow_mut();
         for (w, e) in text.lines().filter_map(decode) {
-            if m.get(&w).is_none_or(|o| o.at < e.at) {
+            if m.get(&w).is_none_or(|o| supersedes(&e, o)) {
                 m.insert(w, e);
                 // bounded as it goes, however long the text
                 if m.len() > 2 * MEM_MAX {
@@ -283,5 +326,63 @@ mod tests {
         assert_eq!(b.get((0, 0)).unwrap().point.life, 2);
         a.load(&b.dump());
         assert_eq!(a.get((0, 0)).unwrap().at, 9);
+    }
+
+    fn at(at: u64, rift: u64, life: u64) -> Entry {
+        let mut pass = [life as u8; 65];
+        pass[0] = b'b';
+        Entry {
+            at,
+            point: Point {
+                rift,
+                life,
+                pass,
+                sponsor: None,
+            },
+        }
+    }
+
+    #[test]
+    fn supersedes_orders_by_rift_then_life() {
+        let old = at(1000, 2, 5);
+        assert!(
+            supersedes(&at(10, 2, 6), &old),
+            "a newer life, given earlier"
+        );
+        assert!(supersedes(&at(10, 3, 1), &old), "a newer rift, lower life");
+        assert!(supersedes(&at(1000, 2, 5), &old), "the same, again");
+        assert!(supersedes(&at(2000, 2, 5), &old), "the same, later");
+        assert!(!supersedes(&at(999, 2, 5), &old), "the same, earlier");
+        assert!(!supersedes(&at(2000, 2, 4), &old), "a lower life");
+        assert!(!supersedes(&at(2000, 1, 9), &old), "a lower rift");
+        // a long-unused entry, or one dated ahead, gives way
+        assert!(supersedes(&at(1001 + KEY_FORGET, 1, 1), &old));
+        assert!(supersedes(&at(1, 1, 1), &at(1_000_000, 2, 5)));
+    }
+
+    #[test]
+    fn mem_put_never_takes_an_older_point() {
+        let k = MemKeys::default();
+        assert!(k.keep((0, 0), &at(100, 2, 6)));
+        k.put((0, 0), &at(200, 2, 5));
+        k.put((0, 0), &at(300, 1, 9));
+        assert_eq!(k.get((0, 0)), Some(at(100, 2, 6)));
+        assert!(!k.keep((0, 0), &at(400, 2, 5)));
+        assert!(k.keep((0, 0), &at(50, 2, 7)));
+        assert_eq!(k.get((0, 0)).unwrap().point.life, 7);
+    }
+
+    #[test]
+    fn mem_load_keeps_the_newest_point_not_the_latest_entry() {
+        // another tab saw ~zod's new life first; this one's older
+        // lookup finished later
+        let a = MemKeys::default();
+        a.put((0, 0), &at(100, 2, 7));
+        let b = MemKeys::default();
+        b.put((0, 0), &at(200, 2, 6));
+        b.load(&a.dump());
+        assert_eq!(b.get((0, 0)), Some(at(100, 2, 7)));
+        a.load(&b.dump());
+        assert_eq!(a.get((0, 0)), Some(at(100, 2, 7)));
     }
 }

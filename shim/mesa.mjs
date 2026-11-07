@@ -400,8 +400,14 @@ export async function open({ wasm, transport, store, log = console.error, env = 
     if (!firing) arm();
     if (keyed && X.urb_keys_puts() !== keyPuts) {
       keyPuts = X.urb_keys_puts();
-      X.urb_keys_dump();
-      Promise.resolve(keys.save(answer())).catch(e => log(`keeping the key cache failed: ${e?.message ?? e}`));
+      // what another tab or window kept since is taken first, so its
+      // newer points stand (keys.rs supersedes) and aren't saved over
+      Promise.resolve(keys.load()).then(t => {
+        if (dead) return;
+        if (t) text('urb_keys_load', [], String(t));
+        X.urb_keys_dump();
+        return keys.save(answer());
+      }).catch(e => log(`keeping the key cache failed: ${e?.message ?? e}`));
     }
   }
 
