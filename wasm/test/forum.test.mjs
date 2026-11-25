@@ -140,10 +140,10 @@ test('a board and a thread, as load:fb assembles them', async () => {
 });
 
 test('a host on the ball instance is found there', async () => {
-  const u = await fakeUrb(board(), { indexAt: FORUM_BASES[1] });
+  const u = await fakeUrb(board(), { indexAt: FORUM_BASES[2] });
   const b = await forum(u.urb, '~nec').board('test');
   assert.equal(b.posts.length, 2);
-  assert.deepEqual(u.peeks.slice(0, 2).map(p => p[0]), FORUM_BASES.map(b => `${b}/pub`));
+  assert.deepEqual(u.peeks.slice(0, 3).map(p => p[0]), FORUM_BASES.map(b => `${b}/pub`));
   await u.close();
 });
 

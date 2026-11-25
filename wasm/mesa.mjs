@@ -50,8 +50,10 @@
 // It also serves, for pub.mjs: our files to other ships' grubbery (their
 // peeks and keeps, see grub.serve) and our scry namespace (scry.serve).
 
+export const SHELL_DESK_BASE = '/apps/shell/desks/lattice.desk/desk/data/lattice.lattice_app';
 export const DESK_BASE = '/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app';
 const APP_BASE = '/apps/lattice.lattice_app';
+export const PEER_BASES = [DESK_BASE, SHELL_DESK_BASE, APP_BASE];
 const REVS_TTL = 60_000;     // +revs-ttl
 const KEEN_TIMEOUT = 10_000; // +mesa-timeout
 const PEEK_TIMEOUT = 30_000; // +remote-timeout
@@ -1163,7 +1165,7 @@ export async function open({ wasm, transport, store, log = console.error, env = 
   // +peer-base: where the peer runs lattice, asked, not guessed
   async function base(her, who) {
     if (!bases.has(who)) {
-      for (const b of [DESK_BASE, APP_BASE]) {
+      for (const b of PEER_BASES) {
         const got = await peekRevs(her, who, b);
         //  no answer: the other place would only wait behind the same
         //  stall. later: a ship catching up on a comet that moved

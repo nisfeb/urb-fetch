@@ -11,7 +11,7 @@
 use crate::codec::{self, MAX_NUMBER, Measured};
 use crate::js::{Js, MAX_MS, Object, int_number};
 use crate::noun::NounRef;
-use crate::url::{APP_BASE, DESK_BASE};
+use crate::url::PEER_BASES;
 use crate::{Int, UrbError};
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -273,7 +273,7 @@ pub mod board {
     use super::*;
 
     /// +peer-bases: where a ship may run lattice
-    pub const BASES: [&str; 2] = [DESK_BASE, APP_BASE];
+    pub const BASES: [&str; 3] = PEER_BASES;
     /// how long each base is asked for
     pub const BASE_WAIT: u64 = 8_000;
     pub const ACTION: (&str, &str) = ("/lattice", "forum-action");

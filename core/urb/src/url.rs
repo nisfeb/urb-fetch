@@ -3,10 +3,16 @@
 
 use crate::{Int, UrbError};
 
-/// mesa.mjs's DESK_BASE: where lattice runs, as grubbery names it
+/// Current kernel desk layout (`/apps/shell`, matching lattice's `+desk-base` since lattice 133)
+pub const SHELL_DESK_BASE: &str = "/apps/shell/desks/lattice.desk/desk/data/lattice.lattice_app";
+/// Previous kernel desk layout (`/apps/shell.shell`, matching `+desk-base-old`)
 pub const DESK_BASE: &str = "/apps/shell.shell/desks/lattice.desk/desk/data/lattice.lattice_app";
-/// the older place lattice ran, which +peer-base asks second
+/// Older ball-compiled layout (`+app-base`)
 pub const APP_BASE: &str = "/apps/lattice.lattice_app";
+/// All peer bases: try the recorded desk base first so existing traces replay
+/// unchanged, then the current `/apps/shell` desk base (since lattice 133),
+/// then the legacy app base. Once a ship answers, its base is cached.
+pub const PEER_BASES: [&str; 3] = [DESK_BASE, SHELL_DESK_BASE, APP_BASE];
 
 /// What an url's path names, by its mount: 'n' a published page, 'k' a
 /// know entry, 'p' one of lattice's live pages, 't' a file anywhere in
