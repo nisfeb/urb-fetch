@@ -224,7 +224,10 @@ fn a_ship_that_answers_no_base_with_anything_is_not_later() {
     veto(&mut c, 20, &wire);
     let second = only_peek(&c);
     assert_ne!(second, wire);
-    let outs = veto(&mut c, 30, &second);
+    veto(&mut c, 30, &second);
+    let third = only_peek(&c);
+    assert_ne!(third, second);
+    let outs = veto(&mut c, 40, &third);
     let Some(Err(f)) = done(&outs, 9) else {
         panic!("{outs:?}");
     };
@@ -441,6 +444,48 @@ fn one_read_looks_in_the_one_list_it_got() {
     };
     assert_eq!((p.key.as_str(), p.how), ("/a/index", "peek"));
     assert_eq!(p.body, "the index");
+    drop(c);
+    assert_eq!(alive(), 0);
+}
+
+#[test]
+fn shell_desk_base_is_found_and_kept_on_refresh() {
+    let mut c = core();
+    read(&mut c, 10, 9, "urb://~zod/n/a");
+    // first probe (DESK_BASE) is vetoed by a /apps/shell ship
+    let first = only_peek(&c);
+    veto(&mut c, 20, &first);
+    // second probe (SHELL_DESK_BASE) answers with the revision list
+    let second = only_peek(&c);
+    assert_ne!(second, first);
+    answer(&mut c, 30, &second, revs(&[("/a", "0v1")]));
+    let outs = sage(
+        &mut c,
+        40,
+        "/g/x/1/grubbery//1/pub/page/a/0v1",
+        "md",
+        "hello",
+    );
+    let Some(Ok(Reply::Read(p))) = done(&outs, 9) else {
+        panic!("{outs:?}");
+    };
+    assert_eq!(p.body, "hello");
+    // expiring the list refreshes against the cached SHELL_DESK_BASE without re-probing DESK_BASE
+    c.expire_revs("~zod");
+    read(&mut c, 50, 10, "urb://~zod/n/a");
+    let refresh = only_peek(&c);
+    answer(&mut c, 60, &refresh, revs(&[("/a", "0v2")]));
+    let outs = sage(
+        &mut c,
+        70,
+        "/g/x/1/grubbery//1/pub/page/a/0v2",
+        "md",
+        "world",
+    );
+    let Some(Ok(Reply::Read(p))) = done(&outs, 10) else {
+        panic!("{outs:?}");
+    };
+    assert_eq!(p.body, "world");
     drop(c);
     assert_eq!(alive(), 0);
 }

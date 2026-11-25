@@ -78,6 +78,8 @@ test('a base probe nobody answers ends the read at 30 s', async () => {
     await t.flush();
     t.veto(3);
     await t.flush();
+    t.veto(4);
+    await t.flush();
     assert.ok(n.done && n.e instanceof UrbError && !n.e.later && /answered no lattice peek/.test(n.e.message), String(n.e));
   } finally {
     await t.done();

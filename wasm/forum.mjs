@@ -35,9 +35,9 @@
 // refuses a board it can read only part of. Unlike lattice's clam, the
 // treap order of a map or set is not checked.
 
-import { DESK_BASE, UrbError } from './mesa.mjs';
+import { PEER_BASES, UrbError } from './mesa.mjs';
 
-export const FORUM_BASES = [DESK_BASE, '/apps/lattice.lattice_app'];   // +peer-bases
+export const FORUM_BASES = [...PEER_BASES];   // +peer-bases
 const BASE_WAIT = 8_000;
 const DA_UNIX_EPOCH = 0x8000000cce9e0d80n;
 const ACTION = ['/lattice', 'forum-action'];

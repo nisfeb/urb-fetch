@@ -25,7 +25,7 @@ use crate::msg::{self, File};
 use crate::noun::{self, Noun, NounRef, Value};
 use crate::publish::{self, PubState};
 use crate::rt::{self, Promise, Settled, Step, on_err, on_ok, resolve, spawn, then, wait, wait_ok};
-use crate::url::{self, APP_BASE, DESK_BASE, Mount, PAGE_MARKS};
+use crate::url::{self, Mount, PAGE_MARKS, PEER_BASES, SHELL_DESK_BASE};
 use crate::{Int, UrbError};
 
 mod apps;
@@ -2644,7 +2644,7 @@ fn base(w: &World, i: &Rc<Inst>, her: Ship, who: String) -> Promise {
 }
 
 fn base_try(w: &World, i: Rc<Inst>, her: Ship, who: String, k: usize) -> Step {
-    let bases = [DESK_BASE, APP_BASE];
+    let bases = PEER_BASES;
     if k == bases.len() {
         return base_done(i, who);
     }
@@ -2702,7 +2702,11 @@ fn rev_list(w: &World, i: &Rc<Inst>, her: Ship, who: String) -> Promise {
                 _ => {
                     // {at: now(), list: await ...}: at is read first
                     let at = w.now();
-                    let b = if b == APP_BASE { APP_BASE } else { DESK_BASE };
+                    let b = PEER_BASES
+                        .iter()
+                        .copied()
+                        .find(|&p| p == b)
+                        .unwrap_or(SHELL_DESK_BASE);
                     let p = peek_revs(w, &i, her, who.clone(), b);
                     wait_ok(Val::Promise(p), move |_, got| {
                         // no answer yet: the stale list beats none,
